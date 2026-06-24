@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: mopl
+  profiles:
+    active: dev
+  jpa:
+    properties:
+      hibernate:
+        jdbc.batch_size: 1000
+        order_inserts: true
+        order_updates: true
+  batch:
+    jdbc:
+      initialize-schema: never
+
+  jackson:
+    serialization:
+      write-dates-as-timestamps: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health, info, metrics, prometheus
+  endpoint:
+    health:
+      show-details: always
+    prometheus:
+      enabled: true
