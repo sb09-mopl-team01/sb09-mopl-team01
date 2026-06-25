@@ -25,10 +25,7 @@ public class ConversationService {
     UUID withUserId = request.withUserId();
     validateParticipants(requesterId, withUserId);
 
-    Conversation conversationKey = Conversation.between(requesterId, withUserId);
     Conversation conversation = conversationRepository
-        .findByParticipantAIdAndParticipantBId(conversationKey.getParticipantAId(), conversationKey.getParticipantBId())
-        .orElseGet(() -> saveConversation(conversationKey));
 
     return conversationMapper.toDto(conversation, requesterId);
   }
