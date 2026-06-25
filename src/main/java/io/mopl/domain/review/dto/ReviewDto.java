@@ -15,13 +15,4 @@ public class ReviewDto {
   private String text;
   private double rating;
 
-  public static ReviewDto from(Review review) {
-    return ReviewDto.builder()
-        .id(review.getId())
-        .contentId(review.getContent().getId())
-        .author(UserSummary.from(review.getAuthor()))
-        .text(review.getText())
-        .rating(review.getRating())
-        .build();
-  }
 }

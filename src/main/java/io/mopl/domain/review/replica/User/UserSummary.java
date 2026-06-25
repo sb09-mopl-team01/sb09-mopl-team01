@@ -12,11 +12,4 @@ public class UserSummary {
   private String name;
   private String profileImageUrl;
 
-  public static UserSummary from(User user) {
-    return UserSummary.builder()
-        .userId(user.getId())
-        .name("임시유저")
-        .profileImageUrl("임시URL")
-        .build();
-  }
 }
