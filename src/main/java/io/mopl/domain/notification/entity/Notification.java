@@ -31,14 +31,13 @@ public class Notification extends BaseEntity {
   private NotificationLevel level;
 
   @Column(nullable = false)
-  private boolean read;
+  private boolean read = false;
 
   private Notification(UUID receiverId, String title, String content, NotificationLevel level) {
     this.receiverId = receiverId;
     this.title = title;
     this.content = content;
     this.level = level;
-    this.read = false;
   }
 
   public static Notification create(

@@ -3,6 +3,7 @@ package io.mopl.domain.notification.service;
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
+import io.mopl.domain.notification.mapper.NotificationMapper;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -16,6 +17,7 @@ import org.springframework.util.StringUtils;
 public class NotificationService {
 
   private final NotificationRepository notificationRepository;
+  private final NotificationMapper notificationMapper;
 
   @Transactional
   public NotificationDto create(NotificationCreateCommand command) {
@@ -28,7 +30,7 @@ public class NotificationService {
         command.level()
     );
 
-    return NotificationDto.from(notificationRepository.save(notification));
+    return notificationMapper.toDto(notificationRepository.save(notification));
   }
 
   private void validateCreateCommand(NotificationCreateCommand command) {
