@@ -89,4 +89,3 @@ chmod +x gradlew
 
 - API 명세는 Swagger 문서를 기준으로 관리합니다.
 - 구현 시 엔드포인트, 요청/응답 DTO, 커서 페이지네이션 형식은 Swagger와 정합성을 맞춥니다.
-- 팀 작업 규칙과 브랜치 전략은 `AGENTS.md`에서 관리합니다.
