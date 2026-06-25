@@ -7,7 +7,14 @@ import io.mopl.domain.notification.mapper.NotificationMapper;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
+import io.mopl.global.response.CursorResponse;
+import io.mopl.global.response.SortDirection;
+import java.time.DateTimeException;
+import java.time.Instant;
+import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
@@ -15,6 +22,8 @@ import org.springframework.util.StringUtils;
 @Service
 @RequiredArgsConstructor
 public class NotificationService {
+
+  private static final String CREATED_AT_SORT = "createdAt";
 
   private final NotificationRepository notificationRepository;
   private final NotificationMapper notificationMapper;
@@ -33,6 +42,46 @@ public class NotificationService {
     return notificationMapper.toDto(notificationRepository.save(notification));
   }
 
+  @Transactional(readOnly = true)
+  public CursorResponse<NotificationDto> getNotifications(
+      UUID receiverId,
+      String cursor,
+      UUID idAfter,
+      int limit,
+      String sortBy,
+      SortDirection sortDirection
+  ) {
+    validateListCommand(receiverId, limit, sortBy, sortDirection);
+
+    Instant parsedCursor = parseCursor(cursor);
+    List<Notification> notifications = findNotifications(
+        receiverId,
+        parsedCursor,
+        idAfter,
+        limit,
+        sortDirection
+    );
+
+    boolean hasNext = notifications.size() > limit;
+    List<Notification> pageData = notifications.stream()
+        .limit(limit)
+        .toList();
+    List<NotificationDto> data = pageData.stream()
+        .map(notificationMapper::toDto)
+        .toList();
+    Notification lastNotification = pageData.isEmpty() ? null : pageData.get(pageData.size() - 1);
+
+    return new CursorResponse<>(
+        data,
+        hasNext && lastNotification != null ? lastNotification.getCreatedAt().toString() : null,
+        hasNext && lastNotification != null ? lastNotification.getId() : null,
+        hasNext,
+        notificationRepository.countByReceiverId(receiverId),
+        sortBy,
+        sortDirection
+    );
+  }
+
   private void validateCreateCommand(NotificationCreateCommand command) {
     if (command == null
         || command.receiverId() == null
@@ -41,5 +90,56 @@ public class NotificationService {
         || command.level() == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
+  }
+
+  private void validateListCommand(
+      UUID receiverId,
+      int limit,
+      String sortBy,
+      SortDirection sortDirection
+  ) {
+    if (receiverId == null
+        || limit <= 0
+        || !CREATED_AT_SORT.equals(sortBy)
+        || sortDirection == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private Instant parseCursor(String cursor) {
+    if (!StringUtils.hasText(cursor)) {
+      return null;
+    }
+
+    try {
+      return Instant.parse(cursor);
+    } catch (DateTimeException e) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private List<Notification> findNotifications(
+      UUID receiverId,
+      Instant cursor,
+      UUID idAfter,
+      int limit,
+      SortDirection sortDirection
+  ) {
+    PageRequest pageRequest = PageRequest.of(0, limit + 1);
+    if (sortDirection == SortDirection.ASCENDING) {
+      return notificationRepository.findByReceiverIdWithCursorAsc(
+          receiverId,
+          cursor,
+          idAfter,
+          pageRequest
+      );
+    }
+
+    return notificationRepository.findByReceiverIdWithCursorDesc(
+        receiverId,
+        cursor,
+        idAfter,
+        pageRequest
+    );
   }
 }
