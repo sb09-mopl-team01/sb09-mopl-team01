@@ -14,7 +14,15 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "reviews")
+@Table(
+    name = "review",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_review_author_content",
+            columnNames = {"author_id", "content_id"}
+        )
+    }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Review extends BaseUpdatableEntity {

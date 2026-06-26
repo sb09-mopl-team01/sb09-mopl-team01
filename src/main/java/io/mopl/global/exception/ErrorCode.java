@@ -19,6 +19,12 @@ public enum ErrorCode {
   EMAIL_DUPLICATION(HttpStatus.CONFLICT, "USER_409", "이메일이 이미 존재합니다"),
   LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "USER_401", "이메일 또는 비밀번호가 틀렸습니다"),
   FORBIDDEN(HttpStatus.FORBIDDEN, "USER_403", "권한이 없습니다"),
+
+  // 참여자 파악 여부
+  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다.")
+
+
+  ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
   ;
 
   private final HttpStatus status;
