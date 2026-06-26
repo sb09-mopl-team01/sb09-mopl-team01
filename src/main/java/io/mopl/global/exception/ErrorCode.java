@@ -21,7 +21,7 @@ public enum ErrorCode {
   FORBIDDEN(HttpStatus.FORBIDDEN, "USER_403", "권한이 없습니다"),
 
   // 참여자 파악 여부
-  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다.")
+  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
