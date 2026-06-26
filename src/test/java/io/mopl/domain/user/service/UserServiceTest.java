@@ -15,9 +15,10 @@ import io.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.exception.DuplicateUserEmailException;
+import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
-import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -87,8 +88,8 @@ class UserServiceTest {
     UserCreateRequest request = new UserCreateRequest("duplicate@example.com", "홍길동", "password123");
     given(userRepository.existsByEmail(request.email())).willReturn(true);
 
-    BaseException exception = assertThrows(BaseException.class, () -> userService.createUser(request));
-    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.DUPLICATE_RESOURCE);
+    DuplicateUserEmailException exception = assertThrows(DuplicateUserEmailException.class, () -> userService.createUser(request));
+    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.EMAIL_DUPLICATION);
   }
 
   @Test
@@ -118,8 +119,8 @@ class UserServiceTest {
     UUID userId = UUID.randomUUID();
     given(userRepository.findById(userId)).willReturn(Optional.empty());
 
-    BaseException exception = assertThrows(BaseException.class, () -> userService.findUser(userId));
-    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT);
+    UserNotFoundException exception = assertThrows(UserNotFoundException.class, () -> userService.findUser(userId));
+    assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND);
   }
 
   @Test
