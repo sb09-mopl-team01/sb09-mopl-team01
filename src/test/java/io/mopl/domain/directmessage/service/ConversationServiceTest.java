@@ -38,7 +38,7 @@ class ConversationServiceTest {
 
     assertThat(result.id()).isNotNull();
     assertThat(result.with().userId()).isEqualTo(withUserId);
-    assertThat(result.lastestMessage()).isNull();
+    assertThat(result.latestMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
     assertThat(conversationRepository.count()).isEqualTo(1);
   }

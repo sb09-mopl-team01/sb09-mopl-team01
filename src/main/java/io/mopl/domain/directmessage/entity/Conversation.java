@@ -1,6 +1,8 @@
 package io.mopl.domain.directmessage.entity;
 
 import io.mopl.global.entity.BaseEntity;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
@@ -13,7 +15,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
+@Table(  //유니크 제약 추가
     name = "conversations",
     uniqueConstraints = {
         @UniqueConstraint(
@@ -46,6 +48,10 @@ public class Conversation extends BaseEntity {
     if (participantAId.equals(userId)) {
       return participantBId;
     }
-    return participantAId;
+    if (participantBId.equals(userId)) {
+      return participantAId;
+    }
+
+    throw new BaseException(ErrorCode.NOT_CHAT_PARTICIPANT);
   }
 }

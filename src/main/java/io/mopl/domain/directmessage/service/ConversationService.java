@@ -9,6 +9,7 @@ import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -24,12 +25,27 @@ public class ConversationService {
     UUID withUserId = request.withUserId();
     validateParticipants(requesterId, withUserId);
 
-    Conversation key = Conversation.between(requesterId, withUserId);
+    Conversation conversationKey = Conversation.between(requesterId, withUserId);
     Conversation conversation = conversationRepository
-        .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
-        .orElseGet(() -> conversationRepository.save(key));
+        .findByParticipantAIdAndParticipantBId(conversationKey.getParticipantAId(), conversationKey.getParticipantBId())
+        .orElseGet(() -> saveConversation(conversationKey));
 
     return conversationMapper.toDto(conversation, requesterId);
+  }
+
+  private Conversation saveConversation(Conversation conversation) {
+    try {
+      return conversationRepository.save(conversation);
+    } catch (DataIntegrityViolationException e) {
+
+      // 다른 트랜잭션이 이미 생성한 경우 재조회
+      return conversationRepository
+          .findByParticipantAIdAndParticipantBId(
+              conversation.getParticipantAId(),
+              conversation.getParticipantBId()
+          )
+          .orElseThrow(() -> e);
+    }
   }
 
   private void validateParticipants(UUID requesterId, UUID withUserId) {
