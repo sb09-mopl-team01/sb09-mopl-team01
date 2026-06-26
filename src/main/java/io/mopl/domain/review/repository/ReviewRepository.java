@@ -18,4 +18,5 @@ public interface ReviewRepository extends JpaRepository<Review, UUID>, ReviewRep
   @Query("SELECT COALESCE(AVG(r.rating), 0.0) FROM Review r WHERE r.content.id = :contentId")
   double calculateAverageRatingByContentId(@Param("contentId") UUID contentId);
 
+  long countByContentId(UUID contentId);
 }
