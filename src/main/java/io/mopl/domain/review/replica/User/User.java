@@ -4,7 +4,7 @@ import io.mopl.global.entity.BaseUpdatableEntity;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Table;
 
-@Entity
+@Entity(name = "ReviewReplicaUser")
 @Table(name = "users")
 public class User extends BaseUpdatableEntity {
 

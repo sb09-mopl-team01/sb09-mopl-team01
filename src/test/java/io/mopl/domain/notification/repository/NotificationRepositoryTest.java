@@ -16,7 +16,10 @@ import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
-@Import(io.mopl.global.config.AppConfig.class)
+@Import({
+    io.mopl.global.config.AppConfig.class,
+    io.mopl.global.config.QueryDslConfig.class
+})
 @ActiveProfiles("test")
 class NotificationRepositoryTest {
 
@@ -65,6 +68,26 @@ class NotificationRepositoryTest {
     assertThat(result)
         .extracting(Notification::getId)
         .containsExactly(first.getId());
+  }
+
+  @Test
+  @DisplayName("커서 이후 알림만 오래된순으로 조회한다")
+  void findByReceiverIdWithCursorAscAfterCursor() {
+    UUID receiverId = UUID.randomUUID();
+    saveNotification(receiverId, "첫 번째 알림");
+    Notification second = saveNotification(receiverId, "두 번째 알림");
+    Notification third = saveNotification(receiverId, "세 번째 알림");
+
+    List<Notification> result = notificationRepository.findByReceiverIdWithCursorAsc(
+        receiverId,
+        second.getCreatedAt(),
+        second.getId(),
+        PageRequest.of(0, 10)
+    );
+
+    assertThat(result)
+        .extracting(Notification::getId)
+        .containsExactly(third.getId());
   }
 
   @Test
