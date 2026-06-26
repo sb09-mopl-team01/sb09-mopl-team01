@@ -34,6 +34,9 @@ public class ReviewController {
 
   @PatchMapping("/{reviewId}")
   public ResponseEntity<ReviewDto> updateReview(
+
+      // 임시
+      // Security 연동 완료 시 @AuthenticationPrincipal 로 대체
       @RequestAttribute("userId") UUID userId,
       @PathVariable UUID reviewId,
       @Valid @RequestBody ReviewUpdateRequest request) {
