@@ -3,7 +3,9 @@ package io.mopl.domain.user.dto.data;
 import io.mopl.domain.user.entity.Role;
 import java.time.Instant;
 import java.util.UUID;
+import lombok.Builder;
 
+@Builder
 public record UserDto(
     UUID id,
     String email,

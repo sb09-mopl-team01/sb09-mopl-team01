@@ -142,7 +142,7 @@ class NotificationServiceTest {
     assertThatThrownBy(() -> notificationService.getNotifications(
         UUID.randomUUID(),
         "invalid-cursor",
-        null,
+        UUID.randomUUID(),
         10,
         "createdAt",
         SortDirection.DESCENDING
