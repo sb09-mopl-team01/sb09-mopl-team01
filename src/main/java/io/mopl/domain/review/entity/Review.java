@@ -1,11 +1,8 @@
 package io.mopl.domain.review.entity;
 
-//import io.mopl.domain.content.entity.Content;
-//import io.mopl.domain.user.entity.User;
+import io.mopl.domain.content.entity.Content;
+import io.mopl.domain.user.entity.User;
 
-
-import io.mopl.domain.review.replica.Content.Content;
-import io.mopl.domain.review.replica.User.User;
 import io.mopl.global.entity.BaseUpdatableEntity;
 import jakarta.persistence.*;
 import lombok.AccessLevel;

@@ -1,16 +1,17 @@
 package io.mopl.domain.review.service;
 
 
+import io.mopl.domain.content.entity.Content;
+import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.review.dto.ReviewDto;
 import io.mopl.domain.review.dto.request.ReviewCreateRequest;
 import io.mopl.domain.review.dto.request.ReviewUpdateRequest;
 import io.mopl.domain.review.entity.Review;
 import io.mopl.domain.review.mapper.ReviewMapper;
-import io.mopl.domain.review.replica.Content.Content;
-import io.mopl.domain.review.replica.Content.ContentRepository;
-import io.mopl.domain.review.replica.User.User;
-import io.mopl.domain.review.replica.User.UserRepository;
+
 import io.mopl.domain.review.repository.ReviewRepository;
+import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
