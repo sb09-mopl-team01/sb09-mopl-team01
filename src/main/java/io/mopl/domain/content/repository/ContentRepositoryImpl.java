@@ -48,7 +48,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
             cursorCondition(cursor, idAfter, resolvedDirection)
         )
         .orderBy(createOrderSpecifier(resolvedDirection), createIdOrderSpecifier(resolvedDirection))
-        .limit(limit + 1L)
+        .limit(limit + 1)
         .fetch();
 
     boolean hasNext = contents.size() > limit;
