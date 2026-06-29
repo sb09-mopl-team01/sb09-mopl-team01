@@ -2,6 +2,7 @@ package io.mopl.domain.content.service;
 
 import io.mopl.domain.content.storage.ContentThumbnailStorage;
 import java.util.Locale;
+import java.util.Set;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
@@ -12,6 +13,12 @@ import org.springframework.web.multipart.MultipartFile;
 @ConditionalOnBean(ContentThumbnailStorage.class)
 @RequiredArgsConstructor
 public class ContentThumbnailService {
+
+  private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
+      "image/jpeg",
+      "image/png",
+      "image/webp"
+  );
 
   private final ContentThumbnailStorage contentThumbnailStorage;
 
@@ -44,8 +51,9 @@ public class ContentThumbnailService {
     }
 
     String contentType = thumbnail.getContentType();
-    if (contentType == null || !contentType.toLowerCase(Locale.ROOT).startsWith("image/")) {
-      throw new IllegalArgumentException("콘텐츠 썸네일은 이미지 파일이어야 합니다.");
+    if (contentType == null
+        || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
+      throw new IllegalArgumentException("지원하지 않는 콘텐츠 썸네일 이미지 형식입니다.");
     }
 
     String extension = StringUtils.getFilenameExtension(thumbnail.getOriginalFilename());
