@@ -48,4 +48,11 @@ public class Notification extends BaseEntity {
   ) {
     return new Notification(receiverId, title, content, level);
   }
+
+  /**
+   * API는 DELETE로 정의되어 있지만, 알림 이력 보존을 위해 읽음 상태만 변경합니다.
+   */
+  public void markAsRead() {
+    this.read = true;
+  }
 }
