@@ -71,6 +71,10 @@ public class SecurityConfig {
 
   private void configureAuthorizeRequests(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry auth) {
     auth
-        .anyRequest().permitAll();
+        .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
+        .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
+        .anyRequest().authenticated();
+        // 테스트 시 보안 해제 하고싶으면 사용
+        //.anyRequest().permitAll();
   }
 }
