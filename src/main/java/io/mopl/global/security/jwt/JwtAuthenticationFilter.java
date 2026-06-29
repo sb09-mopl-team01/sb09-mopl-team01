@@ -1,7 +1,6 @@
 package io.mopl.global.security.jwt;
 
 import io.mopl.global.security.MoplUserDetailsService;
-import io.mopl.global.security.UserDetailsServiceImpl;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;

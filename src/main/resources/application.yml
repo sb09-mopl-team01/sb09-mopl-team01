@@ -27,3 +27,11 @@ management:
       show-details: always
     prometheus:
       enabled: true
+
+
+jwt:
+  # 향후 env로 옮길 예정
+  secret: bXktand0LXNlY3JldC1rZXktZm9yLXNwcmluZy1zZWN1cml0eQ==
+  #
+  access-token-validity-seconds: 30
+  refresh-token-validity-seconds: 604800
