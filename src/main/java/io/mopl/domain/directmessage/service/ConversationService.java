@@ -5,6 +5,9 @@ import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
+import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.exception.UserNotFoundException;
+import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import java.util.UUID;
@@ -18,19 +21,21 @@ import org.springframework.transaction.annotation.Transactional;
 public class ConversationService {
 
   private final ConversationRepository conversationRepository;
+  private final UserRepository userRepository;
   private final ConversationMapper conversationMapper;
 
   @Transactional
   public ConversationDto createConversation(UUID requesterId, ConversationCreateRequest request) {
-    UUID withUserId = request.withUserId();
-    validateParticipants(requesterId, withUserId);
+    User requester = getUser(requesterId);
+    User withUser = getUser(request.withUserId());
+    validateParticipants(requester.getId(), withUser.getId());
 
-    Conversation key = Conversation.between(requesterId, withUserId);
+    Conversation key = Conversation.between(requester.getId(), withUser.getId());
     Conversation conversation = conversationRepository
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
-        .orElseGet(() -> conversationRepository.save(key));
+        .orElseGet(() -> saveConversation(key));
 
-    return conversationMapper.toDto(conversation, requesterId);
+    return conversationMapper.toDto(conversation, requester, withUser);
   }
 
   private Conversation saveConversation(Conversation conversation) {
@@ -52,5 +57,10 @@ public class ConversationService {
     if (requesterId.equals(withUserId)) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
+  }
+
+  private User getUser(UUID userId) {
+    return userRepository.findById(userId)
+        .orElseThrow(UserNotFoundException::new);
   }
 }

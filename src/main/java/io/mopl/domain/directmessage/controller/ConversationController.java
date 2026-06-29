@@ -7,8 +7,8 @@ import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -21,7 +21,7 @@ public class ConversationController {
 
   @PostMapping
   public ConversationDto createConversation(
-      @RequestHeader("X-User-Id") UUID requesterId,
+      @RequestAttribute("userId") UUID requesterId,
       @Valid @RequestBody ConversationCreateRequest request
   ) {
     return conversationService.createConversation(requesterId, request);
