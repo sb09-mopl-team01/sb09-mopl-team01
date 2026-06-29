@@ -3,8 +3,6 @@ package io.mopl.domain.notification.service;
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
-import io.mopl.domain.notification.event.NotificationEventPublisher;
-import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.mapper.NotificationMapper;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.global.exception.BaseException;
@@ -33,7 +31,6 @@ public class NotificationService {
 
   private final NotificationRepository notificationRepository;
   private final NotificationMapper notificationMapper;
-  private final NotificationEventPublisher eventPublisher;
 
   @Transactional
   public NotificationDto create(NotificationCreateCommand command) {
@@ -47,27 +44,6 @@ public class NotificationService {
     );
 
     return notificationMapper.toDto(notificationRepository.save(notification));
-  }
-
-  @Transactional
-  public void readNotification(UUID notificationId) {
-    if (notificationId == null) {
-      log.warn("Invalid notification read request. notificationId=null");
-      throw new BaseException(ErrorCode.INVALID_INPUT);
-    }
-
-    Notification notification = notificationRepository.findById(notificationId)
-        .orElseThrow(() -> {
-          log.warn("Notification read target not found. notificationId={}", notificationId);
-          return new BaseException(ErrorCode.INVALID_INPUT);
-        });
-
-    notification.markAsRead();
-    eventPublisher.publish(new NotificationReadEvent(
-        notification.getId(),
-        notification.getReceiverId(),
-        Instant.now()
-    ));
   }
 
   @Transactional(readOnly = true)

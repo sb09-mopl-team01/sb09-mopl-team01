@@ -2,15 +2,11 @@ package io.mopl.domain.notification.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
 import io.mopl.domain.notification.entity.NotificationLevel;
-import io.mopl.domain.notification.event.NotificationEventPublisher;
-import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -22,7 +18,6 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
@@ -35,9 +30,6 @@ class NotificationServiceTest {
 
   @Autowired
   private NotificationRepository notificationRepository;
-
-  @MockitoBean
-  private NotificationEventPublisher eventPublisher;
 
   @Test
   @DisplayName("알림 생성 요청을 저장하고 DTO로 반환한다")
@@ -142,43 +134,6 @@ class NotificationServiceTest {
     assertThat(secondPage.nextCursor()).isNull();
     assertThat(secondPage.nextIdAfter()).isNull();
     assertThat(secondPage.totalCount()).isEqualTo(3);
-  }
-
-  @Test
-  @DisplayName("알림을 읽음 상태로 변경한다")
-  void readNotification() {
-    NotificationDto notification = createNotification(UUID.randomUUID(), "읽음 처리할 알림");
-
-    notificationService.readNotification(notification.id());
-
-    Notification result = notificationRepository.findById(notification.id()).orElseThrow();
-    assertThat(result.isRead()).isTrue();
-    verify(eventPublisher).publish(argThat(event ->
-        event.notificationId().equals(notification.id())
-            && event.receiverId().equals(notification.receiverId())
-            && event.occurredAt() != null
-    ));
-  }
-
-  @Test
-  @DisplayName("이미 읽은 알림을 다시 읽음 처리해도 성공한다")
-  void readNotificationAlreadyRead() {
-    NotificationDto notification = createNotification(UUID.randomUUID(), "이미 읽은 알림");
-    notificationService.readNotification(notification.id());
-
-    notificationService.readNotification(notification.id());
-
-    Notification result = notificationRepository.findById(notification.id()).orElseThrow();
-    assertThat(result.isRead()).isTrue();
-  }
-
-  @Test
-  @DisplayName("존재하지 않는 알림은 읽음 처리하지 않는다")
-  void readNotificationNotFound() {
-    assertThatThrownBy(() -> notificationService.readNotification(UUID.randomUUID()))
-        .isInstanceOf(BaseException.class)
-        .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_INPUT);
   }
 
   @Test
