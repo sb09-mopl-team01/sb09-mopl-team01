@@ -19,6 +19,7 @@ public class ContentThumbnailService {
       "image/png",
       "image/webp"
   );
+  private static final long MAX_THUMBNAIL_SIZE_BYTES = 5 * 1024 * 1024;
 
   private final ContentThumbnailStorage contentThumbnailStorage;
 
@@ -54,6 +55,10 @@ public class ContentThumbnailService {
     if (contentType == null
         || !ALLOWED_CONTENT_TYPES.contains(contentType.toLowerCase(Locale.ROOT))) {
       throw new IllegalArgumentException("지원하지 않는 콘텐츠 썸네일 이미지 형식입니다.");
+    }
+
+    if (thumbnail.getSize() > MAX_THUMBNAIL_SIZE_BYTES) {
+      throw new IllegalArgumentException("콘텐츠 썸네일 파일 크기는 5MB를 초과할 수 없습니다.");
     }
 
     String extension = StringUtils.getFilenameExtension(thumbnail.getOriginalFilename());
