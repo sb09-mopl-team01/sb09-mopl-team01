@@ -35,7 +35,7 @@ class ContentRepositoryTest {
     Content content = Content.createManual(
         ContentType.MOVIE,
         "인사이드 아웃 2",
-        "감정 캐릭터가 성장하는 애니메이션 영화",
+        "감정 캐릭터가 등장하는 애니메이션 영화",
         "https://image.example.com/inside-out-2.jpg",
         List.of("애니메이션", "가족", "애니메이션")
     );
@@ -78,12 +78,12 @@ class ContentRepositoryTest {
   }
 
   @Test
-  @DisplayName("콘텐츠 타입을 Swagger enum 값으로 저장한다")
+  @DisplayName("콘텐츠 타입은 Swagger enum 값으로 저장한다")
   void saveContentTypeAsApiValue() {
     Content content = Content.createManual(
         ContentType.TV_SERIES,
         "TV 시리즈",
-        "tvSeries 저장값을 확인할 콘텐츠",
+        "tvSeries 타입 저장 확인용 콘텐츠",
         null,
         List.of("드라마")
     );
