@@ -4,7 +4,9 @@ import io.mopl.domain.auth.dto.LoginRequest;
 import io.mopl.domain.auth.dto.LoginResponse;
 import io.mopl.domain.auth.service.AuthService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ModelAttribute;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -17,8 +19,8 @@ public class AuthController {
 
   private final AuthService authService;
 
-  @PostMapping("/sign-in")
-  public ResponseEntity<LoginResponse> login(@RequestBody LoginRequest request) {
+  @PostMapping(value ="/sign-in", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
+  public ResponseEntity<LoginResponse> login(@ModelAttribute LoginRequest request) {
     LoginResponse response = authService.login(request.username(), request.password());
 
     return ResponseEntity.ok(response);
