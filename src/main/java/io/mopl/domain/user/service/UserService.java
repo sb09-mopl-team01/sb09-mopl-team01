@@ -1,5 +1,7 @@
 package io.mopl.domain.user.service;
 
+import io.mopl.domain.user.exception.DuplicateUserEmailException;
+import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.domain.user.dto.data.UserDto;
@@ -34,7 +36,7 @@ public class UserService {
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
     if (userRepository.existsByEmail(request.email())) {
-      throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
+      throw new DuplicateUserEmailException();
     }
 
     User user = User.builder()
@@ -119,6 +121,6 @@ public class UserService {
 
   private User getUserById(UUID userId) {
     return userRepository.findById(userId)
-        .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
+        .orElseThrow(UserNotFoundException::new);
   }
 }
