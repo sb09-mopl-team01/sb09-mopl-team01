@@ -15,7 +15,7 @@ public enum ErrorCode {
   TOO_MANY_REQUESTS(HttpStatus.TOO_MANY_REQUESTS, "COMMON_429", "요청이 너무 빠릅니다. 잠시 후 다시 시도해주세요."),
 
   // 참여자 파악 여부
-  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다.")
+  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
