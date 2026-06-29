@@ -1,0 +1,48 @@
+package io.mopl.global.security.handler;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mopl.domain.auth.dto.LoginResponse;
+import io.mopl.domain.user.dto.data.UserDto;
+import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.global.security.MoplUserDetails;
+import io.mopl.global.security.jwt.JwtProvider;
+import jakarta.servlet.ServletException;
+import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpServletResponse;
+import java.io.IOException;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.stereotype.Component;
+
+@Slf4j
+@Component
+@RequiredArgsConstructor
+public class LoginSuccessHandler implements AuthenticationSuccessHandler {
+
+  private final ObjectMapper objectMapper;
+  private final JwtProvider jwtProvider;
+  private final UserMapper userMapper;
+
+  @Override
+  public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
+      Authentication authentication) throws IOException, ServletException {
+
+    log.debug("[LoginSuccessHandler] 로그인 성공 처리 완료");
+
+    MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
+
+    String accessToken = jwtProvider.generateAccessToken(userDetails);
+    UserDto userDto = userMapper.toDto(userDetails.getUser());
+    LoginResponse loginResponse = new LoginResponse(userDto, accessToken);
+
+    response.setStatus(HttpStatus.OK.value());
+    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
+    response.setCharacterEncoding("UTF-8");
+
+    objectMapper.writeValue(response.getWriter(), loginResponse);
+  }
+}

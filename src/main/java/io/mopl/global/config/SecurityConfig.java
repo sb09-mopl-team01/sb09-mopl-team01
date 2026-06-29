@@ -1,14 +1,18 @@
 package io.mopl.global.config;
 
+import io.mopl.global.security.filter.MoplLoginFilter;
+import io.mopl.global.security.handler.LoginFailureHandler;
+import io.mopl.global.security.handler.LoginSuccessHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
-import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.annotation.web.configurers.AuthorizeHttpRequestsConfigurer;
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer;
@@ -27,23 +31,25 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 public class SecurityConfig {
 
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
+  private final LoginSuccessHandler loginSuccessHandler;
+  private final LoginFailureHandler loginFailureHandler;
 
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+  public AuthenticationManager authenticationManager(
+      AuthenticationConfiguration authenticationConfiguration) throws Exception {
+    return authenticationConfiguration.getAuthenticationManager();
+  }
+
+  @Bean
+  public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+
     http
         .csrf(this::configureCsrf)
-
         .formLogin(this::configureFormLogin)
-
-        .httpBasic(this::configureHttpBasic)
-
         .sessionManagement(this::configureSessionManagement)
+        .authorizeHttpRequests(this::configureAuthorizeRequests);
 
-        .authorizeHttpRequests(this::configureAuthorizeRequests)
-
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class)
-
-    ;
+    this.configureCustomFilters(http, authenticationManager);
 
     return http.build();
   }
@@ -51,6 +57,17 @@ public class SecurityConfig {
   @Bean
   public PasswordEncoder passwordEncoder() {
     return new BCryptPasswordEncoder();
+  }
+
+
+  private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+    MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);
+    moplLoginFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
+    moplLoginFilter.setAuthenticationFailureHandler(loginFailureHandler);
+
+    http
+        .addFilterAt(moplLoginFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
   }
 
   private void configureCsrf(CsrfConfigurer<HttpSecurity> csrf) {
@@ -74,6 +91,7 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
         .anyRequest().authenticated();
+
         // 테스트 시 보안 해제 하고싶으면 사용
         //.anyRequest().permitAll();
   }

@@ -18,11 +18,4 @@ import org.springframework.web.bind.annotation.RestController;
 public class AuthController {
 
   private final AuthService authService;
-
-  @PostMapping(value ="/sign-in", consumes = MediaType.APPLICATION_FORM_URLENCODED_VALUE)
-  public ResponseEntity<LoginResponse> login(@ModelAttribute LoginRequest request) {
-    LoginResponse response = authService.login(request.username(), request.password());
-
-    return ResponseEntity.ok(response);
-  }
 }

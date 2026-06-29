@@ -17,23 +17,4 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class AuthService {
 
-  private final UserRepository userRepository;
-  private final UserMapper userMapper;
-  private final PasswordEncoder passwordEncoder;
-  private final JwtProvider jwtProvider;
-
-  public LoginResponse login(String email, String rawPassword) {
-    User user = userRepository.findByEmail(email)
-        .orElseThrow(InvalidEmailException::new);
-
-    if (!passwordEncoder.matches(rawPassword, user.getPasswordHash())) {
-      throw new InvalidPasswordException();
-    }
-
-    MoplUserDetails userDetails = new MoplUserDetails(user);
-    String accessToken = jwtProvider.generateAccessToken(userDetails);
-
-    UserDto userDto = userMapper.toDto(user);
-    return new LoginResponse(userDto, accessToken);
-  }
 }
