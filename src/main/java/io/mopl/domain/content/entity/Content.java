@@ -169,6 +169,9 @@ public class Content extends BaseUpdatableEntity {
     Set<String> normalizedTags = new LinkedHashSet<>();
     for (String tag : tags) {
       String normalizedTag = requireText(tag, "콘텐츠 태그는 빈 값일 수 없습니다.");
+      if (normalizedTag.length() > 50) {
+        throw new IllegalArgumentException("콘텐츠 태그는 50자를 초과할 수 없습니다.");
+      }
       normalizedTags.add(normalizedTag);
     }
 
@@ -176,5 +179,9 @@ public class Content extends BaseUpdatableEntity {
       throw new IllegalArgumentException("콘텐츠 태그는 하나 이상 필요합니다.");
     }
     return normalizedTags;
+  }
+
+  //리뷰: 리뷰 평점 평균 동기화 추가
+  public void updateAverageRating(double newAverage) {
   }
 }

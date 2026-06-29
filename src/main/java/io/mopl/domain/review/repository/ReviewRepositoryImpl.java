@@ -3,7 +3,7 @@ package io.mopl.domain.review.repository;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import io.mopl.domain.review.entity.QReview;
+
 import io.mopl.domain.review.entity.Review;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
