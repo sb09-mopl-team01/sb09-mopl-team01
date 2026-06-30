@@ -183,5 +183,6 @@ public class Content extends BaseUpdatableEntity {
 
   //리뷰: 리뷰 평점 평균 동기화 추가
   public void updateAverageRating(double newAverage) {
+
   }
 }
