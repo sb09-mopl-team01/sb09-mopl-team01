@@ -14,11 +14,13 @@ import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
+import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -50,13 +52,25 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     // 임시로 서버 메모리에 저장
     refreshTokenRepository.save(email, refreshToken);
 
-    ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
+    ResponseCookie refreshTokenCookie = ResponseCookie.from("REFRESH_TOKEN", refreshToken)
         .httpOnly(true)
-        .secure(true)
+        .secure(false) // https 사용시 수정
         .path("/")
         .maxAge(refreshTokenValiditySeconds)
         .sameSite("Strict")
         .build();
+    response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
+
+    CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+    if (csrfToken != null) {
+      ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken.getToken())
+          .httpOnly(false)
+          .secure(false) // https 사용시 수정
+          .path("/")
+          .sameSite("Strict")
+          .build();
+      response.addHeader(HttpHeaders.SET_COOKIE, csrfCookie.toString());
+    }
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
     LoginResponse loginResponse = new LoginResponse(userDto, accessToken);
