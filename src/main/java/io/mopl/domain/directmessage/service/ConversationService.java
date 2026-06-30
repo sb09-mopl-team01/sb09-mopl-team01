@@ -2,9 +2,13 @@ package io.mopl.domain.directmessage.service;
 
 import io.mopl.domain.directmessage.dto.ConversationCreateRequest;
 import io.mopl.domain.directmessage.dto.ConversationDto;
+import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.entity.Conversation;
+import io.mopl.domain.directmessage.entity.DirectMessage;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
+import io.mopl.domain.directmessage.mapper.DirectMessageMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
+import io.mopl.domain.directmessage.repository.DirectMessageRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.repository.UserRepository;
@@ -33,8 +37,10 @@ public class ConversationService {
   private static final String CREATED_AT_SORT = "createdAt";
 
   private final ConversationRepository conversationRepository;
+  private final DirectMessageRepository directMessageRepository;
   private final UserRepository userRepository;
   private final ConversationMapper conversationMapper;
+  private final DirectMessageMapper directMessageMapper;
 
   @Transactional
   public ConversationDto createConversation(UUID requesterId, ConversationCreateRequest request) {
@@ -100,6 +106,68 @@ public class ConversationService {
     );
   }
 
+  @Transactional(readOnly = true)
+  public ConversationDto findConversation(UUID requesterId, UUID conversationId) {
+    User requester = getUser(requesterId);
+    Conversation conversation = getConversation(conversationId);
+    User withUser = getOtherUser(
+        findOtherParticipants(requester.getId(), List.of(conversation)),
+        conversation.getOtherParticipantId(requester.getId())
+    );
+
+    return conversationMapper.toDto(conversation, requester, withUser);
+  }
+
+  @Transactional(readOnly = true)
+  public CursorResponse<DirectMessageDto> findDirectMessages(
+      UUID requesterId,
+      UUID conversationId,
+      String cursor,
+      UUID idAfter,
+      int limit,
+      SortDirection sortDirection,
+      String sortBy
+  ) {
+    User requester = getUser(requesterId);
+    Conversation conversation = getConversation(conversationId);
+    conversation.getOtherParticipantId(requester.getId());
+    validateFindConversationsCommand(limit, sortDirection, sortBy);
+
+    Instant parsedCursor = parseCursor(cursor);
+    List<DirectMessage> directMessages = directMessageRepository.findByConversationIdWithCursor(
+        conversation.getId(),
+        parsedCursor,
+        idAfter,
+        sortDirection,
+        PageRequest.of(0, limit + 1)
+    );
+
+    boolean hasNext = directMessages.size() > limit;
+    List<DirectMessage> pageData = directMessages.stream()
+        .limit(limit)
+        .toList();
+    Map<UUID, User> usersById = findMessageParticipants(pageData);
+    List<DirectMessageDto> data = pageData.stream()
+        .map(directMessage -> directMessageMapper.toDto(
+            directMessage,
+            getOtherUser(usersById, directMessage.getSenderId()),
+            getOtherUser(usersById, directMessage.getReceiverId())
+        ))
+        .toList();
+
+    DirectMessage lastDirectMessage = pageData.isEmpty() ? null : pageData.get(pageData.size() - 1);
+
+    return new CursorResponse<>(
+        data,
+        hasNext && lastDirectMessage != null ? lastDirectMessage.getCreatedAt().toString() : null,
+        hasNext && lastDirectMessage != null ? lastDirectMessage.getId() : null,
+        hasNext,
+        directMessageRepository.countByConversationId(conversation.getId()),
+        sortBy,
+        sortDirection
+    );
+  }
+
   private Conversation saveConversation(Conversation conversation) {
     try {
       return conversationRepository.save(conversation);
@@ -150,6 +218,11 @@ public class ConversationService {
         .orElseThrow(UserNotFoundException::new);
   }
 
+  private Conversation getConversation(UUID conversationId) {
+    return conversationRepository.findById(conversationId)
+        .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
+  }
+
   private Map<UUID, User> findOtherParticipants(UUID requesterId, List<Conversation> conversations) {
     List<UUID> userIds = conversations.stream()
         .map(conversation -> conversation.getOtherParticipantId(requesterId))
@@ -166,5 +239,18 @@ public class ConversationService {
       throw new UserNotFoundException();
     }
     return user;
+  }
+
+  private Map<UUID, User> findMessageParticipants(List<DirectMessage> directMessages) {
+    List<UUID> userIds = directMessages.stream()
+        .flatMap(directMessage -> List.of(
+            directMessage.getSenderId(),
+            directMessage.getReceiverId()
+        ).stream())
+        .distinct()
+        .toList();
+
+    return userRepository.findAllById(userIds).stream()
+        .collect(Collectors.toMap(User::getId, Function.identity()));
   }
 }
