@@ -13,6 +13,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
@@ -30,6 +31,9 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
   private final UserMapper userMapper;
 
   private final RefreshTokenMemoryRepository refreshTokenRepository;
+
+  @Value("${jwt.refresh-token-validity-seconds}")
+  private long refreshTokenValiditySeconds;
 
   @Override
   public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -50,7 +54,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
         .httpOnly(true)
         .secure(true)
         .path("/")
-        .maxAge(604800)
+        .maxAge(refreshTokenValiditySeconds)
         .sameSite("Strict")
         .build();
 
