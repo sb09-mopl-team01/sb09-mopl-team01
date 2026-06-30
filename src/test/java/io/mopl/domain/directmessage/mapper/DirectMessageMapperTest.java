@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.entity.DirectMessage;
+import io.mopl.global.config.QueryDslConfig;
 import jakarta.persistence.EntityManager;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @SpringBootTest
 @ActiveProfiles("test")
-@Import(DirectMessageMapper.class)
+@Import({DirectMessageMapper.class, QueryDslConfig.class})
 class DirectMessageMapperTest {
 
   @Autowired
