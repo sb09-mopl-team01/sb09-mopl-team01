@@ -9,9 +9,9 @@ import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
 import io.mopl.domain.notification.entity.NotificationLevel;
-import io.mopl.domain.notification.event.NotificationEventPublisher;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.repository.NotificationRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -37,7 +37,7 @@ class NotificationServiceTest {
   private NotificationRepository notificationRepository;
 
   @MockitoBean
-  private NotificationEventPublisher eventPublisher;
+  private DomainEventPublisher eventPublisher;
 
   @Test
   @DisplayName("알림 생성 요청을 저장하고 DTO로 반환한다")
@@ -153,11 +153,14 @@ class NotificationServiceTest {
 
     Notification result = notificationRepository.findById(notification.id()).orElseThrow();
     assertThat(result.isRead()).isTrue();
-    verify(eventPublisher).publish(argThat(event ->
-        event.notificationId().equals(notification.id())
-            && event.receiverId().equals(notification.receiverId())
-            && event.occurredAt() != null
-    ));
+    verify(eventPublisher).publish(argThat(event -> {
+      if (!(event instanceof NotificationReadEvent readEvent)) {
+        return false;
+      }
+      return readEvent.notificationId().equals(notification.id())
+          && readEvent.receiverId().equals(notification.receiverId())
+          && readEvent.occurredAt() != null;
+    }));
   }
 
   @Test

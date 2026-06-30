@@ -3,10 +3,10 @@ package io.mopl.domain.notification.service;
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
-import io.mopl.domain.notification.event.NotificationEventPublisher;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.mapper.NotificationMapper;
 import io.mopl.domain.notification.repository.NotificationRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.logging.CursorPageLogger;
@@ -33,7 +33,7 @@ public class NotificationService {
 
   private final NotificationRepository notificationRepository;
   private final NotificationMapper notificationMapper;
-  private final NotificationEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public NotificationDto create(NotificationCreateCommand command) {
