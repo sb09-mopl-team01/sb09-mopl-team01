@@ -20,9 +20,13 @@ public enum ErrorCode {
   LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "USER_401", "이메일 또는 비밀번호가 틀렸습니다"),
   FORBIDDEN(HttpStatus.FORBIDDEN, "USER_403", "권한이 없습니다"),
 
-  // Message
-  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
+  // Auth
+  AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_401", "인증 정보가 필요합니다"),
 
+  // Direct Message
+  SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
+  CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
+  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403", "채팅방 참여자가 아닙니다."),
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
   ;

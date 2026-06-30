@@ -49,13 +49,13 @@ public class ConversationService {
               conversation.getParticipantAId(),
               conversation.getParticipantBId()
           )
-          .orElseThrow(() -> e);
+          .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_CREATE_RACE_CONDITION));
     }
   }
 
   private void validateParticipants(UUID requesterId, UUID withUserId) {
     if (requesterId.equals(withUserId)) {
-      throw new BaseException(ErrorCode.INVALID_INPUT);
+      throw new BaseException(ErrorCode.SELF_CONVERSATION_NOT_ALLOWED);
     }
   }
 

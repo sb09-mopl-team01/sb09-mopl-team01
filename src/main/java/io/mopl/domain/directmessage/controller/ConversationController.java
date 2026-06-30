@@ -21,7 +21,7 @@ public class ConversationController {
 
   @PostMapping
   public ConversationDto createConversation(
-      @RequestAttribute("userId") UUID requesterId,
+      @RequestAttribute(name = "userId", required = true) UUID requesterId,
       @Valid @RequestBody ConversationCreateRequest request
   ) {
     return conversationService.createConversation(requesterId, request);
