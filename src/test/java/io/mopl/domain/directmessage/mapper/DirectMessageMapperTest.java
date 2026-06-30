@@ -5,23 +5,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.entity.DirectMessage;
-import io.mopl.global.config.QueryDslConfig;
-import jakarta.persistence.EntityManager;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.annotation.Transactional;
 
-@Transactional
-@SpringBootTest
-@ActiveProfiles("test")
-@Import({DirectMessageMapper.class, QueryDslConfig.class})
 class DirectMessageMapperTest {
 
   private final DirectMessageMapper directMessageMapper = new DirectMessageMapper();

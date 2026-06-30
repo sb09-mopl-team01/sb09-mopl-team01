@@ -11,23 +11,28 @@ import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
-import io.mopl.global.config.QueryDslConfig;
+import io.mopl.domain.user.dto.response.UserSummary;
+import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
+import io.mopl.global.response.CursorResponse;
+import io.mopl.global.response.SortDirection;
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
-import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.context.annotation.Import;
-import org.springframework.test.context.ActiveProfiles;
-import org.springframework.transaction.annotation.Transactional;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.test.util.ReflectionTestUtils;
 
-@Transactional
-@SpringBootTest
-@ActiveProfiles("test")
-@Import({ConversationService.class, ConversationMapper.class, QueryDslConfig.class})
+@ExtendWith(MockitoExtension.class)
 class ConversationServiceTest {
 
   @InjectMocks
@@ -100,16 +105,75 @@ class ConversationServiceTest {
   }
 
   @Test
-  void createConversationRejectsSelfConversation() {
-    UUID requesterId = UUID.randomUUID();
-    User requester = createUser(requesterId, "requester");
-
+  void createConversationRejectsSelfConversationWithDomainErrorCode() {
     when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
 
     assertThatThrownBy(() -> conversationService.createConversation(
         requesterId,
         new ConversationCreateRequest(requesterId)
-    )).isInstanceOf(BaseException.class);
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.SELF_CONVERSATION_NOT_ALLOWED);
+  }
+
+  @Test
+  void createConversationThrowsDomainErrorWhenRaceConditionRequeryFails() {
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+    when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
+        .thenReturn(Optional.empty());
+    when(conversationRepository.save(any(Conversation.class)))
+        .thenThrow(new DataIntegrityViolationException("duplicate conversation"));
+
+    assertThatThrownBy(() -> conversationService.createConversation(
+        requesterId,
+        new ConversationCreateRequest(withUserId)
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.CONVERSATION_CREATE_RACE_CONDITION);
+  }
+
+  @Test
+  void findConversationsReturnsOnlyRequesterConversationsWithCursorResponse() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    Instant createdAt = Instant.now();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    ReflectionTestUtils.setField(conversation, "createdAt", createdAt);
+    ConversationDto expected = createConversationDto(conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findMyConversationsWithCursor(
+        requesterId,
+        "receiver",
+        null,
+        null,
+        SortDirection.DESCENDING,
+        PageRequest.of(0, 2)
+    )).thenReturn(List.of(conversation));
+    when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
+    when(conversationMapper.toDto(conversation, requester, withUser)).thenReturn(expected);
+    when(conversationRepository.countMyConversations(requesterId, "receiver")).thenReturn(1L);
+
+    CursorResponse<ConversationDto> result = conversationService.findConversations(
+        requesterId,
+        "receiver",
+        null,
+        null,
+        1,
+        SortDirection.DESCENDING,
+        "createdAt"
+    );
+
+    assertThat(result.data()).containsExactly(expected);
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.nextCursor()).isNull();
+    assertThat(result.nextIdAfter()).isNull();
+    assertThat(result.totalCount()).isEqualTo(1);
+    assertThat(result.sortBy()).isEqualTo("createdAt");
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
   }
 
   private User createUser(UUID id, String name) {
