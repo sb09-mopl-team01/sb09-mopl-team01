@@ -3,6 +3,8 @@ package io.mopl.global.config;
 import io.mopl.global.security.filter.MoplLoginFilter;
 import io.mopl.global.security.handler.LoginFailureHandler;
 import io.mopl.global.security.handler.LoginSuccessHandler;
+import io.mopl.global.security.handler.MoplLogoutHandler;
+import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -17,6 +19,7 @@ import org.springframework.security.config.annotation.web.configurers.AuthorizeH
 import org.springframework.security.config.annotation.web.configurers.CsrfConfigurer;
 import org.springframework.security.config.annotation.web.configurers.FormLoginConfigurer;
 import org.springframework.security.config.annotation.web.configurers.HttpBasicConfigurer;
+import org.springframework.security.config.annotation.web.configurers.LogoutConfigurer;
 import org.springframework.security.config.annotation.web.configurers.SessionManagementConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -33,6 +36,8 @@ public class SecurityConfig {
   private final JwtAuthenticationFilter jwtAuthenticationFilter;
   private final LoginSuccessHandler loginSuccessHandler;
   private final LoginFailureHandler loginFailureHandler;
+  private final MoplLogoutHandler logoutHandler;
+  private final MoplLogoutSuccessHandler logoutSuccessHandler;
 
   @Bean
   public AuthenticationManager authenticationManager(
@@ -46,6 +51,7 @@ public class SecurityConfig {
     http
         .csrf(this::configureCsrf)
         .formLogin(this::configureFormLogin)
+        .logout(this::configureLogout)
         .sessionManagement(this::configureSessionManagement)
         .authorizeHttpRequests(this::configureAuthorizeRequests);
 
@@ -78,6 +84,14 @@ public class SecurityConfig {
     login.disable();
   }
 
+  private void configureLogout(LogoutConfigurer<HttpSecurity> logout) {
+    logout.logoutUrl("/api/auth/sign-out")
+        .addLogoutHandler(logoutHandler)
+        .logoutSuccessHandler(logoutSuccessHandler)
+        .invalidateHttpSession(false)
+        .deleteCookies("REFRESH_TOKEN");
+  }
+
   private void configureHttpBasic(HttpBasicConfigurer<HttpSecurity> basic) {
     basic.disable();
   }
@@ -90,6 +104,11 @@ public class SecurityConfig {
     auth
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
+        .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 새로고침
+
+        .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
+        .requestMatchers("/h2-console/**").permitAll()
+
         .anyRequest().authenticated();
 
         // 테스트 시 보안 해제 하고싶으면 사용
