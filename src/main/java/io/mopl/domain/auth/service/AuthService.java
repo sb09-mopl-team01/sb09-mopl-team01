@@ -26,10 +26,11 @@ public class AuthService {
     }
 
     String email = jwtProvider.getUsername(currentRefreshToken);
-    String savedToken = refreshTokenRepository.findByEmail(email).orElse("");
-    if (!savedToken.equals(currentRefreshToken)) {
+    if (!refreshTokenRepository.isValid(email, currentRefreshToken)) {
       throw new IllegalArgumentException("만료되었거나 조작된 리프레시 토큰입니다.");
     }
+
+    refreshTokenRepository.removeToken(email, currentRefreshToken);
 
     MoplUserDetails userDetails = (MoplUserDetails) userDetailsService.loadUserByUsername(email);
     String newAccessToken = jwtProvider.generateAccessToken(userDetails);

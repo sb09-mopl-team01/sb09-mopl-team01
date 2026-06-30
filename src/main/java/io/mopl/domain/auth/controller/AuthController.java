@@ -45,7 +45,7 @@ public class AuthController {
       String tokenValue = csrfToken.getToken();
 
       ResponseCookie cookie = ResponseCookie.from("XSRF-TOKEN", tokenValue)
-          .httpOnly(false) // https 적용 시 수정 필요
+          .httpOnly(false)
           .secure(false) // https 적용 시 수정 필요
           .path("/")
           .sameSite("Strict")
