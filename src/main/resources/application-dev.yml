@@ -2,3 +2,10 @@ spring:
   config:
     import:
       - classpath:application-local-h2.yml
+
+  # .env 파일로 옮겨야함
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:admin1234}
