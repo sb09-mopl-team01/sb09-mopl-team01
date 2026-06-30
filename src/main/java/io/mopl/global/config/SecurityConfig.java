@@ -80,6 +80,10 @@ public class SecurityConfig {
 
   private void configureCsrf(CsrfConfigurer<HttpSecurity> csrf) {
     CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    csrfTokenRepository.setCookieName("XSRF-TOKEN");
+    csrfTokenRepository.setHeaderName("X-XSRF-TOKEN");
+    csrfTokenRepository.setCookiePath("/");
+
     csrf.csrfTokenRepository(csrfTokenRepository)
         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
         .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh");

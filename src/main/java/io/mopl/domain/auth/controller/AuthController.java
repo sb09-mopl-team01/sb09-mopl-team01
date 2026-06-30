@@ -14,6 +14,7 @@ import io.mopl.global.security.jwt.JwtProvider;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -29,6 +30,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/auth")
 @RequiredArgsConstructor
@@ -37,14 +39,23 @@ public class AuthController {
   private final AuthService authService;
 
   @GetMapping("/csrf-token")
-  public ResponseEntity<Void> getCsrfToken(HttpServletRequest request) {
-    CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
+  public ResponseEntity<Void> getCsrfToken(CsrfToken csrfToken, HttpServletResponse response) {
 
     if (csrfToken != null) {
-      csrfToken.getToken();
+      String tokenValue = csrfToken.getToken();
+
+      ResponseCookie cookie = ResponseCookie.from("XSRF-TOKEN", tokenValue)
+          .httpOnly(false) // https 적용 시 수정 필요
+          .secure(false) // https 적용 시 수정 필요
+          .path("/")
+          .sameSite("Strict")
+          .build();
+
+      response.addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+
     }
 
-    return ResponseEntity.ok().build();
+    return ResponseEntity.noContent().build();
   }
 
   @PostMapping("/refresh")
