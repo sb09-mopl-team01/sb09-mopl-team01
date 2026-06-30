@@ -11,21 +11,23 @@ import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
-import io.mopl.domain.user.dto.response.UserSummary;
-import io.mopl.domain.user.entity.User;
-import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.config.QueryDslConfig;
 import io.mopl.global.exception.BaseException;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.transaction.annotation.Transactional;
 
-@ExtendWith(MockitoExtension.class)
+@Transactional
+@SpringBootTest
+@ActiveProfiles("test")
+@Import({ConversationService.class, ConversationMapper.class, QueryDslConfig.class})
 class ConversationServiceTest {
 
   @InjectMocks

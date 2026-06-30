@@ -1,7 +1,6 @@
 package io.mopl.domain.review.dto;
 
-import io.mopl.domain.review.entity.Review;
-import io.mopl.domain.review.replica.User.UserSummary;
+import io.mopl.domain.user.dto.response.UserSummary;
 import java.util.UUID;
 import lombok.Builder;
 import lombok.Getter;
