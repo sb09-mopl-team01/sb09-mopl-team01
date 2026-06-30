@@ -28,13 +28,17 @@ public class JwtProvider {
   private final MACVerifier verifier;
 
   private final long accessTokenValiditySeconds;
+  private final long refreshTokenValiditySeconds;
 
   public JwtProvider(
       @Value("${jwt.secret}")
       String secret,
 
       @Value("${jwt.access-token-validity-seconds}")
-      long accessTokenValiditySeconds
+      long accessTokenValiditySeconds,
+
+      @Value("${jwt.refresh-token-validity-seconds}")
+      long refreshTokenValiditySeconds
   ) throws JOSEException {
 
     byte[] secretKey = Base64.getDecoder().decode(secret);
@@ -44,6 +48,8 @@ public class JwtProvider {
     this.verifier = new MACVerifier(secretKey);
 
     this.accessTokenValiditySeconds = accessTokenValiditySeconds;
+
+    this.refreshTokenValiditySeconds = refreshTokenValiditySeconds;
 
     log.info("JwtTokenProvider initialized");
   }
@@ -109,6 +115,27 @@ public class JwtProvider {
 
     } catch (ParseException e) {
       throw new RuntimeException(e);
+    }
+  }
+
+  public String generateRefreshToken(String email) {
+    try {
+      Instant now = Instant.now();
+      Instant expiration = now.plusSeconds(refreshTokenValiditySeconds);
+
+      JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
+          .subject(email)
+          .issueTime(Date.from(now))
+          .expirationTime(Date.from(expiration))
+          .jwtID(UUID.randomUUID().toString())
+          .build();
+
+      SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
+      signedJWT.sign(signer);
+      return signedJWT.serialize();
+
+    } catch (Exception e) {
+      throw new RuntimeException("Refresh Token 생성 실패", e);
     }
   }
 }
