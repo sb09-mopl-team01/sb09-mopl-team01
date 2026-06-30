@@ -26,6 +26,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration
 @EnableWebSecurity
@@ -77,7 +79,10 @@ public class SecurityConfig {
   }
 
   private void configureCsrf(CsrfConfigurer<HttpSecurity> csrf) {
-    csrf.disable();
+    CookieCsrfTokenRepository csrfTokenRepository = CookieCsrfTokenRepository.withHttpOnlyFalse();
+    csrf.csrfTokenRepository(csrfTokenRepository)
+        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh");
   }
 
   private void configureFormLogin(FormLoginConfigurer<HttpSecurity> login) {
@@ -105,6 +110,7 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll() // 회원가입
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 새로고침
+        .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
 
         .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
