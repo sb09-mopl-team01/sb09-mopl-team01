@@ -7,6 +7,7 @@ import io.mopl.domain.directmessage.dto.ConversationCreateRequest;
 import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
+import io.mopl.global.config.QueryDslConfig;
 import io.mopl.global.exception.BaseException;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
@@ -20,7 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 @SpringBootTest
 @ActiveProfiles("test")
-@Import({ConversationService.class, ConversationMapper.class})
+@Import({ConversationService.class, ConversationMapper.class, QueryDslConfig.class})
 class ConversationServiceTest {
 
   @Autowired
