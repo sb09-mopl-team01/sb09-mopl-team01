@@ -4517,10 +4517,6 @@
               "WARNING",
               "ERROR"
             ]
-          },
-          "read": {
-            "type": "boolean",
-            "description": "읽음 여부"
           }
         },
         "required": [
@@ -4528,7 +4524,6 @@
           "createdAt",
           "id",
           "level",
-          "read",
           "receiverId",
           "title"
         ]
