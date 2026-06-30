@@ -2,6 +2,7 @@ package io.mopl.global.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.auth.dto.LoginResponse;
+import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.global.security.MoplUserDetails;
@@ -14,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
@@ -27,6 +29,8 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
   private final JwtProvider jwtProvider;
   private final UserMapper userMapper;
 
+  private final RefreshTokenMemoryRepository refreshTokenRepository;
+
   @Override
   public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
       Authentication authentication) throws IOException, ServletException {
@@ -34,8 +38,22 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     log.debug("[LoginSuccessHandler] 로그인 성공 처리 완료");
 
     MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
+    String email = userDetails.getUsername();
 
     String accessToken = jwtProvider.generateAccessToken(userDetails);
+    String refreshToken = jwtProvider.generateRefreshToken(email);
+
+    // 임시로 서버 메모리에 저장
+    refreshTokenRepository.save(email, refreshToken);
+
+    ResponseCookie refreshTokenCookie = ResponseCookie.from("refreshToken", refreshToken)
+        .httpOnly(true)
+        .secure(true)
+        .path("/")
+        .maxAge(604800)
+        .sameSite("Strict")
+        .build();
+
     UserDto userDto = userMapper.toDto(userDetails.getUser());
     LoginResponse loginResponse = new LoginResponse(userDto, accessToken);
 
