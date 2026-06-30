@@ -5,6 +5,7 @@ import io.mopl.domain.auth.dto.LoginResponse;
 import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.global.security.CookieProvider;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.jwt.JwtProvider;
 import jakarta.servlet.ServletException;
@@ -33,9 +34,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
   private final UserMapper userMapper;
 
   private final RefreshTokenMemoryRepository refreshTokenRepository;
-
-  @Value("${jwt.refresh-token-validity-seconds}")
-  private long refreshTokenValiditySeconds;
+  private final CookieProvider cookieProvider;
 
   @Override
   public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
@@ -52,25 +51,8 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     // 임시로 서버 메모리에 저장
     refreshTokenRepository.save(email, refreshToken);
 
-    ResponseCookie refreshTokenCookie = ResponseCookie.from("REFRESH_TOKEN", refreshToken)
-        .httpOnly(true)
-        .secure(false) // https 사용시 수정
-        .path("/")
-        .maxAge(refreshTokenValiditySeconds)
-        .sameSite("Strict")
-        .build();
+    ResponseCookie refreshTokenCookie = cookieProvider.createRefreshTokenCookie(refreshToken);
     response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
-
-    CsrfToken csrfToken = (CsrfToken) request.getAttribute(CsrfToken.class.getName());
-    if (csrfToken != null) {
-      ResponseCookie csrfCookie = ResponseCookie.from("XSRF-TOKEN", csrfToken.getToken())
-          .httpOnly(false)
-          .secure(false) // https 사용시 수정
-          .path("/")
-          .sameSite("Strict")
-          .build();
-      response.addHeader(HttpHeaders.SET_COOKIE, csrfCookie.toString());
-    }
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
     LoginResponse loginResponse = new LoginResponse(userDto, accessToken);

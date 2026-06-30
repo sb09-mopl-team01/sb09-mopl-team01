@@ -1,5 +1,6 @@
 package io.mopl.global.config;
 
+import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.filter.MoplLoginFilter;
 import io.mopl.global.security.handler.LoginFailureHandler;
 import io.mopl.global.security.handler.LoginSuccessHandler;
@@ -27,6 +28,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 
 @Configuration
@@ -52,6 +54,7 @@ public class SecurityConfig {
 
     http
         .csrf(this::configureCsrf)
+        .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
         .formLogin(this::configureFormLogin)
         .logout(this::configureLogout)
         .sessionManagement(this::configureSessionManagement)
@@ -83,6 +86,7 @@ public class SecurityConfig {
     csrfTokenRepository.setCookieName("XSRF-TOKEN");
     csrfTokenRepository.setHeaderName("X-XSRF-TOKEN");
     csrfTokenRepository.setCookiePath("/");
+    csrfTokenRepository.setCookieCustomizer(cookieBuilder -> cookieBuilder.secure(false));
 
     csrf.csrfTokenRepository(csrfTokenRepository)
         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
