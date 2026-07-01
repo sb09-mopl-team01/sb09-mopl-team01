@@ -8,6 +8,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.OneToOne;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.Objects;
@@ -29,7 +30,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class WatchingSession extends BaseEntity {
 
-  @ManyToOne(fetch = FetchType.LAZY, optional = false)
+  @OneToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "watcher_id", nullable = false)
   private User watcher;
 
