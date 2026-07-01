@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
@@ -38,7 +39,10 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
     "mopl.content.thumbnail.storage-path=build/test-content-thumbnails",
-    "mopl.content.thumbnail.url-prefix=/content-thumbnails"
+    "mopl.content.thumbnail.url-prefix=/content-thumbnails",
+    "spring.data.redis.host=localhost",
+    "spring.data.redis.port=6379",
+    "spring.data.redis.password="
 })
 class ContentAdminControllerIntegrationTest {
 
@@ -88,7 +92,8 @@ class ContentAdminControllerIntegrationTest {
 
     MvcResult createResult = mockMvc.perform(multipart("/api/contents")
             .file(createRequestPart)
-            .file(createThumbnail))
+            .file(createThumbnail)
+            .with(csrf()))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.title").value("등록 제목"))
         .andExpect(jsonPath("$.thumbnailUrl").exists())
@@ -118,7 +123,8 @@ class ContentAdminControllerIntegrationTest {
             .with(request -> {
               request.setMethod("PATCH");
               return request;
-            }))
+            })
+            .with(csrf()))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.title").value("수정 제목"))
         .andExpect(jsonPath("$.description").value("수정 설명"));
@@ -131,7 +137,8 @@ class ContentAdminControllerIntegrationTest {
       assertThat(updatedContent.getThumbnailUrl()).endsWith(".png");
     });
 
-    mockMvc.perform(delete("/api/contents/{contentId}", contentId))
+    mockMvc.perform(delete("/api/contents/{contentId}", contentId)
+            .with(csrf()))
         .andExpect(status().isOk());
 
     assertThat(contentRepository.existsById(contentId)).isFalse();
