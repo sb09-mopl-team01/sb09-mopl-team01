@@ -25,21 +25,33 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
       String sortDirection, String sortBy) {
 
     QPlaylist playlist = QPlaylist.playlist;
-    QPlaylistSubscription subscription = QPlaylistSubscription.playlistSubscription;
+    QPlaylistSubscription sub = QPlaylistSubscription.playlistSubscription;
 
-    return queryFactory.selectFrom(playlist)
-        // 구독자 필터가 있을 때만 조인해서 성능 최적화
-        .leftJoin(subscription).on(subscription.playlist.eq(playlist))
+    var query = queryFactory.selectFrom(playlist);
+
+    if (subscriberId != null) {
+      query.leftJoin(sub).on(sub.playlist.eq(playlist))
+          .where(sub.user.id.eq(subscriberId))
+          .groupBy(playlist.id);
+    }
+
+    return query
         .where(
-            keywordLike(keyword),
-            ownerEq(ownerId),
-            subscriberEq(subscriberId),
+            containsKeyword(keyword),
+            eqOwnerId(ownerId),
             cursorCondition(cursor, idAfter, sortDirection, sortBy)
         )
-        .groupBy(playlist.id)
         .orderBy(getSortOrder(sortDirection, sortBy), getTieBreakerOrder(sortDirection))
-        .limit(limit + 1)
+        .limit(limit + 1L)
         .fetch();
+  }
+
+  private BooleanExpression containsKeyword(String keyword) {
+    return keyword != null ? QPlaylist.playlist.title.containsIgnoreCase(keyword) : null;
+  }
+
+  private BooleanExpression eqOwnerId(UUID ownerId) {
+    return ownerId != null ? QPlaylist.playlist.owner.id.eq(ownerId) : null;
   }
 
   @Override
