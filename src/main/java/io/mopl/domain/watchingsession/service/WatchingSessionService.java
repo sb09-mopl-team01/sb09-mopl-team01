@@ -40,7 +40,7 @@ public class WatchingSessionService {
     validateIds(watcherId, contentId);
     if (watchingSessionRepository.existsByWatcherId(watcherId)) {
       log.warn("Watching session already exists. watcherId={}", watcherId);
-      throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
+      throw new BaseException(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
     }
 
     User watcher = userRepository.findById(watcherId)
@@ -58,7 +58,7 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
     if (!watchingSessionRepository.existsByWatcherId(watcherId)) {
-      throw new BaseException(ErrorCode.INVALID_INPUT);
+      throw new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND);
     }
     watchingSessionRepository.deleteByWatcherId(watcherId);
   }
@@ -125,11 +125,11 @@ public class WatchingSessionService {
       String sortBy,
       SortDirection sortDirection
   ) {
-    if (contentId == null
-        || limit <= 0
-        || !CREATED_AT_SORT.equals(sortBy)
-        || sortDirection == null) {
+    if (contentId == null || limit <= 0) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+    if (!CREATED_AT_SORT.equals(sortBy) || sortDirection == null) {
+      throw new BaseException(ErrorCode.INVALID_WATCHING_SESSION_SORT);
     }
   }
 
@@ -141,7 +141,7 @@ public class WatchingSessionService {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeException e) {
-      throw new BaseException(ErrorCode.INVALID_INPUT);
+      throw new BaseException(ErrorCode.INVALID_WATCHING_SESSION_CURSOR);
     }
   }
 }

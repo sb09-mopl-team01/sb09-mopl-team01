@@ -68,7 +68,7 @@ class WatchingSessionServiceTest {
     assertThatThrownBy(() -> watchingSessionService.startWatching(watcher.getId(), secondContent.getId()))
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.DUPLICATE_RESOURCE);
+        .isEqualTo(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
   }
 
   @Test
@@ -82,6 +82,15 @@ class WatchingSessionServiceTest {
 
     assertThat(watchingSessionService.findByWatcher(watcher.getId())).isNull();
     assertThat(watchingSessionRepository.existsByWatcherId(watcher.getId())).isFalse();
+  }
+
+  @Test
+  @DisplayName("시청 중인 세션이 없으면 종료할 수 없다")
+  void endWatchingNotFound() {
+    assertThatThrownBy(() -> watchingSessionService.endWatching(UUID.randomUUID()))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.WATCHING_SESSION_NOT_FOUND);
   }
 
   @Test
@@ -165,7 +174,7 @@ class WatchingSessionServiceTest {
     ))
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_INPUT);
+        .isEqualTo(ErrorCode.INVALID_WATCHING_SESSION_CURSOR);
 
     assertThatThrownBy(() -> watchingSessionService.findByContent(
         UUID.randomUUID(),
@@ -178,7 +187,7 @@ class WatchingSessionServiceTest {
     ))
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
-        .isEqualTo(ErrorCode.INVALID_INPUT);
+        .isEqualTo(ErrorCode.INVALID_WATCHING_SESSION_SORT);
   }
 
   private WatchingSession startSession(User watcher, Content content) {

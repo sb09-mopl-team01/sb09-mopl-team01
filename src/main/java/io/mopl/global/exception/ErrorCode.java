@@ -27,10 +27,15 @@ public enum ErrorCode {
   // 참여자 파악 여부
   NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
+  // WatchingSession
+  WATCHING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCHING_SESSION_404", "시청 세션을 찾을 수 없습니다"),
+  WATCHING_SESSION_ALREADY_EXISTS(HttpStatus.CONFLICT, "WATCHING_SESSION_409", "이미 시청 중인 세션이 존재합니다"),
+  INVALID_WATCHING_SESSION_CURSOR(HttpStatus.BAD_REQUEST, "WATCHING_SESSION_CURSOR_400", "잘못된 시청 세션 커서입니다"),
+  INVALID_WATCHING_SESSION_SORT(HttpStatus.BAD_REQUEST, "WATCHING_SESSION_SORT_400", "지원하지 않는 시청 세션 정렬 조건입니다"),
+
   // Direct Message
   SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
   CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
-  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403", "채팅방 참여자가 아닙니다."),
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
   ;
