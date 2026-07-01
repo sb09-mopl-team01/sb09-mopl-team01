@@ -3,8 +3,11 @@ package io.mopl.domain.auth.service;
 
 import io.mopl.domain.auth.dto.TokenRefreshResult;
 import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
+import io.mopl.domain.mail.service.MailService;
 import io.mopl.domain.user.dto.data.UserDto;
+import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
@@ -19,6 +22,9 @@ public class AuthService {
   private final RefreshTokenMemoryRepository refreshTokenRepository;
   private final MoplUserDetailsService userDetailsService;
   private final UserMapper userMapper;
+  private final UserRepository userRepository;
+  private final TempPasswordService tempPasswordService;
+  private final MailService mailService;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
     if (currentRefreshToken == null || !jwtProvider.validateToken(currentRefreshToken)) {
@@ -40,6 +46,18 @@ public class AuthService {
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
     return new TokenRefreshResult(newAccessToken, newRefreshToken, userDto);
+  }
+
+
+  public void resetPassword(String email) {
+    userRepository.findByEmail(email)
+        .orElseThrow(UserNotFoundException::new);
+
+    String tempPassword = tempPasswordService.generateRandomPassword();
+
+    tempPasswordService.saveTempPassword(email, tempPassword);
+
+    mailService.sendTempPasswordEmail(email, tempPassword);
   }
 
 }
