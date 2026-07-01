@@ -202,4 +202,81 @@ class ContentRepositoryTest {
     assertThat(result.totalCount()).isEqualTo(1);
     assertThat(result.hasNext()).isFalse();
   }
+
+  @Test
+  @DisplayName("평점순으로 콘텐츠 목록을 조회한다")
+  void findContentsByRateSort() {
+    Content lowRatedContent = Content.createManual(
+        ContentType.MOVIE,
+        "낮은 평점 영화",
+        "평점순 정렬 확인용 영화",
+        null,
+        List.of("영화")
+    );
+    lowRatedContent.updateReviewStats(2.0, 1);
+    Content highRatedContent = Content.createManual(
+        ContentType.MOVIE,
+        "높은 평점 영화",
+        "평점순 정렬 확인용 영화",
+        null,
+        List.of("영화")
+    );
+    highRatedContent.updateReviewStats(4.5, 3);
+
+    contentRepository.saveAndFlush(lowRatedContent);
+    contentRepository.saveAndFlush(highRatedContent);
+    entityManager.clear();
+
+    CursorResponse<Content> result = contentRepository.findContentsByCursor(
+        null,
+        null,
+        null,
+        null,
+        null,
+        10,
+        "rate",
+        SortDirection.DESCENDING
+    );
+
+    assertThat(result.data())
+        .extracting(Content::getAverageRating)
+        .containsExactly(4.5, 2.0);
+    assertThat(result.sortBy()).isEqualTo("rate");
+  }
+
+  @Test
+  @DisplayName("임시 watcherCount 정렬은 0 커서와 ID 보조 정렬로 동작한다")
+  void findContentsByTemporaryWatcherCountSort() {
+    Content firstContent = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "첫 번째 영화",
+        "watcherCount 임시 정렬 확인용 영화",
+        null,
+        List.of("영화")
+    ));
+    Content secondContent = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "두 번째 영화",
+        "watcherCount 임시 정렬 확인용 영화",
+        null,
+        List.of("영화")
+    ));
+    entityManager.clear();
+
+    CursorResponse<Content> result = contentRepository.findContentsByCursor(
+        null,
+        null,
+        null,
+        null,
+        null,
+        1,
+        "watcherCount",
+        SortDirection.ASCENDING
+    );
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.nextCursor()).isEqualTo("0");
+    assertThat(result.nextIdAfter()).isNotNull();
+    assertThat(result.sortBy()).isEqualTo("watcherCount");
+  }
 }

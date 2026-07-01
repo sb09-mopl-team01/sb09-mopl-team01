@@ -33,7 +33,8 @@ import lombok.NoArgsConstructor;
     },
     indexes = {
         @Index(name = "idx_contents_type", columnList = "type"),
-        @Index(name = "idx_contents_created_at_id", columnList = "created_at, id")
+        @Index(name = "idx_contents_created_at_id", columnList = "created_at, id"),
+        @Index(name = "idx_contents_average_rating_id", columnList = "average_rating, id")
     }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
@@ -60,6 +61,12 @@ public class Content extends BaseUpdatableEntity {
 
   @Column(name = "last_synced_at")
   private Instant lastSyncedAt;
+
+  @Column(name = "average_rating", nullable = false)
+  private double averageRating = 0.0;
+
+  @Column(name = "review_count", nullable = false)
+  private int reviewCount = 0;
 
   @ElementCollection(fetch = FetchType.LAZY)
   @CollectionTable(
@@ -181,8 +188,15 @@ public class Content extends BaseUpdatableEntity {
     return normalizedTags;
   }
 
-  //리뷰: 리뷰 평점 평균 동기화 추가
   public void updateAverageRating(double newAverage) {
+    this.averageRating = newAverage;
+  }
 
+  public void updateReviewStats(double averageRating, int reviewCount) {
+    if (reviewCount < 0) {
+      throw new IllegalArgumentException("리뷰 수는 음수일 수 없습니다.");
+    }
+    this.averageRating = averageRating;
+    this.reviewCount = reviewCount;
   }
 }
