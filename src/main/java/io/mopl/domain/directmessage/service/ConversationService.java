@@ -50,6 +50,7 @@ public class ConversationService {
     return conversationMapper.toDto(conversation, requester, withUser);
   }
 
+  //대화방 목록 조회
   @Transactional(readOnly = true)
   public CursorResponse<ConversationDto> findConversations(
       UUID requesterId,
