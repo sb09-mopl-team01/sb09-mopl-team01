@@ -10,6 +10,7 @@ public record NotificationDto(
     UUID receiverId,
     String title,
     String content,
-    NotificationLevel level
+    NotificationLevel level,
+    boolean read
 ) {
 }
