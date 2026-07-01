@@ -39,7 +39,7 @@ public class PlaylistContent extends BaseEntity {
   @JoinColumn(name = "content_id", nullable = false)
   private Content content;
 
-  private PlaylistContent(Playlist playlist, Content content) {
+  public PlaylistContent(Playlist playlist, Content content) {
     this.playlist = playlist;
     this.content = content;
   }

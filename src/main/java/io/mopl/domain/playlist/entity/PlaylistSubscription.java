@@ -40,7 +40,7 @@ public class PlaylistSubscription extends BaseEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  private PlaylistSubscription(Playlist playlist, User user) {
+  public PlaylistSubscription(Playlist playlist, User user) {
     this.playlist = playlist;
     this.user = user;
   }
