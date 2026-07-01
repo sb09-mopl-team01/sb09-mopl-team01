@@ -10,6 +10,7 @@ import io.mopl.domain.user.service.UserService;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/users")
 @RequiredArgsConstructor
@@ -41,15 +43,23 @@ public class UserController {
       @RequestParam String sortBy,
       @RequestParam SortDirection sortDirection
   ) {
+    log.info("[사용자 관리] 사용자 다건 조회 요청 수신. emailLike={}, roleEqual={}, isLocked={}"
+            + ", idAfter={}, limit={}, sortBy={}, sortDirection={}", emailLike, roleEqual, isLocked
+        , idAfter, limit, sortBy, sortDirection);
     CursorResponse<UserDto> response = userService.findUsers(
         emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection
     );
+    log.debug("[사용자 관리] 사용자 다건 조회 요청 처리 완료. emailLike={}, roleEqual={}, isLocked={}"
+            + ", idAfter={}, limit={}, sortBy={}, sortDirection={}", emailLike, roleEqual, isLocked
+        , idAfter, limit, sortBy, sortDirection);
     return ResponseEntity.ok(response);
   }
 
   @GetMapping("/{userId}")
   public ResponseEntity<UserDto> findUser(@PathVariable UUID userId) {
+    log.info("[사용자 관리] 사용자 조회 요청 수신. id={}", userId);
     UserDto response = userService.findUser(userId);
+    log.debug("[사용자 관리] 사용자 조회 요청 처리 완료. id={}", userId);
     return ResponseEntity.ok(response);
   }
 
@@ -59,7 +69,9 @@ public class UserController {
       @RequestPart("request") UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image
   ) {
+    log.info("[사용자 관리] 사용자 프로필 수정 요청 수신. id={}", userId);
     UserDto response = userService.updateProfile(userId, request, image);
+    log.debug("[사용자 관리] 사용자 프로필 수정 요청 처리 완료. id={}", userId);
     return ResponseEntity.ok(response);
   }
 
@@ -68,7 +80,9 @@ public class UserController {
       @PathVariable UUID userId,
       @RequestBody UserRoleUpdateRequest request
   ) {
+    log.info("[사용자 관리] 사용자 권한 변경 요청 수신. id={}", userId);
     userService.updateUserRole(userId, request);
+    log.debug("[사용자 관리] 사용자 권한 변경 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 
@@ -77,7 +91,9 @@ public class UserController {
       @PathVariable UUID userId,
       @RequestBody ChangePasswordRequest request
   ) {
+    log.info("[사용자 관리] 사용자 비밀번호 수정 요청 수신. id={}", userId);
     userService.changePassword(userId, request);
+    log.debug("[사용자 관리] 사용자 비밀번호 수정 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 
@@ -86,7 +102,9 @@ public class UserController {
       @PathVariable UUID userId,
       @RequestBody UserLockUpdateRequest request
   ) {
+    log.info("[사용자 관리] 사용자 잠금 요청 수신. id={}", userId);
     userService.updateUserLockStatus(userId, request);
+    log.debug("[사용자 관리] 사용자 잠금 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 }
