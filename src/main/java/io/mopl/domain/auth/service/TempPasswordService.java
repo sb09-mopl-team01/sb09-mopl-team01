@@ -34,4 +34,13 @@ public class TempPasswordService {
         TimeUnit.MINUTES
     );
   }
+
+  public String getTempPassword(String email) {
+    Object tempPassword = redisTemplate.opsForValue().get(REDIS_KEY_PREFIX + email);
+    return tempPassword != null ? tempPassword.toString() : null;
+  }
+
+  public void deleteTempPassword(String email) {
+    redisTemplate.delete(REDIS_KEY_PREFIX + email);
+  }
 }
