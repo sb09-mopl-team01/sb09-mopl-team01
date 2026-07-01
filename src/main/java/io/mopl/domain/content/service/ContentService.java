@@ -2,6 +2,7 @@ package io.mopl.domain.content.service;
 
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
+import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
@@ -18,6 +19,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,23 @@ public class ContentService {
   private final ContentRepository contentRepository;
   private final ContentStatsService contentStatsService;
   private final ContentMapper contentMapper;
+  private final ContentThumbnailService contentThumbnailService;
+
+  @Transactional
+  public ContentDto createContent(ContentCreateRequest request, MultipartFile thumbnail) {
+    String thumbnailUrl = null;
+    try {
+      thumbnailUrl = contentThumbnailService.uploadRequired(thumbnail);
+      Content content = contentMapper.toEntity(request, thumbnailUrl);
+      Content savedContent = contentRepository.save(content);
+      log.info("Content create completed. contentId={}", savedContent.getId());
+      return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
+    } catch (IllegalArgumentException e) {
+      contentThumbnailService.delete(thumbnailUrl);
+      log.warn("Content create rejected. title={}", request == null ? null : request.title());
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
 
   public ContentDto findContent(UUID contentId) {
     Content content = contentRepository.findById(contentId)

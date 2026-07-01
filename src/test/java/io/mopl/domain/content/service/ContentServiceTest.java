@@ -3,9 +3,11 @@ package io.mopl.domain.content.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
+import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
@@ -19,6 +21,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.springframework.mock.web.MockMultipartFile;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -38,6 +41,9 @@ class ContentServiceTest {
 
   @Mock
   private ContentMapper contentMapper;
+
+  @Mock
+  private ContentThumbnailService contentThumbnailService;
 
   @Test
   @DisplayName("콘텐츠 단건 조회 시 집계값을 조합해 DTO로 변환한다")
@@ -145,5 +151,54 @@ class ContentServiceTest {
     assertThat(result.data()).containsExactly(expectedDto);
     assertThat(result.hasNext()).isTrue();
     assertThat(result.totalCount()).isEqualTo(1L);
+  }
+
+  @Test
+  @DisplayName("관리자 콘텐츠 생성 시 MANUAL 콘텐츠를 저장하고 DTO로 반환한다")
+  void createContent() {
+    ContentCreateRequest request = new ContentCreateRequest(
+        ContentType.MOVIE,
+        "영화",
+        "영화 설명",
+        java.util.Set.of("액션")
+    );
+    MockMultipartFile thumbnail = new MockMultipartFile(
+        "thumbnail",
+        "poster.jpg",
+        "image/jpeg",
+        "image".getBytes()
+    );
+    String thumbnailUrl = "/content-thumbnails/poster.jpg";
+    Content content = Content.createManual(
+        ContentType.MOVIE,
+        "영화",
+        "영화 설명",
+        thumbnailUrl,
+        request.tags()
+    );
+    UUID contentId = UUID.randomUUID();
+    ReflectionTestUtils.setField(content, "id", contentId);
+    ContentStats stats = new ContentStats(0.0, 0, 0L);
+    ContentDto expectedDto = ContentDto.builder()
+        .id(contentId)
+        .type(ContentType.MOVIE)
+        .title("영화")
+        .description("영화 설명")
+        .thumbnailUrl(thumbnailUrl)
+        .tags(java.util.Set.of("액션"))
+        .averageRating(0.0)
+        .reviewCount(0)
+        .watcherCount(0L)
+        .build();
+    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
+    given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
+    given(contentRepository.save(content)).willReturn(content);
+    given(contentStatsService.getStats(content)).willReturn(stats);
+    given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
+
+    ContentDto result = contentService.createContent(request, thumbnail);
+
+    assertThat(result).isEqualTo(expectedDto);
+    verify(contentRepository).save(content);
   }
 }
