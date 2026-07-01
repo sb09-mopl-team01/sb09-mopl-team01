@@ -246,6 +246,47 @@ class ConversationServiceTest {
     assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
   }
 
+  @Test
+  void readDirectMessageMarksMessageAsReadWhenRequesterIsReceiver() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    DirectMessage directMessage = DirectMessage.create(conversation, withUserId, requesterId, "hello");
+    UUID directMessageId = UUID.randomUUID();
+    ReflectionTestUtils.setField(directMessage, "id", directMessageId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(directMessageRepository.findById(directMessageId)).thenReturn(Optional.of(directMessage));
+
+    conversationService.readDirectMessage(requesterId, conversationId, directMessageId);
+
+    assertThat(directMessage.isRead()).isTrue();
+  }
+
+  @Test
+  void readDirectMessageRejectsWhenRequesterIsSender() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    DirectMessage directMessage = DirectMessage.create(conversation, requesterId, withUserId, "hello");
+    UUID directMessageId = UUID.randomUUID();
+    ReflectionTestUtils.setField(directMessage, "id", directMessageId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(directMessageRepository.findById(directMessageId)).thenReturn(Optional.of(directMessage));
+
+    assertThatThrownBy(() -> conversationService.readDirectMessage(
+        requesterId,
+        conversationId,
+        directMessageId
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
   private User createUser(UUID id, String name) {
     User user = User.builder()
         .email(name + "@example.com")
