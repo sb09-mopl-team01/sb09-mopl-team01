@@ -6,6 +6,7 @@ import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSes
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
+import io.mopl.global.response.SortDirection;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -35,7 +36,7 @@ public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryC
         .where(
             watchingSession.content.id.eq(contentId),
             watcherNameContains(watcherNameLike),
-            cursorConditionDesc(cursor, idAfter)
+            cursorCondition(cursor, idAfter, SortDirection.DESCENDING)
         )
         .orderBy(watchingSession.createdAt.desc(), watchingSession.id.desc())
         .limit(pageable.getPageSize())
@@ -57,7 +58,7 @@ public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryC
         .where(
             watchingSession.content.id.eq(contentId),
             watcherNameContains(watcherNameLike),
-            cursorConditionAsc(cursor, idAfter)
+            cursorCondition(cursor, idAfter, SortDirection.ASCENDING)
         )
         .orderBy(watchingSession.createdAt.asc(), watchingSession.id.asc())
         .limit(pageable.getPageSize())
@@ -85,35 +86,25 @@ public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryC
     return user.name.containsIgnoreCase(watcherNameLike.trim());
   }
 
-  private BooleanExpression cursorConditionDesc(Instant cursor, UUID idAfter) {
+  private BooleanExpression cursorCondition(Instant cursor, UUID idAfter, SortDirection sortDirection) {
     if (cursor == null) {
       return null;
     }
 
-    BooleanExpression olderThanCursor = watchingSession.createdAt.lt(cursor);
+    BooleanExpression comparedAt = sortDirection == SortDirection.ASCENDING
+        ? watchingSession.createdAt.gt(cursor)
+        : watchingSession.createdAt.lt(cursor);
     if (idAfter == null) {
-      return olderThanCursor;
+      return comparedAt;
     }
 
-    return olderThanCursor.or(
+    BooleanExpression comparedId = sortDirection == SortDirection.ASCENDING
+        ? watchingSession.id.gt(idAfter)
+        : watchingSession.id.lt(idAfter);
+
+    return comparedAt.or(
         watchingSession.createdAt.eq(cursor)
-            .and(watchingSession.id.lt(idAfter))
-    );
-  }
-
-  private BooleanExpression cursorConditionAsc(Instant cursor, UUID idAfter) {
-    if (cursor == null) {
-      return null;
-    }
-
-    BooleanExpression newerThanCursor = watchingSession.createdAt.gt(cursor);
-    if (idAfter == null) {
-      return newerThanCursor;
-    }
-
-    return newerThanCursor.or(
-        watchingSession.createdAt.eq(cursor)
-            .and(watchingSession.id.gt(idAfter))
+            .and(comparedId)
     );
   }
 }
