@@ -27,6 +27,10 @@ public enum ErrorCode {
   // 참여자 파악 여부
   NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
+  // Direct Message
+  SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
+  CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
+  NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403", "채팅방 참여자가 아닙니다."),
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
   ;

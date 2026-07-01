@@ -1,21 +1,29 @@
 package io.mopl.domain.directmessage.mapper;
 
 import io.mopl.domain.directmessage.dto.ConversationDto;
-import io.mopl.domain.directmessage.dto.UserSummary;
 import io.mopl.domain.directmessage.entity.Conversation;
-import java.util.UUID;
+import io.mopl.domain.user.dto.response.UserSummary;
+import io.mopl.domain.user.entity.User;
 import org.springframework.stereotype.Component;
 
 @Component
 public class ConversationMapper {
 
-  public ConversationDto toDto(Conversation conversation, UUID requesterId) {
-    UUID withUserId = conversation.getOtherParticipantId(requesterId);
+  public ConversationDto toDto(Conversation conversation, User requester, User withUser) {
+    conversation.getOtherParticipantId(requester.getId());
     return new ConversationDto(
         conversation.getId(),
-        UserSummary.from(withUserId),
+        toUserSummary(withUser),
         null,
         false
     );
+  }
+
+  private UserSummary toUserSummary(User user) {
+    return UserSummary.builder()
+        .userId(user.getId())
+        .name(user.getName())
+        .profileImageUrl(user.getProfileImageUrl())
+        .build();
   }
 }
