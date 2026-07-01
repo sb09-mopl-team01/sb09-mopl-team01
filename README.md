@@ -73,6 +73,10 @@ chmod +x gradlew
 ./gradlew bootRun
 ```
 
+## 로컬 환경 Docker 기반 Redis 컨테이너 실행
+```bash
+   docker-compose -f docker-compose-redis.yml up -d
+````
 기본 개발 프로필은 `dev`이며, 로컬 개발 환경에서는 H2 기반 설정을 사용합니다.
 
 ## 테스트
@@ -84,6 +88,8 @@ chmod +x gradlew
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
 인메모리 H2 데이터베이스를 사용합니다.
+
+
 
 ## 문서
 
