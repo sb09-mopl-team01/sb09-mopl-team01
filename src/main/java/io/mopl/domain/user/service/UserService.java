@@ -35,7 +35,6 @@ public class UserService {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
-  private final TempPasswordService tempPasswordService;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -105,7 +104,6 @@ public class UserService {
 
     String newPasswordHash = passwordEncoder.encode(request.password());
     user.changePassword(newPasswordHash);
-    tempPasswordService.deleteTempPassword(user.getEmail());
     log.info("[사용자 관리] 사용자 비밀번호 완료. id={}", userId);
   }
 
