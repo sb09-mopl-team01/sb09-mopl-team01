@@ -243,4 +243,15 @@ class ContentControllerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isEqualTo(expectedDto);
   }
+
+  @Test
+  @DisplayName("DELETE /api/contents/{id} - 관리자 콘텐츠 삭제 성공 시 200을 반환한다")
+  void deleteContent() {
+    UUID contentId = UUID.randomUUID();
+
+    ResponseEntity<Void> response = contentController.deleteContent(contentId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    verify(contentService).deleteContent(contentId);
+  }
 }

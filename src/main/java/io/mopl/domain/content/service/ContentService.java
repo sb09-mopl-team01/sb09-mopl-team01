@@ -132,6 +132,15 @@ public class ContentService {
     }
   }
 
+  @Transactional
+  public void deleteContent(UUID contentId) {
+    Content content = getContentOrThrow(contentId);
+    String thumbnailUrl = content.getThumbnailUrl();
+    contentRepository.delete(content);
+    contentThumbnailService.delete(thumbnailUrl);
+    log.info("Content delete completed. contentId={}", contentId);
+  }
+
   private Content getContentOrThrow(UUID contentId) {
     return contentRepository.findById(contentId)
         .orElseThrow(() -> {

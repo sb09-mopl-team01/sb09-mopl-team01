@@ -244,4 +244,24 @@ class ContentServiceTest {
     assertThat(content.getTitle()).isEqualTo("수정 제목");
     assertThat(content.getThumbnailUrl()).isEqualTo("/content-thumbnails/current.jpg");
   }
+
+  @Test
+  @DisplayName("관리자 콘텐츠 삭제 시 콘텐츠와 썸네일을 삭제한다")
+  void deleteContent() {
+    UUID contentId = UUID.randomUUID();
+    Content content = Content.createManual(
+        ContentType.MOVIE,
+        "영화",
+        "영화 설명",
+        "/content-thumbnails/current.jpg",
+        List.of("액션")
+    );
+    ReflectionTestUtils.setField(content, "id", contentId);
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+
+    contentService.deleteContent(contentId);
+
+    verify(contentRepository).delete(content);
+    verify(contentThumbnailService).delete("/content-thumbnails/current.jpg");
+  }
 }
