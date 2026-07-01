@@ -9,9 +9,9 @@ import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
 import io.mopl.domain.notification.entity.NotificationLevel;
-import io.mopl.domain.notification.event.NotificationEventPublisher;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.repository.NotificationRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -37,7 +37,7 @@ class NotificationServiceTest {
   private NotificationRepository notificationRepository;
 
   @MockitoBean
-  private NotificationEventPublisher eventPublisher;
+  private DomainEventPublisher eventPublisher;
 
   @Test
   @DisplayName("알림 생성 요청을 저장하고 DTO로 반환한다")
@@ -58,6 +58,7 @@ class NotificationServiceTest {
     assertThat(result.title()).isEqualTo("새 DM이 도착했습니다");
     assertThat(result.content()).isEqualTo("상대방이 메시지를 보냈습니다.");
     assertThat(result.level()).isEqualTo(NotificationLevel.INFO);
+    assertThat(result.read()).isFalse();
 
     Notification savedNotification = notificationRepository.findById(result.id()).orElseThrow();
     assertThat(savedNotification.getReceiverId()).isEqualTo(receiverId);
@@ -103,6 +104,9 @@ class NotificationServiceTest {
     assertThat(result.data())
         .extracting(NotificationDto::receiverId)
         .containsOnly(receiverId);
+    assertThat(result.data())
+        .extracting(NotificationDto::read)
+        .containsOnly(false);
     assertThat(result.hasNext()).isTrue();
     assertThat(result.nextCursor()).isNotBlank();
     assertThat(result.nextIdAfter()).isNotNull();
@@ -153,11 +157,26 @@ class NotificationServiceTest {
 
     Notification result = notificationRepository.findById(notification.id()).orElseThrow();
     assertThat(result.isRead()).isTrue();
-    verify(eventPublisher).publish(argThat(event ->
-        event.notificationId().equals(notification.id())
-            && event.receiverId().equals(notification.receiverId())
-            && event.occurredAt() != null
-    ));
+    CursorResponse<NotificationDto> notifications = notificationService.getNotifications(
+        notification.receiverId(),
+        null,
+        null,
+        10,
+        "createdAt",
+        SortDirection.DESCENDING
+    );
+    assertThat(notifications.data())
+        .singleElement()
+        .extracting(NotificationDto::read)
+        .isEqualTo(true);
+    verify(eventPublisher).publish(argThat(event -> {
+      if (!(event instanceof NotificationReadEvent readEvent)) {
+        return false;
+      }
+      return readEvent.notificationId().equals(notification.id())
+          && readEvent.receiverId().equals(notification.receiverId())
+          && readEvent.occurredAt() != null;
+    }));
   }
 
   @Test
