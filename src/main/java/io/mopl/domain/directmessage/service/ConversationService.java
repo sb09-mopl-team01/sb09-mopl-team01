@@ -52,8 +52,9 @@ public class ConversationService {
     Conversation conversation = conversationRepository
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
         .orElseGet(() -> saveConversation(key));
+    validateConversationParticipant(conversation, requester.getId());
 
-    return conversationMapper.toDto(conversation, requester, withUser);
+    return conversationMapper.toDto(conversation, withUser);
   }
 
   //대화방 목록 조회
@@ -88,7 +89,6 @@ public class ConversationService {
     List<ConversationDto> data = pageData.stream()
         .map(conversation -> conversationMapper.toDto(
             conversation,
-            requester,
             getOtherUser(usersById, conversation.getOtherParticipantId(requester.getId()))
         ))
         .toList();
@@ -110,12 +110,13 @@ public class ConversationService {
   public ConversationDto findConversation(UUID requesterId, UUID conversationId) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
+    validateConversationParticipant(conversation, requester.getId());
     User withUser = getOtherUser(
         findOtherParticipants(requester.getId(), List.of(conversation)),
         conversation.getOtherParticipantId(requester.getId())
     );
 
-    return conversationMapper.toDto(conversation, requester, withUser);
+    return conversationMapper.toDto(conversation, withUser);
   }
 
   @Transactional(readOnly = true)
@@ -187,6 +188,10 @@ public class ConversationService {
     if (requesterId.equals(withUserId)) {
       throw new BaseException(ErrorCode.SELF_CONVERSATION_NOT_ALLOWED);
     }
+  }
+
+  private void validateConversationParticipant(Conversation conversation, UUID requesterId) {
+    conversation.getOtherParticipantId(requesterId);
   }
 
   private void validateFindConversationsCommand(
