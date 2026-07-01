@@ -93,7 +93,7 @@ public class SecurityConfig {
 
     csrf.csrfTokenRepository(csrfTokenRepository)
         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh");
+        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/api/auth/sign-out");
   }
 
   private void configureFormLogin(FormLoginConfigurer<HttpSecurity> login) {
@@ -122,7 +122,9 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 새로고침
         .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
+        .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
 
+        .requestMatchers("/", "/error").permitAll()
         .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
 
