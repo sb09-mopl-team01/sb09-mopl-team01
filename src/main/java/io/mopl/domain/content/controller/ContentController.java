@@ -2,6 +2,7 @@ package io.mopl.domain.content.controller;
 
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.service.ContentService;
 import io.mopl.global.exception.BaseException;
@@ -19,6 +20,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -50,6 +52,17 @@ public class ContentController {
   @GetMapping("/{contentId}")
   public ResponseEntity<ContentDto> findContent(@PathVariable UUID contentId) {
     ContentDto response = contentService.findContent(contentId);
+    return ResponseEntity.ok(response);
+  }
+
+  @PatchMapping(value = "/{contentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ContentDto> updateContent(
+      @PathVariable UUID contentId,
+      @Valid @RequestPart("request") ContentUpdateRequest request,
+      @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail
+  ) {
+    ContentDto response = contentService.updateContent(contentId, request, thumbnail);
     return ResponseEntity.ok(response);
   }
 

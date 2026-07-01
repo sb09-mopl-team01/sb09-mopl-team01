@@ -3,6 +3,7 @@ package io.mopl.domain.content.service;
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
@@ -14,6 +15,7 @@ import io.mopl.global.response.SortDirection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -95,5 +97,46 @@ public class ContentService {
         contents.sortBy(),
         contents.sortDirection()
     );
+  }
+
+  @Transactional
+  public ContentDto updateContent(
+      UUID contentId,
+      ContentUpdateRequest request,
+      MultipartFile thumbnail
+  ) {
+    Content content = getContentOrThrow(contentId);
+    String currentThumbnailUrl = content.getThumbnailUrl();
+    String uploadedThumbnailUrl = null;
+
+    try {
+      String thumbnailUrl = contentThumbnailService.uploadOptional(thumbnail, currentThumbnailUrl);
+      if (!Objects.equals(currentThumbnailUrl, thumbnailUrl)) {
+        uploadedThumbnailUrl = thumbnailUrl;
+      }
+      content.updateManual(
+          request == null ? null : request.title(),
+          request == null ? null : request.description(),
+          request == null ? null : request.tags(),
+          thumbnailUrl
+      );
+      if (uploadedThumbnailUrl != null) {
+        contentThumbnailService.delete(currentThumbnailUrl);
+      }
+      log.info("Content update completed. contentId={}", contentId);
+      return contentMapper.toDto(content, contentStatsService.getStats(content));
+    } catch (IllegalArgumentException e) {
+      contentThumbnailService.delete(uploadedThumbnailUrl);
+      log.warn("Content update rejected. contentId={}", contentId);
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private Content getContentOrThrow(UUID contentId) {
+    return contentRepository.findById(contentId)
+        .orElseThrow(() -> {
+          log.warn("Content find failed. contentId={}", contentId);
+          return new BaseException(ErrorCode.INVALID_INPUT);
+        });
   }
 }

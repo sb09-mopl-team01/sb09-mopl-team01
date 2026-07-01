@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
@@ -200,5 +201,47 @@ class ContentServiceTest {
 
     assertThat(result).isEqualTo(expectedDto);
     verify(contentRepository).save(content);
+  }
+
+  @Test
+  @DisplayName("관리자 콘텐츠 수정 시 thumbnail이 없으면 기존 썸네일을 유지한다")
+  void updateContentWithoutThumbnailKeepsCurrentThumbnail() {
+    UUID contentId = UUID.randomUUID();
+    ContentUpdateRequest request = new ContentUpdateRequest(
+        "수정 제목",
+        "수정 설명",
+        java.util.Set.of("수정태그")
+    );
+    Content content = Content.createManual(
+        ContentType.MOVIE,
+        "영화",
+        "영화 설명",
+        "/content-thumbnails/current.jpg",
+        List.of("액션")
+    );
+    ReflectionTestUtils.setField(content, "id", contentId);
+    ContentStats stats = new ContentStats(0.0, 0, 0L);
+    ContentDto expectedDto = ContentDto.builder()
+        .id(contentId)
+        .type(ContentType.MOVIE)
+        .title("수정 제목")
+        .description("수정 설명")
+        .thumbnailUrl("/content-thumbnails/current.jpg")
+        .tags(java.util.Set.of("수정태그"))
+        .averageRating(0.0)
+        .reviewCount(0)
+        .watcherCount(0L)
+        .build();
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+    given(contentThumbnailService.uploadOptional(null, "/content-thumbnails/current.jpg"))
+        .willReturn("/content-thumbnails/current.jpg");
+    given(contentStatsService.getStats(content)).willReturn(stats);
+    given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
+
+    ContentDto result = contentService.updateContent(contentId, request, null);
+
+    assertThat(result).isEqualTo(expectedDto);
+    assertThat(content.getTitle()).isEqualTo("수정 제목");
+    assertThat(content.getThumbnailUrl()).isEqualTo("/content-thumbnails/current.jpg");
   }
 }

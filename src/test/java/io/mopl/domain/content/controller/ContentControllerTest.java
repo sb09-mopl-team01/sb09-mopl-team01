@@ -9,6 +9,7 @@ import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.service.ContentService;
 import io.mopl.global.exception.BaseException;
@@ -206,6 +207,40 @@ class ContentControllerTest {
     ResponseEntity<ContentDto> response = contentController.createContent(request, thumbnail);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getBody()).isEqualTo(expectedDto);
+  }
+
+  @Test
+  @DisplayName("PATCH /api/contents/{id} - 관리자 콘텐츠 수정 성공 시 200을 반환한다")
+  void updateContent() {
+    UUID contentId = UUID.randomUUID();
+    ContentUpdateRequest request = new ContentUpdateRequest(
+        "수정 제목",
+        "수정 설명",
+        java.util.Set.of("수정태그")
+    );
+    MockMultipartFile thumbnail = new MockMultipartFile(
+        "thumbnail",
+        "poster.jpg",
+        "image/jpeg",
+        "image".getBytes()
+    );
+    ContentDto expectedDto = ContentDto.builder()
+        .id(contentId)
+        .type(ContentType.MOVIE)
+        .title("수정 제목")
+        .description("수정 설명")
+        .thumbnailUrl("/content-thumbnails/poster.jpg")
+        .tags(java.util.Set.of("수정태그"))
+        .averageRating(0.0)
+        .reviewCount(0)
+        .watcherCount(0L)
+        .build();
+    given(contentService.updateContent(contentId, request, thumbnail)).willReturn(expectedDto);
+
+    ResponseEntity<ContentDto> response = contentController.updateContent(contentId, request, thumbnail);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isEqualTo(expectedDto);
   }
 }
