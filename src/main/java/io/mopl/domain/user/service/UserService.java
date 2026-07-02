@@ -3,6 +3,7 @@ package io.mopl.domain.user.service;
 import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
+import io.mopl.domain.user.storage.ProfileImageStorage;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.domain.user.dto.data.UserDto;
@@ -35,6 +36,7 @@ public class UserService {
   private final UserRepository userRepository;
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
+  private final ProfileImageStorage profileImageStorage;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -71,14 +73,27 @@ public class UserService {
           log.info("[사용자 관리] 사용자 프로필 수정 실패.존재하지 않는 사용자. id={}", userId);
           return new UserNotFoundException();
         });
-
-    String profileImageUrl = null;
-
+    String oldImageUrl = user.getProfileImageUrl();
+    String newImageUrl = oldImageUrl;
     if (image != null && !image.isEmpty()) {
-      // 이미지 로컬 저장 기능 구현 후 추가
+      try {
+        newImageUrl = profileImageStorage.store(image);
+      } catch (Exception e) {
+        log.warn("Update User Profile Image Fail. url={}", oldImageUrl);
+        throw new BaseException(ErrorCode.PROFILE_IMAGE_UPLOAD_FAIL);
+      }
     }
 
-    user.updateProfile(request.name(), profileImageUrl);
+    user.updateProfile(request.name(), newImageUrl);
+
+    if (image != null && !image.isEmpty() && oldImageUrl != null) {
+      try {
+        profileImageStorage.delete(oldImageUrl);
+      } catch (Exception e) {
+        log.warn("Delete Previous User Profile Image Fail. url={}", oldImageUrl);
+      }
+    }
+
     log.info("[사용자 관리] 사용자 프로필 수정 완료. id={}", userId);
     return userMapper.toDto(user);
   }
