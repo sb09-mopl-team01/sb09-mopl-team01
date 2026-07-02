@@ -42,11 +42,9 @@ management:
 
 
 jwt:
-  # 향후 env로 옮길 예정
-  secret: bXktand0LXNlY3JldC1rZXktZm9yLXNwcmluZy1zZWN1cml0eQ==
-  #
-  access-token-validity-seconds: 3600
-  refresh-token-validity-seconds: 604800
+  secret: ${JWT_SECRET}
+  access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:3600}
+  refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:604800}
 
 mopl:
   # 향후 env로 옮길 예정

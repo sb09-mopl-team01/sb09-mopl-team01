@@ -12,9 +12,11 @@ import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -29,12 +31,16 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
+    log.info("Auth Token-Refresh Started.");
+
     if (currentRefreshToken == null || !jwtProvider.validateToken(currentRefreshToken)) {
+      log.warn("Auth Token-Refresh Failed. Invalid refresh token.");
       throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
     }
 
     String email = jwtProvider.getUsername(currentRefreshToken);
     if (!refreshTokenRepository.isValid(email, currentRefreshToken)) {
+      log.warn("Auth Token-Refresh Failed. Expired or manipulated token. email={}", email);
       throw new IllegalArgumentException("만료되었거나 조작된 리프레시 토큰입니다.");
     }
 
@@ -47,13 +53,19 @@ public class AuthService {
     refreshTokenRepository.save(email, newRefreshToken);
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
+
+    log.info("Auth Token Refresh Completed. email={}", email);
     return new TokenRefreshResult(newAccessToken, newRefreshToken, userDto);
   }
 
-
   public void resetPassword(String email) {
+    log.info("Auth Reset Password Started. email={}", email);
+
     userRepository.findByEmail(email)
-        .orElseThrow(UserNotFoundException::new);
+        .orElseThrow(() -> {
+          log.warn("Auth Reset Password Failed. User not found. email={}", email);
+          return new UserNotFoundException();
+        });
 
     String tempPassword = tempPasswordService.generateRandomPassword();
     String encodedTempPassword = passwordEncoder.encode(tempPassword);
@@ -61,6 +73,7 @@ public class AuthService {
     tempPasswordService.saveTempPassword(email, encodedTempPassword);
 
     mailService.sendTempPasswordEmail(email, tempPassword);
-  }
 
+    log.info("Auth Reset Password Completed. email={}", email);
+  }
 }

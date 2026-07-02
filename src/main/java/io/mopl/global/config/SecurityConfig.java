@@ -125,7 +125,7 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
 
         .requestMatchers("/", "/error").permitAll()
-        .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
+        .requestMatchers("/index.html", "/*.ico", "/assets/**", "/*.svg").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
 

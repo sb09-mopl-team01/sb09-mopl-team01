@@ -41,7 +41,7 @@ public class UserService {
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
     if (userRepository.existsByEmail(request.email())) {
-      log.info("[사용자 관리] 사용자 생성 실패. 이메일 중복. email={}", request.email());
+      log.warn("User Create Failed. Email duplication. email={}", request.email());
       throw new DuplicateUserEmailException();
     }
 
@@ -52,17 +52,17 @@ public class UserService {
         .build();
 
     User savedUser = userRepository.save(user);
-    log.info("[사용자 관리] 사용자 생성 완료. id={}", savedUser.getId());
+    log.info("User Create Completed. id={}", savedUser.getId());
     return userMapper.toDto(savedUser);
   }
 
   public UserDto findUser(UUID userId) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("[사용자 관리] 사용자 조회 실패. id={}", userId);
+          log.warn("User Single Read Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
-    log.info("[사용자 관리] 사용자 조회 완료. id={}", userId);
+    log.info("User Single Read Completed. id={}", userId);
     return userMapper.toDto(user);
   }
 
@@ -70,16 +70,18 @@ public class UserService {
   public UserDto updateProfile(UUID userId, UserUpdateRequest request, MultipartFile image) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("[사용자 관리] 사용자 프로필 수정 실패.존재하지 않는 사용자. id={}", userId);
+          log.info("User Update Profile Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
+
     String oldImageUrl = user.getProfileImageUrl();
     String newImageUrl = oldImageUrl;
+
     if (image != null && !image.isEmpty()) {
       try {
         newImageUrl = profileImageStorage.store(image);
       } catch (Exception e) {
-        log.warn("Update User Profile Image Fail. url={}", oldImageUrl);
+        log.warn("User Update Profile Image Failed. url={}", oldImageUrl);
         throw new BaseException(ErrorCode.PROFILE_IMAGE_UPLOAD_FAIL);
       }
     }
@@ -90,11 +92,11 @@ public class UserService {
       try {
         profileImageStorage.delete(oldImageUrl);
       } catch (Exception e) {
-        log.warn("Delete Previous User Profile Image Fail. url={}", oldImageUrl);
+        log.warn("User Delete Previous Profile Image Failed. url={}", oldImageUrl);
       }
     }
 
-    log.info("[사용자 관리] 사용자 프로필 수정 완료. id={}", userId);
+    log.info("User Update Profile Completed. id={}", userId);
     return userMapper.toDto(user);
   }
 
@@ -102,31 +104,31 @@ public class UserService {
   public void updateUserRole(UUID userId, UserRoleUpdateRequest request) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("[사용자 관리] 사용자 권한 수정 실패.존재하지 않는 사용자. id={}", userId);
+          log.warn("User Update Role Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
     user.updateRole(request.role());
-    log.info("[사용자 관리] 사용자 권한 수정 완료. id={}, role={}", userId, user.getRole());
+    log.info("User Update Role Completed. id={}, role={}", userId, user.getRole());
   }
 
   @Transactional
   public void changePassword(UUID userId, ChangePasswordRequest request) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("[사용자 관리] 사용자 비밀번호 변경 실패.존재하지 않는 사용자. id={}", userId);
+          log.warn("User Update Password Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
 
     String newPasswordHash = passwordEncoder.encode(request.password());
     user.changePassword(newPasswordHash);
-    log.info("[사용자 관리] 사용자 비밀번호 완료. id={}", userId);
+    log.info("User Update Password Completed. id={}", userId);
   }
 
   @Transactional
   public void updateUserLockStatus(UUID userId, UserLockUpdateRequest request) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("[사용자 관리] 사용자 잠금 실패.존재하지 않는 사용자. id={}", userId);
+          log.warn("User Update LockStatus Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
 
@@ -136,16 +138,17 @@ public class UserService {
       user.unlockAccount();
     }
 
-    log.info("[사용자 관리] 사용자 잠금 완료. id={}", userId);
+    log.info("User Update LockStatus Completed. id={}", userId);
   }
 
   public CursorResponse<UserDto> findUsers(
       String emailLike, String roleEqual, Boolean isLocked,
       String cursor, UUID idAfter, int limit,
       String sortBy, SortDirection sortDirection) {
-    log.info("[사용자 관리] 사용자 다건 조회 시작. emailLike={}, roleEqual={}, isLocked={}"
-        + ", idAfter={}, limit={}, sortBy={}, sortDirection={}", emailLike, roleEqual, isLocked
-    , idAfter, limit, sortBy, sortDirection);
+
+    log.info("User Multiple Read Started. emailLike={}, roleEqual={}, isLocked={}, cursor={}, idAfter={}, limit={}, sortBy={}, sortDirection={}",
+        emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection);
+
     CursorResponse<User> entityResponse = userRepository.findUsersByCursor(
         emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection
     );

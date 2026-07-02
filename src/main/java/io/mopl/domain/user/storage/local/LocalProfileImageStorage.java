@@ -16,11 +16,12 @@ import java.util.UUID;
 @Component
 public class LocalProfileImageStorage implements ProfileImageStorage {
 
-  @Value("${file.upload-dir}")
+  @Value("${spring.file.upload-dir}")
   private String uploadDir;
 
   @Override
   public String store(MultipartFile file) {
+    log.debug("ProfileImageStorage Store Started. originalFilename={}", file.getOriginalFilename());
     try {
       String fileName = UUID.randomUUID().toString() + "_" + file.getOriginalFilename();
       Path uploadPath = Paths.get(uploadDir);
@@ -30,26 +31,30 @@ public class LocalProfileImageStorage implements ProfileImageStorage {
       }
 
       file.transferTo(uploadPath.resolve(fileName));
-      log.info("[파일 저장] 로컬 저장 완료. path={}", uploadPath.resolve(fileName));
+      log.debug("ProfileImageStorage Store Completed. path={}", uploadPath.resolve(fileName));
 
-      return "/uploads/images/" + fileName;
+      return uploadDir + fileName;
     } catch (IOException e) {
+      log.error("ProfileImageStorage Store Failed. originalFilename={}", file.getOriginalFilename(), e);
       throw new RuntimeException("파일 저장 실패", e);
     }
   }
 
   @Override
   public void delete(String fileUrl) {
+    log.debug("ProfileImageStorage Delete Started. url={}", fileUrl);
     try {
       String fileName = fileUrl.substring(fileUrl.lastIndexOf("/") + 1);
       Path filePath = Paths.get(uploadDir).resolve(fileName);
 
       if (Files.exists(filePath)) {
         Files.delete(filePath);
-        log.info("[파일 삭제] 로컬 삭제 완료. path={}", filePath);
+        log.debug("ProfileImageStorage Delete Completed. path={}", filePath);
+      } else {
+        log.debug("ProfileImageStorage Delete Skipped. File not found. path={}", filePath);
       }
     } catch (IOException e) {
-      log.error("[파일 삭제] 파일 삭제 실패. url={}", fileUrl, e);
+      log.error("ProfileImageStorage Delete Failed. url={}", fileUrl, e);
     }
   }
 }
