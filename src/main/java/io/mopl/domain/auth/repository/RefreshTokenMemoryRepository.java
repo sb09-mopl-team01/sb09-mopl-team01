@@ -3,18 +3,25 @@ package io.mopl.domain.auth.repository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
 
 import java.util.Map;
 import java.util.Optional;
 import java.util.concurrent.ConcurrentHashMap;
 
-@Repository
-public class RefreshTokenMemoryRepository {
+//@Repository
+@RequiredArgsConstructor
+public class RefreshTokenMemoryRepository implements RefreshTokenRepository{
 
   private final Map<String, List<String>> tokenStorage = new ConcurrentHashMap<>();
 
-  private final int MAX_ACTIVE_TOKENS = 1;
+  @Value("${auth.max-active-tokens}")
+  private int maxActiveTokens;
+
+  @Value("${auth.refresh-ttl-millis}")
+  private long refreshTokenTtlMillis;
 
   public void save(String email, String refreshToken) {
     tokenStorage.compute(email, (key, tokens) -> {
@@ -24,7 +31,7 @@ public class RefreshTokenMemoryRepository {
 
       tokens.add(refreshToken);
 
-      while (tokens.size() > MAX_ACTIVE_TOKENS) {
+      while (tokens.size() > maxActiveTokens) {
         tokens.remove(0);
       }
       return tokens;
