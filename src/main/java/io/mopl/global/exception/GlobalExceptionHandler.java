@@ -8,6 +8,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -65,6 +66,18 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.BAD_REQUEST)
         .body(new ErrorResponse(ErrorCode.INVALID_INPUT.getCode(), message));
+  }
+
+  @ExceptionHandler(ServletRequestBindingException.class)
+  protected ResponseEntity<ErrorResponse> handleServletRequestBindingException(
+      ServletRequestBindingException e, HttpServletRequest request) {
+
+    log.warn("Required request binding value is missing. uri={}, method={}, message={}",
+        request.getRequestURI(), request.getMethod(), e.getMessage());
+
+    return ResponseEntity
+        .status(ErrorCode.AUTHENTICATION_REQUIRED.getStatus())
+        .body(ErrorResponse.of(ErrorCode.AUTHENTICATION_REQUIRED));
   }
 
 
