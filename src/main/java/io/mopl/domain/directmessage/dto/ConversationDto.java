@@ -8,8 +8,7 @@ public record ConversationDto(
     UUID id,
     @JsonProperty("with")
     UserSummary with,
-    @JsonProperty("lastestMessage")
-    DirectMessageDto latestMessage,
+    DirectMessageDto lastestMessage,
     boolean hasUnread
 ) {
 }
