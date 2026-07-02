@@ -179,6 +179,16 @@ public class ConversationService {
 
     validateDirectMessageReadTarget(conversation, directMessage, requester.getId());
     directMessage.markAsRead();
+
+    return new CursorResponse<>(
+        data,
+        hasNext && lastConversation != null ? lastConversation.getCreatedAt().toString() : null,
+        hasNext && lastConversation != null ? lastConversation.getId() : null,
+        hasNext,
+        conversationRepository.countMyConversations(requester.getId(), keywordLike),
+        sortBy,
+        sortDirection
+    );
   }
 
   private Conversation saveConversation(Conversation conversation) {

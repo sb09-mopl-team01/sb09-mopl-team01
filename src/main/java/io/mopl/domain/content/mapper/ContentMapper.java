@@ -5,6 +5,7 @@ import io.mopl.domain.content.dto.ContentStats;
 import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.entity.Content;
+import java.util.LinkedHashSet;
 import org.mapstruct.Mapper;
 
 @Mapper(componentModel = "spring")
@@ -28,7 +29,7 @@ public interface ContentMapper {
         .title(content.getTitle())
         .description(content.getDescription())
         .thumbnailUrl(content.getThumbnailUrl())
-        .tags(content.getTags())
+        .tags(new LinkedHashSet<>(content.getTags()))
         .averageRating(resolvedStats.averageRating())
         .reviewCount(resolvedStats.reviewCount())
         .watcherCount(resolvedStats.watcherCount())
@@ -43,7 +44,7 @@ public interface ContentMapper {
         .title(content.getTitle())
         .description(content.getDescription())
         .thumbnailUrl(content.getThumbnailUrl())
-        .tags(content.getTags())
+        .tags(new LinkedHashSet<>(content.getTags()))
         .averageRating(resolvedStats.averageRating())
         .reviewCount(resolvedStats.reviewCount())
         .build();

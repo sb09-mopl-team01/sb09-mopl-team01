@@ -21,6 +21,8 @@ import org.springframework.stereotype.Repository;
 public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
   private static final String SORT_BY_CREATED_AT = "createdAt";
+  private static final String SORT_BY_RATE = "rate";
+  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
 
   private final JPAQueryFactory queryFactory;
 
@@ -45,9 +47,12 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
             eqType(typeEqual),
             containsKeyword(keywordLike),
             containsAnyTag(tagsIn),
-            cursorCondition(cursor, idAfter, resolvedDirection)
+            cursorCondition(cursor, idAfter, resolvedSortBy, resolvedDirection)
         )
-        .orderBy(createOrderSpecifier(resolvedDirection), createIdOrderSpecifier(resolvedDirection))
+        .orderBy(
+            createOrderSpecifier(resolvedSortBy, resolvedDirection),
+            createIdOrderSpecifier(resolvedDirection)
+        )
         .limit(limit + 1)
         .fetch();
 
@@ -60,7 +65,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     UUID nextIdAfter = null;
     if (!contents.isEmpty()) {
       Content lastContent = contents.get(contents.size() - 1);
-      nextCursor = lastContent.getCreatedAt().toString();
+      nextCursor = nextCursor(lastContent, resolvedSortBy);
       nextIdAfter = lastContent.getId();
     }
 
@@ -86,8 +91,12 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   private String resolveSortBy(String sortBy) {
-    if (sortBy == null || sortBy.isBlank() || SORT_BY_CREATED_AT.equals(sortBy)) {
+    if (sortBy == null || sortBy.isBlank()) {
       return SORT_BY_CREATED_AT;
+    }
+    if (SORT_BY_CREATED_AT.equals(sortBy) || SORT_BY_RATE.equals(sortBy)
+        || SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+      return sortBy;
     }
     throw new IllegalArgumentException("Unsupported content sortBy: " + sortBy);
   }
@@ -116,12 +125,27 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   private BooleanExpression cursorCondition(
       String cursor,
       UUID idAfter,
+      String sortBy,
       SortDirection sortDirection
   ) {
     if (cursor == null || cursor.isBlank()) {
       return null;
     }
 
+    if (SORT_BY_RATE.equals(sortBy)) {
+      return rateCursorCondition(cursor, idAfter, sortDirection);
+    }
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+      return watcherCountCursorCondition(idAfter, sortDirection);
+    }
+    return createdAtCursorCondition(cursor, idAfter, sortDirection);
+  }
+
+  private BooleanExpression createdAtCursorCondition(
+      String cursor,
+      UUID idAfter,
+      SortDirection sortDirection
+  ) {
     Instant cursorCreatedAt = Instant.parse(cursor);
     if (sortDirection == SortDirection.ASCENDING) {
       BooleanExpression afterCursor = content.createdAt.gt(cursorCreatedAt);
@@ -138,7 +162,50 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     return beforeCursor.or(content.createdAt.eq(cursorCreatedAt).and(content.id.lt(idAfter)));
   }
 
-  private OrderSpecifier<Instant> createOrderSpecifier(SortDirection sortDirection) {
+  private BooleanExpression rateCursorCondition(
+      String cursor,
+      UUID idAfter,
+      SortDirection sortDirection
+  ) {
+    double cursorRate = Double.parseDouble(cursor);
+    if (sortDirection == SortDirection.ASCENDING) {
+      BooleanExpression afterCursor = content.averageRating.gt(cursorRate);
+      if (idAfter == null) {
+        return afterCursor;
+      }
+      return afterCursor.or(content.averageRating.eq(cursorRate).and(content.id.gt(idAfter)));
+    }
+
+    BooleanExpression beforeCursor = content.averageRating.lt(cursorRate);
+    if (idAfter == null) {
+      return beforeCursor;
+    }
+    return beforeCursor.or(content.averageRating.eq(cursorRate).and(content.id.lt(idAfter)));
+  }
+
+  private BooleanExpression watcherCountCursorCondition(
+      UUID idAfter,
+      SortDirection sortDirection
+  ) {
+    if (idAfter == null) {
+      return null;
+    }
+    return sortDirection == SortDirection.ASCENDING
+        ? content.id.gt(idAfter)
+        : content.id.lt(idAfter);
+  }
+
+  private OrderSpecifier<?> createOrderSpecifier(String sortBy, SortDirection sortDirection) {
+    if (SORT_BY_RATE.equals(sortBy)) {
+      return sortDirection == SortDirection.ASCENDING
+          ? content.averageRating.asc()
+          : content.averageRating.desc();
+    }
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+      return sortDirection == SortDirection.ASCENDING
+          ? content.id.asc()
+          : content.id.desc();
+    }
     return sortDirection == SortDirection.ASCENDING
         ? content.createdAt.asc()
         : content.createdAt.desc();
@@ -148,5 +215,15 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     return sortDirection == SortDirection.ASCENDING
         ? content.id.asc()
         : content.id.desc();
+  }
+
+  private String nextCursor(Content content, String sortBy) {
+    if (SORT_BY_RATE.equals(sortBy)) {
+      return String.valueOf(content.getAverageRating());
+    }
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+      return "0";
+    }
+    return content.getCreatedAt().toString();
   }
 }
