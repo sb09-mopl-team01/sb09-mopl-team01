@@ -110,12 +110,13 @@ public class ConversationService {
   public ConversationDto findConversation(UUID requesterId, UUID conversationId) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
+    validateConversationParticipant(conversation, requester.getId());
     User withUser = getOtherUser(
         findOtherParticipants(requester.getId(), List.of(conversation)),
         conversation.getOtherParticipantId(requester.getId())
     );
 
-    return conversationMapper.toDto(conversation, requester, withUser);
+    return conversationMapper.toDto(conversation, withUser);
   }
 
   @Transactional(readOnly = true)
@@ -179,16 +180,6 @@ public class ConversationService {
 
     validateDirectMessageReadTarget(conversation, directMessage, requester.getId());
     directMessage.markAsRead();
-
-    return new CursorResponse<>(
-        data,
-        hasNext && lastConversation != null ? lastConversation.getCreatedAt().toString() : null,
-        hasNext && lastConversation != null ? lastConversation.getId() : null,
-        hasNext,
-        conversationRepository.countMyConversations(requester.getId(), keywordLike),
-        sortBy,
-        sortDirection
-    );
   }
 
   private Conversation saveConversation(Conversation conversation) {

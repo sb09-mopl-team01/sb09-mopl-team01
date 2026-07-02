@@ -39,6 +39,9 @@ public enum ErrorCode {
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다"),
   PLAYLIST_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트에 해당 콘텐츠가 없습니다"),
 
+  // 팔로우
+  ALREADY_FOLLOWING(HttpStatus.CONFLICT, "FOLLOW_409", "이미 팔로우 중인 유저입니다."),
+
   // 리뷰
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")
   ;
