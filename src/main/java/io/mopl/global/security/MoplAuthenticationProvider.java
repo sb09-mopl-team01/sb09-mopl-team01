@@ -29,7 +29,7 @@ public class MoplAuthenticationProvider implements AuthenticationProvider {
     String tempPassword = tempPasswordService.getTempPassword(email);
     boolean isTempLogin = false;
 
-    if (tempPassword != null && tempPassword.equals(password)) {
+    if (tempPassword != null && passwordEncoder.matches(password, tempPassword)) {
       isTempLogin = true;
     } else if (passwordEncoder.matches(password, userDetails.getPassword())) {
       isTempLogin = false;

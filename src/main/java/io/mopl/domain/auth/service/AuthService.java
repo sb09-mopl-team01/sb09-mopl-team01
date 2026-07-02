@@ -12,6 +12,7 @@ import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -25,6 +26,7 @@ public class AuthService {
   private final UserRepository userRepository;
   private final TempPasswordService tempPasswordService;
   private final MailService mailService;
+  private final PasswordEncoder passwordEncoder;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
     if (currentRefreshToken == null || !jwtProvider.validateToken(currentRefreshToken)) {
@@ -54,8 +56,9 @@ public class AuthService {
         .orElseThrow(UserNotFoundException::new);
 
     String tempPassword = tempPasswordService.generateRandomPassword();
+    String encodedTempPassword = passwordEncoder.encode(tempPassword);
 
-    tempPasswordService.saveTempPassword(email, tempPassword);
+    tempPasswordService.saveTempPassword(email, encodedTempPassword);
 
     mailService.sendTempPasswordEmail(email, tempPassword);
   }
