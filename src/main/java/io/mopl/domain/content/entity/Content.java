@@ -139,6 +139,26 @@ public class Content extends BaseUpdatableEntity {
     this.lastSyncedAt = Objects.requireNonNull(syncedAt, "동기화 시각은 필수입니다.");
   }
 
+  public void updateManual(
+      String title,
+      String description,
+      Collection<String> tags,
+      String thumbnailUrl
+  ) {
+    if (title != null) {
+      this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
+    }
+    if (description != null) {
+      this.description = requireText(description, "콘텐츠 설명은 필수입니다.");
+    }
+    if (tags != null) {
+      this.tags = normalizeTags(tags);
+    }
+    if (thumbnailUrl != null) {
+      this.thumbnailUrl = normalizeNullableText(thumbnailUrl);
+    }
+  }
+
   private static void validateExternalId(ContentSource source, String externalId) {
     if (source == null) {
       return;
