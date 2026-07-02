@@ -1,6 +1,7 @@
 package io.mopl.global.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -86,5 +87,13 @@ public class GlobalExceptionHandler {
         .stream()
         .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
         .collect(Collectors.joining(", "));
+  }
+
+  @ExceptionHandler({DateTimeParseException.class, NumberFormatException.class})
+  public ResponseEntity<ErrorResponse> handleParsingException(Exception e) {
+    ErrorCode errorCode = ErrorCode.INVALID_INPUT;
+    return ResponseEntity
+        .status(errorCode.getStatus())
+        .body(new ErrorResponse(errorCode.getCode(), "유효하지 않은 커서 형식입니다."));
   }
 }
