@@ -27,11 +27,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Playlist extends BaseUpdatableEntity {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  @Column(name = "id", nullable = false, updatable = false)
-  private UUID id;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "owner_id", nullable = false)
   private User owner;

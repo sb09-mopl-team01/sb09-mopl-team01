@@ -9,8 +9,7 @@ import org.springframework.stereotype.Component;
 @Component
 public class ConversationMapper {
 
-  public ConversationDto toDto(Conversation conversation, User requester, User withUser) {
-    conversation.getOtherParticipantId(requester.getId());
+  public ConversationDto toDto(Conversation conversation, User withUser) {
     return new ConversationDto(
         conversation.getId(),
         toUserSummary(withUser),

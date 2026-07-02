@@ -5,16 +5,17 @@ import java.util.List;
 import java.util.UUID;
 
 public interface PlaylistRepositoryCustom {
+
   List<Playlist> findPlaylistsByCursor(
-      String keywordLike,
-      UUID ownerIdEqual,
-      UUID subscriberIdEqual,
+      String keyword,
+      UUID ownerId,
+      UUID subscriberId,
       String cursor,
       UUID idAfter,
       int limit,
-      String sortBy,
-      String sortDirection
+      String sortDirection,
+      String sortBy
   );
 
-  long countPlaylists(String keywordLike, UUID ownerIdEqual, UUID subscriberIdEqual);
+  long countPlaylists(String keyword, UUID ownerId, UUID subscriberId);
 }

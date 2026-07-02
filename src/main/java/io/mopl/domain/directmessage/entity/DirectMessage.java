@@ -31,6 +31,9 @@ public class DirectMessage extends BaseEntity {
   @Column(nullable = false, length = 1000)
   private String content;
 
+  @Column(nullable = false)
+  private boolean read = false;
+
   private DirectMessage(
       Conversation conversation,
       UUID senderId,
@@ -50,5 +53,9 @@ public class DirectMessage extends BaseEntity {
       String content
   ) {
     return new DirectMessage(conversation, senderId, receiverId, content);
+  }
+
+  public void markAsRead() {
+    this.read = true;
   }
 }
