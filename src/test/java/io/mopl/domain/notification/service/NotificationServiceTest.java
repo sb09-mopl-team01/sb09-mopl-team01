@@ -9,6 +9,7 @@ import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
 import io.mopl.domain.notification.entity.NotificationLevel;
+import io.mopl.domain.notification.event.NotificationCreatedEvent;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.global.event.DomainEventPublisher;
@@ -63,6 +64,15 @@ class NotificationServiceTest {
     Notification savedNotification = notificationRepository.findById(result.id()).orElseThrow();
     assertThat(savedNotification.getReceiverId()).isEqualTo(receiverId);
     assertThat(savedNotification.isRead()).isFalse();
+    verify(eventPublisher).publish(argThat(event -> {
+      if (!(event instanceof NotificationCreatedEvent createdEvent)) {
+        return false;
+      }
+      return createdEvent.notificationId().equals(result.id())
+          && createdEvent.receiverId().equals(receiverId)
+          && createdEvent.notification().equals(result)
+          && createdEvent.occurredAt() != null;
+    }));
   }
 
   @Test
