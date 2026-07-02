@@ -3,6 +3,7 @@ package io.mopl.domain.auth.service;
 
 import io.mopl.domain.auth.dto.TokenRefreshResult;
 import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.mail.service.MailService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.exception.UserNotFoundException;
@@ -20,7 +21,7 @@ import org.springframework.stereotype.Service;
 public class AuthService {
 
   private final JwtProvider jwtProvider;
-  private final RefreshTokenMemoryRepository refreshTokenRepository;
+  private final RefreshTokenRepository refreshTokenRepository;
   private final MoplUserDetailsService userDetailsService;
   private final UserMapper userMapper;
   private final UserRepository userRepository;
