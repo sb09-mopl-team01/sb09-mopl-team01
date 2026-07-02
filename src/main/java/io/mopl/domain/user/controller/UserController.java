@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +37,7 @@ public class UserController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ResponseEntity<CursorResponse<UserDto>> findUsers(
       @RequestParam(required = false) String emailLike,
@@ -67,6 +69,7 @@ public class UserController {
     return ResponseEntity.ok(response);
   }
 
+  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
   @PatchMapping("/{userId}")
   public ResponseEntity<UserDto> updateUser(
       @PathVariable UUID userId,
@@ -79,10 +82,12 @@ public class UserController {
     return ResponseEntity.ok(response);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PatchMapping("/{userId}/role")
   public ResponseEntity<Void> updateUserRole(
       @PathVariable UUID userId,
-      @RequestBody UserRoleUpdateRequest request
+      @RequestBody UserRoleUpdateRequest request,
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
     log.info("[사용자 관리] 사용자 권한 변경 요청 수신. id={}", userId);
     userService.updateUserRole(userId, request);
@@ -90,6 +95,7 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
+  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updateUserPassword(
       @PathVariable UUID userId,
@@ -107,6 +113,7 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PatchMapping("/{userId}/locked")
   public ResponseEntity<Void> updateUserLocked(
       @PathVariable UUID userId,
