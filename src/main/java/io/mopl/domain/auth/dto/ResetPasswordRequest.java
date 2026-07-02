@@ -1,5 +1,7 @@
-package io.mopl.domain.user.dto.request;
+package io.mopl.domain.auth.dto;
 
 public record ResetPasswordRequest(
     String email
-) {}
+) {
+
+}
