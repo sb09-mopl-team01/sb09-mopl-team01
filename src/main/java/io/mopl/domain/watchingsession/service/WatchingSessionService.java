@@ -6,8 +6,11 @@ import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.watchingsession.dto.WatchingSessionDto;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
+import io.mopl.domain.watchingsession.event.WatchingSessionEnteredEvent;
+import io.mopl.domain.watchingsession.event.WatchingSessionLeftEvent;
 import io.mopl.domain.watchingsession.mapper.WatchingSessionMapper;
 import io.mopl.domain.watchingsession.repository.WatchingSessionRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -34,6 +37,7 @@ public class WatchingSessionService {
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
   private final WatchingSessionMapper watchingSessionMapper;
+  private final DomainEventPublisher domainEventPublisher;
 
   @Transactional
   public WatchingSessionDto startWatching(UUID watcherId, UUID contentId) {
@@ -49,18 +53,40 @@ public class WatchingSessionService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     WatchingSession session = WatchingSession.start(watcher, content);
-    return watchingSessionMapper.toDto(watchingSessionRepository.save(session));
+    WatchingSession savedSession = watchingSessionRepository.save(session);
+    domainEventPublisher.publish(new WatchingSessionEnteredEvent(
+        savedSession.getId(),
+        watcherId,
+        contentId,
+        Instant.now()
+    ));
+
+    return watchingSessionMapper.toDto(savedSession);
   }
 
   @Transactional
   public void endWatching(UUID watcherId) {
+    endWatching(watcherId, null);
+  }
+
+  @Transactional
+  public void endWatching(UUID watcherId, UUID contentId) {
     if (watcherId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
-    if (!watchingSessionRepository.existsByWatcherId(watcherId)) {
+    WatchingSession session = watchingSessionRepository.findByWatcherId(watcherId)
+        .orElseThrow(() -> new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND));
+    if (contentId != null && !session.getContent().getId().equals(contentId)) {
       throw new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND);
     }
-    watchingSessionRepository.deleteByWatcherId(watcherId);
+
+    watchingSessionRepository.delete(session);
+    domainEventPublisher.publish(new WatchingSessionLeftEvent(
+        session.getId(),
+        watcherId,
+        session.getContent().getId(),
+        Instant.now()
+    ));
   }
 
   @Transactional(readOnly = true)

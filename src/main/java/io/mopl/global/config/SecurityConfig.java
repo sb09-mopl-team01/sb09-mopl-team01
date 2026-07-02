@@ -90,7 +90,7 @@ public class SecurityConfig {
 
     csrf.csrfTokenRepository(csrfTokenRepository)
         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh");
+        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/ws/**");
   }
 
   private void configureFormLogin(FormLoginConfigurer<HttpSecurity> login) {
@@ -122,6 +122,7 @@ public class SecurityConfig {
 
         .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
+        .requestMatchers("/ws/**").permitAll()
 
         .anyRequest().authenticated();
 
