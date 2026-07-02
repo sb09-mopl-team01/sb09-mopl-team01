@@ -82,4 +82,14 @@ public class ConversationController {
         sortBy
     );
   }
+
+  @PostMapping("/{conversationId}/direct-messages/{directMessageId}/read")
+  public void readDirectMessage(
+      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @PathVariable UUID conversationId,
+      @PathVariable UUID directMessageId
+  ) {
+    conversationService.readDirectMessage(requesterId, conversationId, directMessageId);
+  }
+
 }

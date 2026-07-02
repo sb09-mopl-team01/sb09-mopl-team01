@@ -110,13 +110,12 @@ public class ConversationService {
   public ConversationDto findConversation(UUID requesterId, UUID conversationId) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
-    validateConversationParticipant(conversation, requester.getId());
     User withUser = getOtherUser(
         findOtherParticipants(requester.getId(), List.of(conversation)),
         conversation.getOtherParticipantId(requester.getId())
     );
 
-    return conversationMapper.toDto(conversation, withUser);
+    return conversationMapper.toDto(conversation, requester, withUser);
   }
 
   @Transactional(readOnly = true)
@@ -169,6 +168,29 @@ public class ConversationService {
     );
   }
 
+  @Transactional
+  public void readDirectMessage(UUID requesterId, UUID conversationId, UUID directMessageId) {
+    User requester = getUser(requesterId);
+    Conversation conversation = getConversation(conversationId);
+    conversation.getOtherParticipantId(requester.getId());
+
+    DirectMessage directMessage = directMessageRepository.findById(directMessageId)
+        .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
+
+    validateDirectMessageReadTarget(conversation, directMessage, requester.getId());
+    directMessage.markAsRead();
+
+    return new CursorResponse<>(
+        data,
+        hasNext && lastConversation != null ? lastConversation.getCreatedAt().toString() : null,
+        hasNext && lastConversation != null ? lastConversation.getId() : null,
+        hasNext,
+        conversationRepository.countMyConversations(requester.getId(), keywordLike),
+        sortBy,
+        sortDirection
+    );
+  }
+
   private Conversation saveConversation(Conversation conversation) {
     try {
       return conversationRepository.save(conversation);
@@ -202,6 +224,17 @@ public class ConversationService {
     if (limit <= 0
         || sortDirection == null
         || !CREATED_AT_SORT.equals(sortBy)) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private void validateDirectMessageReadTarget(
+      Conversation conversation,
+      DirectMessage directMessage,
+      UUID requesterId
+  ) {
+    if (!directMessage.getConversation().getId().equals(conversation.getId())
+        || !directMessage.getReceiverId().equals(requesterId)) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }
