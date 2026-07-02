@@ -3,7 +3,10 @@ spring:
     name: mopl
   profiles:
     active: dev
+
   jpa:
+    hibernate:
+      ddl-auto: update
     properties:
       hibernate:
         jdbc.batch_size: 1000

@@ -1,7 +1,9 @@
 spring:
-  config:
-    import:
-      - classpath:application-local-h2.yml
+  datasource:
+    url: jdbc:postgresql://${RDS_HOST:localhost}:${RDS_PORT:5432}/${RDS_DB_NAME:postgres}
+    username: ${RDS_USERNAME:postgres}
+    password: ${RDS_PASSWORD:Moplteam01!}
+    driver-class-name: org.postgresql.Driver
 
   # .env 파일로 옮겨야함
   data:
