@@ -196,7 +196,7 @@ class ConversationServiceTest {
     when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
     when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
     when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
-    when(conversationMapper.toDto(conversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(conversation, withUser)).thenReturn(expected);
 
     ConversationDto result = conversationService.findConversation(requesterId, conversationId);
 

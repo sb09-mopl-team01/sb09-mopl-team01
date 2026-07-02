@@ -17,6 +17,7 @@
 - 헬스 체크: `/actuator/health`
 - Swagger UI: `/swagger-ui/index.html`
 - API Docs: `/v3/api-docs`
+- WebSocket STOMP: `/ws`
 
 ## 주요 기능
 
@@ -88,7 +89,6 @@ chmod +x gradlew
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
 인메모리 H2 데이터베이스를 사용합니다.
-
 
 
 ## 문서
