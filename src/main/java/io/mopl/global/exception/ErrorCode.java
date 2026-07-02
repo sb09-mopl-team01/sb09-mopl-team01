@@ -36,9 +36,16 @@ public enum ErrorCode {
   // 참여자 파악 여부
   NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
+  // WatchingSession
+  WATCHING_SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "WATCHING_SESSION_404", "현재 시청 중인 콘텐츠가 없습니다"),
+  WATCHING_SESSION_ALREADY_EXISTS(HttpStatus.CONFLICT, "WATCHING_SESSION_409", "이미 다른 콘텐츠를 시청 중입니다"),
+  INVALID_WATCHING_SESSION_CURSOR(HttpStatus.BAD_REQUEST, "WATCHING_SESSION_CURSOR_400", "시청 목록을 불러올 수 없습니다"),
+  INVALID_WATCHING_SESSION_SORT(HttpStatus.BAD_REQUEST, "WATCHING_SESSION_SORT_400", "시청 목록을 정렬할 수 없습니다"),
+
   // 플레이리스트
   PLAYLIST_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트를 찾을 수 없습니다"),
   PLAYLIST_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트에 해당 콘텐츠가 없습니다"),
+
   // Direct Message
   SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
