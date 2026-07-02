@@ -2,7 +2,7 @@ package io.mopl.global.security.handler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.auth.dto.LoginResponse;
-import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.global.security.CookieProvider;
@@ -33,7 +33,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
   private final JwtProvider jwtProvider;
   private final UserMapper userMapper;
 
-  private final RefreshTokenMemoryRepository refreshTokenRepository;
+  private final RefreshTokenRepository refreshTokenRepository;
   private final CookieProvider cookieProvider;
 
   @Override
@@ -48,7 +48,6 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     String accessToken = jwtProvider.generateAccessToken(userDetails);
     String refreshToken = jwtProvider.generateRefreshToken(email);
 
-    // 임시로 서버 메모리에 저장
     refreshTokenRepository.save(email, refreshToken);
 
     ResponseCookie refreshTokenCookie = cookieProvider.createRefreshTokenCookie(refreshToken);
