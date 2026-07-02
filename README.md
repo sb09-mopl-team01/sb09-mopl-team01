@@ -17,6 +17,7 @@
 - 헬스 체크: `/actuator/health`
 - Swagger UI: `/swagger-ui/index.html`
 - API Docs: `/v3/api-docs`
+- WebSocket STOMP: `/ws`
 
 ## 주요 기능
 
@@ -65,6 +66,12 @@ src/main/java/io/mopl
 ```
 
 현재 공통 설정과 전역 예외 처리 기반을 먼저 구성하고 있으며, 각 도메인은 Swagger 명세와 프론트엔드 연동 계약에 맞춰 순차적으로 구현합니다.
+
+## 실시간 채널
+
+- 시청 세션 입장 발행: `/pub/contents/{contentId}/watching-sessions/enter`
+- 시청 세션 퇴장 발행: `/pub/contents/{contentId}/watching-sessions/leave`
+- 시청 세션 이벤트 구독: `/sub/contents/{contentId}/watching-sessions`
 
 ## 실행
 
