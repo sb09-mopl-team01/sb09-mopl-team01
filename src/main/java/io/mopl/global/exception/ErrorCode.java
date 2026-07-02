@@ -35,6 +35,7 @@ public enum ErrorCode {
 
   // Direct Message
   SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
+  CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
   CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
 
   ALREADY_REVIEWED(HttpStatus.CONFLICT, "REVIEW_409", "이미 작성한 리뷰가 존재합니다.")

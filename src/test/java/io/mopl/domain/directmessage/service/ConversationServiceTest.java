@@ -81,7 +81,7 @@ class ConversationServiceTest {
     when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
         .thenReturn(Optional.empty());
     when(conversationRepository.save(any(Conversation.class))).thenReturn(savedConversation);
-    when(conversationMapper.toDto(savedConversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(savedConversation, withUser)).thenReturn(expected);
 
     ConversationDto result = conversationService.createConversation(
         requesterId,
@@ -105,7 +105,7 @@ class ConversationServiceTest {
     when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
     when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
         .thenReturn(Optional.of(existingConversation));
-    when(conversationMapper.toDto(existingConversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(existingConversation, withUser)).thenReturn(expected);
 
     ConversationDto result = conversationService.createConversation(
         requesterId,
@@ -164,7 +164,7 @@ class ConversationServiceTest {
         PageRequest.of(0, 2)
     )).thenReturn(List.of(conversation));
     when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
-    when(conversationMapper.toDto(conversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(conversation, withUser)).thenReturn(expected);
     when(conversationRepository.countMyConversations(requesterId, "receiver")).thenReturn(1L);
 
     CursorResponse<ConversationDto> result = conversationService.findConversations(
