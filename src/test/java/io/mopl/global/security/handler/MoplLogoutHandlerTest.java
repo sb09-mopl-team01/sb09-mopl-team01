@@ -2,7 +2,7 @@ package io.mopl.global.security.handler;
 
 import static org.mockito.Mockito.verify;
 
-import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
 import io.mopl.global.security.MoplUserDetails;
@@ -15,8 +15,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class MoplLogoutHandlerTest {
 
-  private final RefreshTokenMemoryRepository refreshTokenRepository =
-      org.mockito.Mockito.mock(RefreshTokenMemoryRepository.class);
+  private final RefreshTokenRepository refreshTokenRepository =
+      org.mockito.Mockito.mock(RefreshTokenRepository.class);
   private final SseNotificationService sseNotificationService =
       org.mockito.Mockito.mock(SseNotificationService.class);
   private final MoplLogoutHandler logoutHandler =
