@@ -17,6 +17,7 @@
 - 헬스 체크: `/actuator/health`
 - Swagger UI: `/swagger-ui/index.html`
 - API Docs: `/v3/api-docs`
+- WebSocket STOMP: `/ws`
 
 ## 주요 기능
 
@@ -66,6 +67,12 @@ src/main/java/io/mopl
 
 현재 공통 설정과 전역 예외 처리 기반을 먼저 구성하고 있으며, 각 도메인은 Swagger 명세와 프론트엔드 연동 계약에 맞춰 순차적으로 구현합니다.
 
+## 실시간 채널
+
+- 시청 세션 입장 발행: `/pub/contents/{contentId}/watching-sessions/enter`
+- 시청 세션 퇴장 발행: `/pub/contents/{contentId}/watching-sessions/leave`
+- 시청 세션 이벤트 구독: `/sub/contents/{contentId}/watching-sessions`
+
 ## 실행
 
 ```bash
@@ -73,6 +80,10 @@ chmod +x gradlew
 ./gradlew bootRun
 ```
 
+## 로컬 환경 Docker 기반 Redis 컨테이너 실행
+```bash
+   docker-compose -f docker-compose-redis.yml up -d
+````
 기본 개발 프로필은 `dev`이며, 로컬 개발 환경에서는 H2 기반 설정을 사용합니다.
 
 ## 테스트
@@ -84,6 +95,8 @@ chmod +x gradlew
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
 인메모리 H2 데이터베이스를 사용합니다.
+
+
 
 ## 문서
 

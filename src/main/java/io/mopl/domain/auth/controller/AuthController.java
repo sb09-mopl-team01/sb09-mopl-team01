@@ -2,6 +2,7 @@ package io.mopl.domain.auth.controller;
 
 import io.mopl.domain.auth.dto.LoginRequest;
 import io.mopl.domain.auth.dto.LoginResponse;
+import io.mopl.domain.auth.dto.ResetPasswordRequest;
 import io.mopl.domain.auth.dto.TokenRefreshRequest;
 import io.mopl.domain.auth.dto.TokenRefreshResult;
 import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
@@ -67,5 +68,13 @@ public class AuthController {
     } catch (IllegalArgumentException e) {
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
     }
+  }
+
+  @PostMapping("/reset-password")
+  public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+
+    authService.resetPassword(request.email());
+
+    return ResponseEntity.noContent().build();
   }
 }

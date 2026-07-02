@@ -1,5 +1,6 @@
 package io.mopl.domain.user.service;
 
+import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.global.exception.BaseException;

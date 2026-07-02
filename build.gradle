@@ -64,6 +64,9 @@ dependencies {
 
     // Redis
     implementation 'org.springframework.boot:spring-boot-starter-data-redis'
+
+    // SMTP
+    implementation 'org.springframework.boot:spring-boot-starter-mail'
 }
 
 jacoco {
