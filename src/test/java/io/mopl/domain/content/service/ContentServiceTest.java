@@ -27,6 +27,8 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.test.util.ReflectionTestUtils;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
@@ -204,6 +206,63 @@ class ContentServiceTest {
   }
 
   @Test
+  @DisplayName("관리자 콘텐츠 생성 트랜잭션 롤백 시 업로드한 썸네일을 삭제한다")
+  void deleteUploadedThumbnailWhenCreateTransactionRollsBack() {
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      ContentCreateRequest request = new ContentCreateRequest(
+          ContentType.MOVIE,
+          "영화",
+          "영화 설명",
+          java.util.Set.of("액션")
+      );
+      MockMultipartFile thumbnail = new MockMultipartFile(
+          "thumbnail",
+          "poster.jpg",
+          "image/jpeg",
+          "image".getBytes()
+      );
+      String thumbnailUrl = "/content-thumbnails/poster.jpg";
+      Content content = Content.createManual(
+          ContentType.MOVIE,
+          "영화",
+          "영화 설명",
+          thumbnailUrl,
+          request.tags()
+      );
+      UUID contentId = UUID.randomUUID();
+      ReflectionTestUtils.setField(content, "id", contentId);
+      ContentStats stats = new ContentStats(0.0, 0, 0L);
+      ContentDto expectedDto = ContentDto.builder()
+          .id(contentId)
+          .type(ContentType.MOVIE)
+          .title("영화")
+          .description("영화 설명")
+          .thumbnailUrl(thumbnailUrl)
+          .tags(java.util.Set.of("액션"))
+          .averageRating(0.0)
+          .reviewCount(0)
+          .watcherCount(0L)
+          .build();
+      given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
+      given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
+      given(contentRepository.save(content)).willReturn(content);
+      given(contentStatsService.getStats(content)).willReturn(stats);
+      given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
+
+      contentService.createContent(request, thumbnail);
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(synchronization ->
+              synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
+
+      verify(contentThumbnailService).delete(thumbnailUrl);
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
+  }
+
+  @Test
   @DisplayName("관리자 콘텐츠 수정 시 thumbnail이 없으면 기존 썸네일을 유지한다")
   void updateContentWithoutThumbnailKeepsCurrentThumbnail() {
     UUID contentId = UUID.randomUUID();
@@ -263,5 +322,14 @@ class ContentServiceTest {
 
     verify(contentRepository).delete(content);
     verify(contentThumbnailService).delete("/content-thumbnails/current.jpg");
+  }
+
+  @Test
+  @DisplayName("관리자 콘텐츠 수정 시 request가 null이면 예외로 처리한다")
+  void rejectNullUpdateRequest() {
+    UUID contentId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> contentService.updateContent(contentId, null, null))
+        .isInstanceOf(BaseException.class);
   }
 }
