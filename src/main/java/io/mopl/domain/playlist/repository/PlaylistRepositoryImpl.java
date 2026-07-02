@@ -2,131 +2,120 @@ package io.mopl.domain.playlist.repository;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
-import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.QPlaylist;
 import io.mopl.domain.playlist.entity.QPlaylistSubscription;
-import jakarta.persistence.EntityManager;
 import java.time.Instant;
-import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
 
 @Repository
+@RequiredArgsConstructor
 public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
 
   private final JPAQueryFactory queryFactory;
 
-  public PlaylistRepositoryImpl(EntityManager em) {
-    this.queryFactory = new JPAQueryFactory(em);
-  }
-
   @Override
   public List<Playlist> findPlaylistsByCursor(
-      String keywordLike, UUID ownerIdEqual, UUID subscriberIdEqual,
-      String cursor, UUID idAfter, int limit, String sortBy, String sortDirection) {
+      String keyword, UUID ownerId, UUID subscriberId,
+      String cursor, UUID idAfter, int limit,
+      String sortDirection, String sortBy) {
 
     QPlaylist playlist = QPlaylist.playlist;
+    QPlaylistSubscription sub = QPlaylistSubscription.playlistSubscription;
 
-    return queryFactory
-        .selectFrom(playlist)
+    var query = queryFactory.selectFrom(playlist);
+
+    if (subscriberId != null) {
+      query.leftJoin(sub).on(sub.playlist.eq(playlist))
+          .where(sub.user.id.eq(subscriberId))
+          .groupBy(playlist.id);
+    }
+
+    return query
         .where(
-            containsKeyword(keywordLike),
-            eqOwnerId(ownerIdEqual),
-            eqSubscriberId(subscriberIdEqual),
-            cursorCondition(cursor, idAfter, sortBy, sortDirection)
+            containsKeyword(keyword),
+            eqOwnerId(ownerId),
+            cursorCondition(cursor, idAfter, sortDirection, sortBy)
         )
-        .orderBy(getOrderSpecifiers(sortBy, sortDirection))
+        .orderBy(getSortOrder(sortDirection, sortBy), getTieBreakerOrder(sortDirection))
         .limit(limit + 1L)
         .fetch();
   }
 
-  @Override
-  public long countPlaylists(String keywordLike, UUID ownerIdEqual, UUID subscriberIdEqual) {
-    QPlaylist playlist = QPlaylist.playlist;
-
-    Long count = queryFactory
-        .select(playlist.count())
-        .from(playlist)
-        .where(
-            containsKeyword(keywordLike),
-            eqOwnerId(ownerIdEqual),
-            eqSubscriberId(subscriberIdEqual)
-        )
-        .fetchOne();
-
-    return count != null ? count : 0L;
-  }
-
-
   private BooleanExpression containsKeyword(String keyword) {
-    if (keyword == null || keyword.isBlank()) {
-      return null;
-    }
-    QPlaylist playlist = QPlaylist.playlist;
-    return playlist.title.containsIgnoreCase(keyword)
-        .or(playlist.description.containsIgnoreCase(keyword));
+    return keyword != null ? QPlaylist.playlist.title.containsIgnoreCase(keyword) : null;
   }
 
   private BooleanExpression eqOwnerId(UUID ownerId) {
     return ownerId != null ? QPlaylist.playlist.owner.id.eq(ownerId) : null;
   }
 
-  private BooleanExpression eqSubscriberId(UUID subscriberId) {
-    if (subscriberId == null) {
-      return null;
-    }
-    QPlaylistSubscription sub = QPlaylistSubscription.playlistSubscription;
-    return QPlaylist.playlist.id.in(
-        JPAExpressions.select(sub.playlist.id)
-            .from(sub)
-            .where(sub.user.id.eq(subscriberId))
-    );
+  @Override
+  public long countPlaylists(String keyword, UUID ownerId, UUID subscriberId) {
+    QPlaylist playlist = QPlaylist.playlist;
+    QPlaylistSubscription subscription = QPlaylistSubscription.playlistSubscription;
+
+    Long count = queryFactory.select(playlist.countDistinct())
+        .from(playlist)
+        .leftJoin(subscription).on(subscription.playlist.eq(playlist))
+        .where(
+            keywordLike(keyword),
+            ownerEq(ownerId),
+            subscriberEq(subscriberId)
+        )
+        .fetchOne();
+    return count != null ? count : 0L;
   }
 
-  private BooleanExpression cursorCondition(String cursor, UUID idAfter, String sortBy, String sortDirection) {
-    if (cursor == null || idAfter == null) {
-      return null;
-    }
-
-    QPlaylist playlist = QPlaylist.playlist;
-    boolean isDesc = "DESCENDING".equalsIgnoreCase(sortDirection);
-
-    try {
-      // 명세서 스펙: sortBy == "subscribeCount" (구독자수 정렬)
-      if ("subscribeCount".equalsIgnoreCase(sortBy)) {
-        long cursorValue = Long.parseLong(cursor);
-        return isDesc
-            ? playlist.subscriberCount.lt(cursorValue).or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.gt(idAfter)))
-            : playlist.subscriberCount.gt(cursorValue).or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.gt(idAfter)));
-      } else {
-        // 기본값: updatedAt (수정일순 정렬)
-        Instant cursorValue = Instant.parse(cursor);
-        return isDesc
-            ? playlist.updatedAt.lt(cursorValue).or(playlist.updatedAt.eq(cursorValue).and(playlist.id.gt(idAfter)))
-            : playlist.updatedAt.gt(cursorValue).or(playlist.updatedAt.eq(cursorValue).and(playlist.id.gt(idAfter)));
-      }
-    } catch (Exception e) {
-      return null; // 커서 파싱 실패 시 조건 없이 첫 페이지부터 안전 조회
-    }
+  private BooleanExpression keywordLike(String keyword) {
+    if (keyword == null || keyword.isBlank()) return null;
+    return QPlaylist.playlist.title.containsIgnoreCase(keyword)
+        .or(QPlaylist.playlist.description.containsIgnoreCase(keyword));
   }
 
-  private OrderSpecifier<?>[] getOrderSpecifiers(String sortBy, String sortDirection) {
+  private BooleanExpression ownerEq(UUID ownerId) {
+    if (ownerId == null) return null;
+    return QPlaylist.playlist.owner.id.eq(ownerId);
+  }
+
+  private BooleanExpression subscriberEq(UUID subscriberId) {
+    if (subscriberId == null) return null;
+    return QPlaylistSubscription.playlistSubscription.user.id.eq(subscriberId);
+  }
+
+  private BooleanExpression cursorCondition(String cursor, UUID idAfter, String sortDirection, String sortBy) {
+    if (cursor == null || idAfter == null) return null;
+
     QPlaylist playlist = QPlaylist.playlist;
-    boolean isDesc = "DESCENDING".equalsIgnoreCase(sortDirection);
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(sortDirection);
 
-    List<OrderSpecifier<?>> orders = new ArrayList<>();
-
-    if ("subscribeCount".equalsIgnoreCase(sortBy)) {
-      orders.add(isDesc ? playlist.subscriberCount.desc() : playlist.subscriberCount.asc());
+    if ("subscribeCount".equals(sortBy)) {
+      Long cursorValue = Long.parseLong(cursor);
+      return isAsc ?
+          playlist.subscriberCount.gt(cursorValue).or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.gt(idAfter))) :
+          playlist.subscriberCount.lt(cursorValue).or(playlist.subscriberCount.eq(cursorValue).and(playlist.id.lt(idAfter)));
     } else {
-      orders.add(isDesc ? playlist.updatedAt.desc() : playlist.updatedAt.asc());
+      Instant cursorValue = Instant.parse(cursor);
+      return isAsc ?
+          playlist.updatedAt.gt(cursorValue).or(playlist.updatedAt.eq(cursorValue).and(playlist.id.gt(idAfter))) :
+          playlist.updatedAt.lt(cursorValue).or(playlist.updatedAt.eq(cursorValue).and(playlist.id.lt(idAfter)));
     }
+  }
 
-    orders.add(playlist.id.asc()); //정렬 보장을 위한 보조 조건 고정
+  private OrderSpecifier<?> getSortOrder(String sortDirection, String sortBy) {
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(sortDirection);
+    if ("subscribeCount".equals(sortBy)) {
+      return isAsc ? QPlaylist.playlist.subscriberCount.asc() : QPlaylist.playlist.subscriberCount.desc();
+    }
+    return isAsc ? QPlaylist.playlist.updatedAt.asc() : QPlaylist.playlist.updatedAt.desc();
+  }
 
-    return orders.toArray(new OrderSpecifier[0]);
+  private OrderSpecifier<UUID> getTieBreakerOrder(String sortDirection) {
+    boolean isAsc = "ASCENDING".equalsIgnoreCase(sortDirection);
+    return isAsc ? QPlaylist.playlist.id.asc() : QPlaylist.playlist.id.desc();
   }
 }

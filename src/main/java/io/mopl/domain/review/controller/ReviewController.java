@@ -12,6 +12,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
@@ -26,9 +27,7 @@ public class ReviewController {
   @PostMapping
   public ResponseEntity<ReviewDto> createReview(
 
-      // 임시
-      // Security 연동 완료 시 @AuthenticationPrincipal 로 대체
-      @RequestAttribute("userId") UUID userId,
+      @AuthenticationPrincipal UUID userId,
       @Valid @RequestBody ReviewCreateRequest request) {
 
     ReviewDto response = reviewService.createReview(userId, request);
@@ -38,9 +37,7 @@ public class ReviewController {
   @PatchMapping("/{reviewId}")
   public ResponseEntity<ReviewDto> updateReview(
 
-      // 임시
-      // Security 연동 완료 시 @AuthenticationPrincipal 로 대체
-      @RequestAttribute("userId") UUID userId,
+      @AuthenticationPrincipal UUID userId,
       @PathVariable UUID reviewId,
       @Valid @RequestBody ReviewUpdateRequest request) {
 
@@ -78,10 +75,13 @@ public class ReviewController {
   }
   @DeleteMapping("/{reviewId}")
   public ResponseEntity<Void> deleteReview(
-      @RequestAttribute("userId") UUID userId,
+
+      @AuthenticationPrincipal UUID userId,
       @PathVariable UUID reviewId) {
 
     reviewService.deleteReview(userId, reviewId);
     return ResponseEntity.ok().build();
   }
+
+
 }
