@@ -1,6 +1,6 @@
 package io.mopl.global.security.handler;
 
-import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
@@ -12,7 +12,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MoplLogoutHandler implements LogoutHandler {
 
-  private final RefreshTokenMemoryRepository refreshTokenRepository;
+  private final RefreshTokenRepository refreshTokenRepository;
 
   @Override
   public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
