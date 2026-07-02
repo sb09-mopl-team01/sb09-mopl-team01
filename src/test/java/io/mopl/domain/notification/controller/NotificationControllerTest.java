@@ -107,12 +107,14 @@ class NotificationControllerTest {
   @Test
   @DisplayName("DELETE /api/notifications/{notificationId} - 알림 읽음 처리")
   void readNotification() throws Exception {
+    UUID receiverId = UUID.randomUUID();
     UUID notificationId = UUID.randomUUID();
 
-    mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId))
+    mockMvc.perform(delete("/api/notifications/{notificationId}", notificationId)
+            .with(user(userDetails(receiverId))))
         .andExpect(status().isNoContent());
 
-    verify(notificationService).readNotification(notificationId);
+    verify(notificationService).readNotification(notificationId, receiverId);
   }
 
   private MoplUserDetails userDetails(UUID userId) {

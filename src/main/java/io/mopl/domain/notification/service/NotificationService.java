@@ -50,9 +50,10 @@ public class NotificationService {
   }
 
   @Transactional
-  public void readNotification(UUID notificationId) {
-    if (notificationId == null) {
-      log.warn("Invalid notification read request. notificationId=null");
+  public void readNotification(UUID notificationId, UUID receiverId) {
+    if (notificationId == null || receiverId == null) {
+      log.warn("Invalid notification read request. notificationId={}, receiverId={}",
+          notificationId, receiverId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
@@ -61,6 +62,12 @@ public class NotificationService {
           log.warn("Notification read target not found. notificationId={}", notificationId);
           return new BaseException(ErrorCode.INVALID_INPUT);
         });
+
+    if (!notification.getReceiverId().equals(receiverId)) {
+      log.warn("Notification read forbidden. notificationId={}, receiverId={}",
+          notificationId, receiverId);
+      throw new BaseException(ErrorCode.FORBIDDEN);
+    }
 
     notification.markAsRead();
     eventPublisher.publish(new NotificationReadEvent(

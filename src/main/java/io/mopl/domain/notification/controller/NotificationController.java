@@ -50,8 +50,15 @@ public class NotificationController {
   }
 
   @DeleteMapping("/{notificationId}")
-  public ResponseEntity<Void> readNotification(@PathVariable UUID notificationId) {
-    notificationService.readNotification(notificationId);
+  public ResponseEntity<Void> readNotification(
+      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @PathVariable UUID notificationId
+  ) {
+    if (userDetails == null) {
+      throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
+    }
+
+    notificationService.readNotification(notificationId, userDetails.getUser().getId());
     return ResponseEntity.noContent().build();
   }
 }

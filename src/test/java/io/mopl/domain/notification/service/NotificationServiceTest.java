@@ -153,7 +153,7 @@ class NotificationServiceTest {
   void readNotification() {
     NotificationDto notification = createNotification(UUID.randomUUID(), "읽음 처리할 알림");
 
-    notificationService.readNotification(notification.id());
+    notificationService.readNotification(notification.id(), notification.receiverId());
 
     Notification result = notificationRepository.findById(notification.id()).orElseThrow();
     assertThat(result.isRead()).isTrue();
@@ -183,18 +183,35 @@ class NotificationServiceTest {
   @DisplayName("이미 읽은 알림을 다시 읽음 처리해도 성공한다")
   void readNotificationAlreadyRead() {
     NotificationDto notification = createNotification(UUID.randomUUID(), "이미 읽은 알림");
-    notificationService.readNotification(notification.id());
+    notificationService.readNotification(notification.id(), notification.receiverId());
 
-    notificationService.readNotification(notification.id());
+    notificationService.readNotification(notification.id(), notification.receiverId());
 
     Notification result = notificationRepository.findById(notification.id()).orElseThrow();
     assertThat(result.isRead()).isTrue();
   }
 
   @Test
+  @DisplayName("다른 사용자의 알림은 읽음 처리하지 않는다")
+  void readNotificationForbidden() {
+    NotificationDto notification = createNotification(UUID.randomUUID(), "다른 사용자 알림");
+
+    assertThatThrownBy(() -> notificationService.readNotification(
+        notification.id(),
+        UUID.randomUUID()
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.FORBIDDEN);
+  }
+
+  @Test
   @DisplayName("존재하지 않는 알림은 읽음 처리하지 않는다")
   void readNotificationNotFound() {
-    assertThatThrownBy(() -> notificationService.readNotification(UUID.randomUUID()))
+    assertThatThrownBy(() -> notificationService.readNotification(
+        UUID.randomUUID(),
+        UUID.randomUUID()
+    ))
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.INVALID_INPUT);
