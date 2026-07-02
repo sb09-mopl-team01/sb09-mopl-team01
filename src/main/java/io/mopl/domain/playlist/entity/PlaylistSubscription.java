@@ -32,11 +32,6 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class PlaylistSubscription extends BaseEntity {
 
-  @Id
-  @GeneratedValue(strategy = GenerationType.UUID)
-  @Column(name = "id", nullable = false, updatable = false)
-  private UUID id;
-
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "playlist_id", nullable = false)
   private Playlist playlist;
@@ -45,7 +40,7 @@ public class PlaylistSubscription extends BaseEntity {
   @JoinColumn(name = "user_id", nullable = false)
   private User user;
 
-  private PlaylistSubscription(Playlist playlist, User user) {
+  public PlaylistSubscription(Playlist playlist, User user) {
     this.playlist = playlist;
     this.user = user;
   }
