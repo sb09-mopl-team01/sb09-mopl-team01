@@ -8,9 +8,13 @@ import static org.mockito.Mockito.when;
 
 import io.mopl.domain.directmessage.dto.ConversationCreateRequest;
 import io.mopl.domain.directmessage.dto.ConversationDto;
+import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.entity.Conversation;
+import io.mopl.domain.directmessage.entity.DirectMessage;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
+import io.mopl.domain.directmessage.mapper.DirectMessageMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
+import io.mopl.domain.directmessage.repository.DirectMessageRepository;
 import io.mopl.domain.user.dto.response.UserSummary;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
@@ -42,10 +46,16 @@ class ConversationServiceTest {
   private ConversationRepository conversationRepository;
 
   @Mock
+  private DirectMessageRepository directMessageRepository;
+
+  @Mock
   private UserRepository userRepository;
 
   @Mock
   private ConversationMapper conversationMapper;
+
+  @Mock
+  private DirectMessageMapper directMessageMapper;
 
   private UUID requesterId;
   private UUID withUserId;
@@ -71,7 +81,7 @@ class ConversationServiceTest {
     when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
         .thenReturn(Optional.empty());
     when(conversationRepository.save(any(Conversation.class))).thenReturn(savedConversation);
-    when(conversationMapper.toDto(savedConversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(savedConversation, withUser)).thenReturn(expected);
 
     ConversationDto result = conversationService.createConversation(
         requesterId,
@@ -80,7 +90,7 @@ class ConversationServiceTest {
 
     assertThat(result.id()).isNotNull();
     assertThat(result.with().userId()).isEqualTo(withUserId);
-    assertThat(result.latestMessage()).isNull();
+    assertThat(result.lastestMessage()).isNull();
     assertThat(result.hasUnread()).isFalse();
     verify(conversationRepository).save(any(Conversation.class));
   }
@@ -95,7 +105,7 @@ class ConversationServiceTest {
     when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
     when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
         .thenReturn(Optional.of(existingConversation));
-    when(conversationMapper.toDto(existingConversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(existingConversation, withUser)).thenReturn(expected);
 
     ConversationDto result = conversationService.createConversation(
         requesterId,
@@ -154,7 +164,7 @@ class ConversationServiceTest {
         PageRequest.of(0, 2)
     )).thenReturn(List.of(conversation));
     when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
-    when(conversationMapper.toDto(conversation, requester, withUser)).thenReturn(expected);
+    when(conversationMapper.toDto(conversation, withUser)).thenReturn(expected);
     when(conversationRepository.countMyConversations(requesterId, "receiver")).thenReturn(1L);
 
     CursorResponse<ConversationDto> result = conversationService.findConversations(
@@ -174,6 +184,66 @@ class ConversationServiceTest {
     assertThat(result.totalCount()).isEqualTo(1);
     assertThat(result.sortBy()).isEqualTo("createdAt");
     assertThat(result.sortDirection()).isEqualTo(SortDirection.DESCENDING);
+  }
+
+  @Test
+  void findConversationReturnsConversationWhenRequesterIsParticipant() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    ConversationDto expected = createConversationDto(conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
+    when(conversationMapper.toDto(conversation, withUser)).thenReturn(expected);
+
+    ConversationDto result = conversationService.findConversation(requesterId, conversationId);
+
+    assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void findDirectMessagesReturnsCursorResponseWhenRequesterIsParticipant() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    DirectMessage directMessage = DirectMessage.create(conversation, requesterId, withUserId, "hello");
+    UUID directMessageId = UUID.randomUUID();
+    Instant createdAt = Instant.now();
+    ReflectionTestUtils.setField(directMessage, "id", directMessageId);
+    ReflectionTestUtils.setField(directMessage, "createdAt", createdAt);
+    DirectMessageDto expected = createDirectMessageDto(directMessageId, conversationId, createdAt);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(directMessageRepository.findByConversationIdWithCursor(
+        conversationId,
+        null,
+        null,
+        SortDirection.ASCENDING,
+        PageRequest.of(0, 2)
+    )).thenReturn(List.of(directMessage));
+    when(userRepository.findAllById(List.of(requesterId, withUserId)))
+        .thenReturn(List.of(requester, withUser));
+    when(directMessageMapper.toDto(directMessage, requester, withUser)).thenReturn(expected);
+    when(directMessageRepository.countByConversationId(conversationId)).thenReturn(1L);
+
+    CursorResponse<DirectMessageDto> result = conversationService.findDirectMessages(
+        requesterId,
+        conversationId,
+        null,
+        null,
+        1,
+        SortDirection.ASCENDING,
+        "createdAt"
+    );
+
+    assertThat(result.data()).containsExactly(expected);
+    assertThat(result.hasNext()).isFalse();
+    assertThat(result.totalCount()).isEqualTo(1);
+    assertThat(result.sortBy()).isEqualTo("createdAt");
+    assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
   }
 
   private User createUser(UUID id, String name) {
@@ -196,6 +266,29 @@ class ConversationServiceTest {
             .build(),
         null,
         false
+    );
+  }
+
+  private DirectMessageDto createDirectMessageDto(
+      UUID directMessageId,
+      UUID conversationId,
+      Instant createdAt
+  ) {
+    return new DirectMessageDto(
+        directMessageId,
+        conversationId,
+        createdAt,
+        UserSummary.builder()
+            .userId(requesterId)
+            .name(requester.getName())
+            .profileImageUrl(requester.getProfileImageUrl())
+            .build(),
+        UserSummary.builder()
+            .userId(withUserId)
+            .name(withUser.getName())
+            .profileImageUrl(withUser.getProfileImageUrl())
+            .build(),
+        "hello"
     );
   }
 }
