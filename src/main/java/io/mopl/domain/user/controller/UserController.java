@@ -1,5 +1,6 @@
 package io.mopl.domain.user.controller;
 
+import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -9,10 +10,12 @@ import io.mopl.domain.user.dto.request.UserUpdateRequest;
 import io.mopl.domain.user.service.UserService;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import io.mopl.global.security.MoplUserDetails;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -25,6 +28,7 @@ import java.util.UUID;
 public class UserController {
 
   private final UserService userService;
+  private final TempPasswordService tempPasswordService;
 
   @PostMapping
   public ResponseEntity<UserDto> createUser(@RequestBody UserCreateRequest request) {
@@ -89,10 +93,16 @@ public class UserController {
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updateUserPassword(
       @PathVariable UUID userId,
-      @RequestBody ChangePasswordRequest request
+      @RequestBody ChangePasswordRequest request,
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
     log.info("[사용자 관리] 사용자 비밀번호 수정 요청 수신. id={}", userId);
     userService.changePassword(userId, request);
+
+    if (userDetails != null) {
+      tempPasswordService.deleteTempPassword(userDetails.getUsername());
+    }
+
     log.debug("[사용자 관리] 사용자 비밀번호 수정 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
