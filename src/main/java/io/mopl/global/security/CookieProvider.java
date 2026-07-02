@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 public class CookieProvider {
 
   @Value("${jwt.refresh-token-validity-seconds}")
-  private static int REFRESH_TOKEN_MAX_AGE;
+  private int REFRESH_TOKEN_MAX_AGE;
 
   public ResponseCookie createRefreshTokenCookie(String refreshToken) {
     return ResponseCookie.from("REFRESH_TOKEN", refreshToken)
