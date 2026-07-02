@@ -2,6 +2,8 @@ package io.mopl.domain.content.service;
 
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
+import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
@@ -13,11 +15,15 @@ import io.mopl.global.response.SortDirection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +34,24 @@ public class ContentService {
   private final ContentRepository contentRepository;
   private final ContentStatsService contentStatsService;
   private final ContentMapper contentMapper;
+  private final ContentThumbnailService contentThumbnailService;
+
+  @Transactional
+  public ContentDto createContent(ContentCreateRequest request, MultipartFile thumbnail) {
+    String thumbnailUrl = null;
+    try {
+      thumbnailUrl = contentThumbnailService.uploadRequired(thumbnail);
+      deleteThumbnailAfterRollback(thumbnailUrl);
+      Content content = contentMapper.toEntity(request, thumbnailUrl);
+      Content savedContent = contentRepository.save(content);
+      log.info("Content create completed. contentId={}", savedContent.getId());
+      return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
+    } catch (IllegalArgumentException e) {
+      contentThumbnailService.delete(thumbnailUrl);
+      log.warn("Content create rejected. title={}", request == null ? null : request.title());
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
 
   public ContentDto findContent(UUID contentId) {
     Content content = contentRepository.findById(contentId)
@@ -76,5 +100,92 @@ public class ContentService {
         contents.sortBy(),
         contents.sortDirection()
     );
+  }
+
+  @Transactional
+  public ContentDto updateContent(
+      UUID contentId,
+      ContentUpdateRequest request,
+      MultipartFile thumbnail
+  ) {
+    if (request == null) {
+      log.warn("Content update rejected. contentId={}, reason=request_null", contentId);
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
+    Content content = getContentOrThrow(contentId);
+    String currentThumbnailUrl = content.getThumbnailUrl();
+    String uploadedThumbnailUrl = null;
+
+    try {
+      String thumbnailUrl = contentThumbnailService.uploadOptional(thumbnail, currentThumbnailUrl);
+      if (!Objects.equals(currentThumbnailUrl, thumbnailUrl)) {
+        uploadedThumbnailUrl = thumbnailUrl;
+        deleteThumbnailAfterRollback(uploadedThumbnailUrl);
+      }
+      content.updateManual(
+          request.title(),
+          request.description(),
+          request.tags(),
+          thumbnailUrl
+      );
+      if (uploadedThumbnailUrl != null) {
+        deleteThumbnailAfterCommit(currentThumbnailUrl);
+      }
+      log.info("Content update completed. contentId={}", contentId);
+      return contentMapper.toDto(content, contentStatsService.getStats(content));
+    } catch (IllegalArgumentException e) {
+      contentThumbnailService.delete(uploadedThumbnailUrl);
+      log.warn("Content update rejected. contentId={}", contentId);
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  @Transactional
+  public void deleteContent(UUID contentId) {
+    Content content = getContentOrThrow(contentId);
+    String thumbnailUrl = content.getThumbnailUrl();
+    contentRepository.delete(content);
+    deleteThumbnailAfterCommit(thumbnailUrl);
+    log.info("Content delete completed. contentId={}", contentId);
+  }
+
+  private Content getContentOrThrow(UUID contentId) {
+    return contentRepository.findById(contentId)
+        .orElseThrow(() -> {
+          log.warn("Content find failed. contentId={}", contentId);
+          return new BaseException(ErrorCode.INVALID_INPUT);
+        });
+  }
+
+  private void deleteThumbnailAfterCommit(String thumbnailUrl) {
+    if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+      return;
+    }
+    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+      contentThumbnailService.delete(thumbnailUrl);
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        contentThumbnailService.delete(thumbnailUrl);
+      }
+    });
+  }
+
+  private void deleteThumbnailAfterRollback(String thumbnailUrl) {
+    if (thumbnailUrl == null || thumbnailUrl.isBlank()
+        || !TransactionSynchronizationManager.isSynchronizationActive()) {
+      return;
+    }
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCompletion(int status) {
+        if (status != STATUS_COMMITTED) {
+          contentThumbnailService.delete(thumbnailUrl);
+        }
+      }
+    });
   }
 }

@@ -1,23 +1,34 @@
 package io.mopl.domain.content.controller;
 
 import io.mopl.domain.content.dto.ContentDto;
+import io.mopl.domain.content.dto.request.ContentCreateRequest;
+import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.service.ContentService;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import jakarta.validation.Valid;
 import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/contents")
@@ -29,10 +40,38 @@ public class ContentController {
 
   private final ContentService contentService;
 
+  @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ContentDto> createContent(
+      @Valid @RequestPart("request") ContentCreateRequest request,
+      @RequestPart("thumbnail") MultipartFile thumbnail
+  ) {
+    ContentDto response = contentService.createContent(request, thumbnail);
+    return ResponseEntity.status(HttpStatus.CREATED).body(response);
+  }
+
   @GetMapping("/{contentId}")
   public ResponseEntity<ContentDto> findContent(@PathVariable UUID contentId) {
     ContentDto response = contentService.findContent(contentId);
     return ResponseEntity.ok(response);
+  }
+
+  @PatchMapping(value = "/{contentId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<ContentDto> updateContent(
+      @PathVariable UUID contentId,
+      @Valid @RequestPart("request") ContentUpdateRequest request,
+      @RequestPart(value = "thumbnail", required = false) MultipartFile thumbnail
+  ) {
+    ContentDto response = contentService.updateContent(contentId, request, thumbnail);
+    return ResponseEntity.ok(response);
+  }
+
+  @DeleteMapping("/{contentId}")
+  @PreAuthorize("hasRole('ADMIN')")
+  public ResponseEntity<Void> deleteContent(@PathVariable UUID contentId) {
+    contentService.deleteContent(contentId);
+    return ResponseEntity.ok().build();
   }
 
   @GetMapping
