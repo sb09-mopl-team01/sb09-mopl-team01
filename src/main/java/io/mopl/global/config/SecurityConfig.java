@@ -1,5 +1,6 @@
 package io.mopl.global.config;
 
+import io.mopl.global.security.MoplAuthenticationProvider;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.filter.MoplLoginFilter;
 import io.mopl.global.security.handler.LoginFailureHandler;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.annotation.authentication.builders.AuthenticationManagerBuilder;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -48,6 +50,7 @@ public class SecurityConfig {
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
     return authenticationConfiguration.getAuthenticationManager();
   }
+
 
   @Bean
   public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
@@ -90,7 +93,7 @@ public class SecurityConfig {
 
     csrf.csrfTokenRepository(csrfTokenRepository)
         .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
-        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh");
+        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/api/auth/sign-out");
   }
 
   private void configureFormLogin(FormLoginConfigurer<HttpSecurity> login) {
@@ -119,7 +122,9 @@ public class SecurityConfig {
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll() // 로그인
         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll() // 새로고침
         .requestMatchers(HttpMethod.GET, "/api/auth/csrf-token").permitAll()
+        .requestMatchers(HttpMethod.POST, "/api/auth/reset-password").permitAll()
 
+        .requestMatchers("/", "/error").permitAll()
         .requestMatchers("/index.html", "/*.ico", "/assets/**").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
 
