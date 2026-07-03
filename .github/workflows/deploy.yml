@@ -1,4 +1,4 @@
-name: Mopl
+name: Mopl-de
 
 on:
   push:
@@ -7,10 +7,11 @@ on:
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
+
     outputs:
       image_path: ${{ steps.build-image.outputs.image_path }}
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
-      ecr_password: ${{ steps.login-ecr.outputs.docker_password }}
+
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -20,14 +21,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Create .env file for build
-        run: |
-          echo "RDS_HOST=${{ secrets.RDS_HOST }}" >> .env
-          echo "RDS_PORT=5432" >> .env
-          echo "RDS_DB_NAME=postgres" >> .env
-          echo "RDS_USERNAME=postgres" >> .env
-          echo "RDS_PASSWORD=Moplteam01!" >> .env
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
@@ -46,7 +39,7 @@ jobs:
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build, tag, and push image to Amazon ECR
+      - name: Build and Push Docker Image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -57,46 +50,54 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "image_path=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+
   deploy:
     needs: build-and-push
     runs-on: ubuntu-latest
+
     steps:
-      - name: Execute Server Application via SSH (Docker Run)
+      - name: Deploy via SSH
         uses: appleboy/ssh-action@master
-        env:
-          IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
-          ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
-          AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: IMAGE_PATH,ECR_REGISTRY,AWS_REGION
+
+          envs: IMAGE_PATH,ECR_REGISTRY,AWS_REGION,RDS_HOST,RDS_PORT,RDS_DB_NAME,RDS_USERNAME,RDS_PASSWORD,AWS_S3_BUCKET
+
+          env:
+            IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
+            ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+            AWS_REGION: ${{ secrets.AWS_REGION }}
+            RDS_HOST: ${{ secrets.RDS_HOST }}
+            RDS_PORT: 5432
+            RDS_DB_NAME: postgres
+            RDS_USERNAME: postgres
+            RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+            AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+
           script: |
             echo "> ECR 로그인"
             aws ecr get-login-password --region $AWS_REGION \
             | docker login --username AWS --password-stdin $ECR_REGISTRY
 
-            if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
-                echo "> 기존 도커 컨테이너 종료 및 삭제"
-                docker stop mopl-backend-apps
-                docker rm mopl-backend-apps
-                sleep 3
-            fi
+            echo "> 기존 컨테이너 제거"
+            docker stop mopl-backend-apps || true
+            docker rm mopl-backend-apps || true
 
-            echo "> 최신 이미지 Pull"
+            echo "> 이미지 pull"
             docker pull $IMAGE_PATH
 
-            echo "> 신규 도커 컨테이너 실행"
+            echo "> 컨테이너 실행"
             docker run -d -p 8080:8080 --name mopl-backend-apps \
-            -e SPRING_PROFILES_ACTIVE=dev \
-            -e RDS_HOST=${{ secrets.RDS_HOST }} \
-            -e RDS_PORT=5432 \
-            -e RDS_DB_NAME=postgres \
-            -e RDS_USERNAME=postgres \
-            -e RDS_PASSWORD=Moplteam01! \
-            -e CLOUD_AWS_REGION_STATIC=${{ secrets.AWS_REGION }} \
-            -e CLOUD_AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
-            $IMAGE_PATH
+              -e SPRING_PROFILES_ACTIVE=dev \
+              -e RDS_HOST=$RDS_HOST \
+              -e RDS_PORT=$RDS_PORT \
+              -e RDS_DB_NAME=$RDS_DB_NAME \
+              -e RDS_USERNAME=$RDS_USERNAME \
+              -e RDS_PASSWORD=$RDS_PASSWORD \
+              -e CLOUD_AWS_REGION_STATIC=$AWS_REGION \
+              -e CLOUD_AWS_S3_BUCKET=$AWS_S3_BUCKET \
+              $IMAGE_PATH
 
             docker image prune -f
