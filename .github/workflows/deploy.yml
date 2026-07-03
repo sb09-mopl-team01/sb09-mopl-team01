@@ -68,4 +68,5 @@ jobs:
             --RDS_DB_NAME=postgres \
             --RDS_USERNAME=postgres \
             --RDS_PASSWORD=Moplteam01! \
+            --cloud.aws.region.static=${{ secrets.AWS_REGION }} \
             > deploy.log 2>&1 &
