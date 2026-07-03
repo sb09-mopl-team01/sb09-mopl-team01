@@ -35,9 +35,9 @@ public class AdminAccountInitializer implements CommandLineRunner {
           .build();
 
       userRepository.save(admin);
-      log.info("[시스템 초기화] 어드민 계정이 생성 완료");
+      log.info("AdminAccount Initialize Completed. email={}", adminEmail);
     } else {
-      log.info("[시스템 초기화] 어드민 계정이 이미 존재합니다. 생성 로직을 스킵합니다.");
+      log.info("AdminAccount Initialize Skipped. Admin account already exists. email={}", adminEmail);
     }
   }
 }
