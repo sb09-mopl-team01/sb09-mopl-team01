@@ -63,24 +63,31 @@ jobs:
     steps:
       - name: Execute Server Application via SSH (Docker Run)
         uses: appleboy/ssh-action@master
+        env:
+          IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
+          ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: IMAGE_PATH,ECR_REGISTRY,AWS_REGION
           script: |
-            echo "${{ needs.build-and-push.outputs.ecr_password }}" | docker login --username AWS --password-stdin ${{ needs.build-and-push.outputs.ecr_registry }}
-            
+            echo "> ECR 로그인"
+            aws ecr get-login-password --region $AWS_REGION \
+            | docker login --username AWS --password-stdin $ECR_REGISTRY
+
             if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
                 echo "> 기존 도커 컨테이너 종료 및 삭제"
                 docker stop mopl-backend-apps
                 docker rm mopl-backend-apps
                 sleep 3
             fi
-            
+
             echo "> 최신 이미지 Pull"
-            docker pull ${{ needs.build-and-push.outputs.image_path }}
-            
-            echo "> 신규 도커 컨테이너 배포 및 이륙"
+            docker pull $IMAGE_PATH
+
+            echo "> 신규 도커 컨테이너 실행"
             docker run -d -p 8080:8080 --name mopl-backend-apps \
             -e SPRING_PROFILES_ACTIVE=dev \
             -e RDS_HOST=${{ secrets.RDS_HOST }} \
@@ -90,6 +97,6 @@ jobs:
             -e RDS_PASSWORD=Moplteam01! \
             -e CLOUD_AWS_REGION_STATIC=${{ secrets.AWS_REGION }} \
             -e CLOUD_AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
-            ${{ needs.build-and-push.outputs.image_path }}
-            
+            $IMAGE_PATH
+
             docker image prune -f
