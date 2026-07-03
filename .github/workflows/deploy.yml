@@ -1,4 +1,4 @@
-name: Mopl-devw
+name: Mopl-dev
 
 on:
   push:
@@ -55,40 +55,44 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
 
-    env:
-      IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
-      ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
-      AWS_REGION: ${{ secrets.AWS_REGION }}
-      RDS_HOST: ${{ secrets.RDS_HOST }}
-      RDS_PORT: 5432
-      RDS_DB_NAME: postgres
-      RDS_USERNAME: postgres
-      RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
-
     steps:
-      - name: Deploy to EC2
+      - name: Deploy
         uses: appleboy/ssh-action@master
+        env:
+          IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
+          ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          RDS_HOST: ${{ secrets.RDS_HOST }}
+          RDS_PORT: 5432
+          RDS_DB_NAME: postgres
+          RDS_USERNAME: postgres
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
 
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
 
+          envs: IMAGE_PATH,ECR_REGISTRY,AWS_REGION,RDS_HOST,RDS_PORT,RDS_DB_NAME,RDS_USERNAME,RDS_PASSWORD,AWS_S3_BUCKET
+
           script: |
             set -e
-
+            
+            echo "===== DEBUG ====="
             echo "IMAGE=$IMAGE_PATH"
             echo "REGISTRY=$ECR_REGISTRY"
             echo "REGION=$AWS_REGION"
-
+            
+            echo "===== ECR LOGIN ====="
             aws ecr get-login-password --region "$AWS_REGION" \
               | docker login --username AWS --password-stdin "$ECR_REGISTRY"
-
+            
+            echo "===== DEPLOY START ====="
             docker rm -f mopl-backend-apps || true
-
+            
             docker pull "$IMAGE_PATH"
-
+            
             docker run -d -p 8080:8080 --name mopl-backend-apps \
               -e SPRING_PROFILES_ACTIVE=dev \
               -e RDS_HOST="$RDS_HOST" \
@@ -99,3 +103,6 @@ jobs:
               -e CLOUD_AWS_REGION_STATIC="$AWS_REGION" \
               -e CLOUD_AWS_S3_BUCKET="$AWS_S3_BUCKET" \
               "$IMAGE_PATH"
+            
+            docker image prune -f
+            echo "===== DEPLOY SUCCESS ====="
