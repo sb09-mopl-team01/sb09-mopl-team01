@@ -61,4 +61,11 @@ jobs:
             fi
             
             echo "> 신규 백엔드 어플리케이션 배포 시작"
-            nohup java -jar *.jar --spring.profiles.active=dev > deploy.log 2>&1 &
+            nohup java -jar *.jar \
+            --spring.profiles.active=dev \
+            --RDS_HOST=${{ secrets.RDS_HOST }} \
+            --RDS_PORT=5432 \
+            --RDS_DB_NAME=postgres \
+            --RDS_USERNAME=postgres \
+            --RDS_PASSWORD=Moplteam01! \
+            > deploy.log 2>&1 &
