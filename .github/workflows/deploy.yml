@@ -1,4 +1,4 @@
-name: Mopl-de
+name: Mopl-dev
 
 on:
   push:
@@ -63,8 +63,6 @@ jobs:
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
 
-          envs: IMAGE_PATH,ECR_REGISTRY,AWS_REGION,RDS_HOST,RDS_PORT,RDS_DB_NAME,RDS_USERNAME,RDS_PASSWORD,AWS_S3_BUCKET
-
           env:
             IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
             ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
@@ -88,7 +86,7 @@ jobs:
             echo "> 이미지 pull"
             docker pull $IMAGE_PATH
 
-            echo "> 컨테이너 실행"
+            echo "> 실행"
             docker run -d -p 8080:8080 --name mopl-backend-apps \
               -e SPRING_PROFILES_ACTIVE=dev \
               -e RDS_HOST=$RDS_HOST \
@@ -99,5 +97,3 @@ jobs:
               -e CLOUD_AWS_REGION_STATIC=$AWS_REGION \
               -e CLOUD_AWS_S3_BUCKET=$AWS_S3_BUCKET \
               $IMAGE_PATH
-
-            docker image prune -f
