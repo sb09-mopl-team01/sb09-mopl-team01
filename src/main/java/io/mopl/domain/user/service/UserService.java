@@ -20,6 +20,9 @@ import io.mopl.global.response.SortDirection;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.CachePut;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,6 +59,7 @@ public class UserService {
     return userMapper.toDto(savedUser);
   }
 
+  @Cacheable(value = "user", key = "#userId")
   public UserDto findUser(UUID userId) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
@@ -66,6 +70,7 @@ public class UserService {
     return userMapper.toDto(user);
   }
 
+  @CachePut(value = "user", key = "#userId")
   @Transactional
   public UserDto updateProfile(UUID userId, UserUpdateRequest request, MultipartFile image) {
     User user = userRepository.findById(userId)
@@ -100,6 +105,7 @@ public class UserService {
     return userMapper.toDto(user);
   }
 
+  @CacheEvict(value = "user", key = "#userId")
   @Transactional
   public void updateUserRole(UUID userId, UserRoleUpdateRequest request) {
     User user = userRepository.findById(userId)
@@ -111,6 +117,7 @@ public class UserService {
     log.info("User Update Role Completed. id={}, role={}", userId, user.getRole());
   }
 
+  @CacheEvict(value = "user", key = "#userId")
   @Transactional
   public void changePassword(UUID userId, ChangePasswordRequest request) {
     User user = userRepository.findById(userId)
@@ -124,6 +131,7 @@ public class UserService {
     log.info("User Update Password Completed. id={}", userId);
   }
 
+  @CacheEvict(value = "user", key = "#userId")
   @Transactional
   public void updateUserLockStatus(UUID userId, UserLockUpdateRequest request) {
     User user = userRepository.findById(userId)
