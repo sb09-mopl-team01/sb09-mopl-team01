@@ -48,6 +48,7 @@ jwt:
   # 향후 env로 옮길 예정
   secret: bXktand0LXNlY3JldC1rZXktZm9yLXNwcmluZy1zZWN1cml0eQ==
   #
+  max-active-tokens: 1
   access-token-validity-seconds: 3600
   refresh-token-validity-seconds: 604800
 
