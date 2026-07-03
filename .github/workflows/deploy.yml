@@ -61,7 +61,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: ECR_REGISTRY, ECR_PASSWORD
           script: |
-            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin $ECR_REGISTRY
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin ${{ steps.login-ecr.outputs.registry }}
             
             if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
                 echo "> 기존 도커 컨테이너 종료 및 삭제"
@@ -71,7 +71,7 @@ jobs:
             fi
             
             echo "> 최신 이미지 Pull"
-            docker pull $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            docker pull ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest
             
             echo "> 신규 도커 컨테이너 배포 및 이륙"
             docker run -d -p 8080:8080 --name mopl-backend-apps \
@@ -83,6 +83,6 @@ jobs:
             -e RDS_PASSWORD=Moplteam01! \
             -e CLOUD_AWS_REGION_STATIC=${{ secrets.AWS_REGION }} \
             -e CLOUD_AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
-            $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest
             
             docker image prune -f
