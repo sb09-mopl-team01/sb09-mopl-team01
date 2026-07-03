@@ -1,4 +1,4 @@
-name: Mopl-dev
+name: Mopl-deve
 
 on:
   push:
@@ -58,21 +58,21 @@ jobs:
     steps:
       - name: Deploy via SSH
         uses: appleboy/ssh-action@master
+        env:
+          IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
+          ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+          AWS_REGION: ${{ secrets.AWS_REGION }}
+          RDS_HOST: ${{ secrets.RDS_HOST }}
+          RDS_PORT: 5432
+          RDS_DB_NAME: postgres
+          RDS_USERNAME: postgres
+          RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+          AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-
-          env:
-            IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
-            ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
-            AWS_REGION: ${{ secrets.AWS_REGION }}
-            RDS_HOST: ${{ secrets.RDS_HOST }}
-            RDS_PORT: 5432
-            RDS_DB_NAME: postgres
-            RDS_USERNAME: postgres
-            RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
-            AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
 
           script: |
             echo "> ECR 로그인"
