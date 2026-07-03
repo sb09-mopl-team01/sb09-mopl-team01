@@ -2,7 +2,7 @@ name: MOPL Backend CD (Auto Deploy)
 
 on:
   push:
-    branches: [ "dev" ]
+    branches: [ "dev", "chore/aws-setup" ] // 테스트용 브랜치 추가
 
 jobs:
   deploy:
