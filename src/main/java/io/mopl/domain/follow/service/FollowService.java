@@ -49,6 +49,11 @@ public class FollowService {
     followRepository.delete(follow);
   }
 
+  public long countFollowers(UUID followeeId) {
+    User followee = getUser(followeeId);
+    return followRepository.countByFollowee(followee);
+  }
+
   private User getUser(UUID userId) {
     return userRepository.findById(userId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
