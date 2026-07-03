@@ -22,15 +22,15 @@ public enum ErrorCode {
 
   // Auth
   AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_401", "인증 정보가 필요합니다"),
+  INVALID_EMAIL(HttpStatus.NOT_FOUND, "AUTH_ACOUNT_404", "이메일이 일치하지 않습니다."),
+  INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH_ACOUNT_403", "비밀번호가 일치하지 않습니다."),
+  INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_1", "유효하지 않은 리프레시 토큰입니다"),
+  EXPIRED_OR_MANIPULATED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_2", "만료되었거나 조작된 리프레시 토큰입니다"),
 
   // Direct Message
   SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
   CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
-
-  // auth
-  INVALID_EMAIL(HttpStatus.NOT_FOUND, "AUTH_404", "이메일이 일치하지 않습니다."),
-  INVALID_PASSWORD(HttpStatus.UNAUTHORIZED, "AUTH_403", "비밀번호가 일치하지 않습니다."),
 
   // mail
   MAIL_SEND_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL_500", "이메일 전송에 실패했습니다"),
