@@ -13,7 +13,7 @@ jobs:
       ecr_registry: ${{ steps.login-ecr.outputs.registry }}
 
     steps:
-      - name: Checkout source code
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Set up JDK 17
@@ -22,10 +22,10 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Grant execute permission for gradlew
+      - name: Grant permission
         run: chmod +x gradlew
 
-      - name: Build with Gradle
+      - name: Build
         run: ./gradlew clean assemble
 
       - name: Configure AWS credentials
@@ -35,11 +35,11 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Login to Amazon ECR
+      - name: Login ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      - name: Build and Push Docker Image
+      - name: Build & Push Docker Image
         id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
@@ -56,45 +56,48 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy via SSH
+      - name: Deploy to EC2
         uses: appleboy/ssh-action@master
+
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
 
           script: |
-            export IMAGE_PATH="${{ needs.build-and-push.outputs.image_path }}"
-            export ECR_REGISTRY="${{ needs.build-and-push.outputs.ecr_registry }}"
-            export AWS_REGION="${{ secrets.AWS_REGION }}"
-            export RDS_HOST="${{ secrets.RDS_HOST }}"
-            export RDS_PORT="5432"
-            export RDS_DB_NAME="postgres"
-            export RDS_USERNAME="postgres"
-            export RDS_PASSWORD="${{ secrets.RDS_PASSWORD }}"
-            export AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}"
+            set -e
 
-            echo "> ECR 로그인"
-            aws ecr get-login-password --region $AWS_REGION \
-            | docker login --username AWS --password-stdin $ECR_REGISTRY
+            IMAGE_PATH="${{ needs.build-and-push.outputs.image_path }}"
+            ECR_REGISTRY="${{ needs.build-and-push.outputs.ecr_registry }}"
+            AWS_REGION="${{ secrets.AWS_REGION }}"
 
-            echo "> 기존 컨테이너 제거"
-            docker stop mopl-backend-apps || true
-            docker rm mopl-backend-apps || true
+            RDS_HOST="${{ secrets.RDS_HOST }}"
+            RDS_PORT="5432"
+            RDS_DB_NAME="postgres"
+            RDS_USERNAME="postgres"
+            RDS_PASSWORD="${{ secrets.RDS_PASSWORD }}"
+            AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}"
 
-            echo "> 이미지 pull"
-            docker pull $IMAGE_PATH
+            echo "IMAGE=$IMAGE_PATH"
+            echo "REGISTRY=$ECR_REGISTRY"
+            echo "REGION=$AWS_REGION"
 
-            echo "> 실행"
+            aws ecr get-login-password --region "$AWS_REGION" \
+              | docker login --username AWS --password-stdin "$ECR_REGISTRY"
+
+            docker rm -f mopl-backend-apps || true
+
+            docker pull "$IMAGE_PATH"
+
             docker run -d -p 8080:8080 --name mopl-backend-apps \
               -e SPRING_PROFILES_ACTIVE=dev \
-              -e RDS_HOST=$RDS_HOST \
-              -e RDS_PORT=$RDS_PORT \
-              -e RDS_DB_NAME=$RDS_DB_NAME \
-              -e RDS_USERNAME=$RDS_USERNAME \
-              -e RDS_PASSWORD=$RDS_PASSWORD \
-              -e CLOUD_AWS_REGION_STATIC=$AWS_REGION \
-              -e CLOUD_AWS_S3_BUCKET=$AWS_S3_BUCKET \
-              $IMAGE_PATH
+              -e RDS_HOST="$RDS_HOST" \
+              -e RDS_PORT="$RDS_PORT" \
+              -e RDS_DB_NAME="$RDS_DB_NAME" \
+              -e RDS_USERNAME="$RDS_USERNAME" \
+              -e RDS_PASSWORD="$RDS_PASSWORD" \
+              -e CLOUD_AWS_REGION_STATIC="$AWS_REGION" \
+              -e CLOUD_AWS_S3_BUCKET="$AWS_S3_BUCKET" \
+              "$IMAGE_PATH"
 
             docker image prune -f
