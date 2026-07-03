@@ -129,6 +129,8 @@ public class SecurityConfig {
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
 
+        .requestMatchers("/actuator/health").permitAll() // 테스트
+
         .anyRequest().authenticated();
 
         // 테스트 시 보안 해제 하고싶으면 사용

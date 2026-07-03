@@ -1,5 +1,3 @@
-name: MOPL Backend CD (Auto Deploy)
-
 on:
   push:
     branches: [ "dev", "chore/aws-setup" ] # 테스트용 브랜치 추가
@@ -32,42 +30,58 @@ jobs:
       - name: Build with Gradle
         run: ./gradlew clean assemble
 
-      - name: Transfer Build File to EC2
-        uses: appleboy/scp-action@master
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          source: "build/libs/*.jar, !build/libs/*-plain.jar"
-          target: "/home/ubuntu/mopl-build"
-          strip_components: 2
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-      - name: Execute Server Application via SSH
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
+          IMAGE_TAG: latest
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Execute Server Application via SSH (Docker Run)
         uses: appleboy/ssh-action@master
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
+          envs: ECR_REGISTRY
           script: |
-            cd /home/ubuntu/mopl-build
+            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY
             
-            CURRENT_PID=$(lsof -t -i:8080)
-            if [ -z "$CURRENT_PID" ]; then
-              echo "> 현재 구동 중인 백엔드 서버가 없으므로 종료하지 않습니다."
-            else
-              echo "> 기존 백엔드 서버 프로세스 종료: $CURRENT_PID"
-              kill -15 $CURRENT_PID
-              sleep 5
+            if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
+                echo "> 기존 도커 컨테이너 종료 및 삭제"
+                docker stop mopl-backend-apps
+                docker rm mopl-backend-apps
+                sleep 3
             fi
             
-            echo "> 신규 백엔드 어플리케이션 배포 시작"
-            nohup java -jar *.jar \
-            --spring.profiles.active=dev \
-            --RDS_HOST=${{ secrets.RDS_HOST }} \
-            --RDS_PORT=5432 \
-            --RDS_DB_NAME=postgres \
-            --RDS_USERNAME=postgres \
-            --RDS_PASSWORD=Moplteam01! \
-            --cloud.aws.region.static=${{ secrets.AWS_REGION }} \
-            --cloud.aws.s3.bucket=${{ secrets.AWS_S3_BUCKET }} \
-            > deploy.log 2>&1 &
+            echo "> 최신 이미지 Pull"
+            docker pull $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            
+            echo "> 신규 도커 컨테이너 배포 및 이륙"
+            docker run -d -p 8080:8080 --name mopl-backend-apps \
+            -e SPRING_PROFILES_ACTIVE=dev \
+            -e RDS_HOST=${{ secrets.RDS_HOST }} \
+            -e RDS_PORT=5432 \
+            -e RDS_DB_NAME=postgres \
+            -e RDS_USERNAME=postgres \
+            -e RDS_PASSWORD=Moplteam01! \
+            -e CLOUD_AWS_REGION_STATIC=${{ secrets.AWS_REGION }} \
+            -e CLOUD_AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
+            $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            
+            docker image prune -f
