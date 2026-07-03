@@ -1,4 +1,4 @@
-name: Mopl-dev
+name: Mopl-devw
 
 on:
   push:
@@ -55,6 +55,17 @@ jobs:
     needs: build-and-push
     runs-on: ubuntu-latest
 
+    env:
+      IMAGE_PATH: ${{ needs.build-and-push.outputs.image_path }}
+      ECR_REGISTRY: ${{ needs.build-and-push.outputs.ecr_registry }}
+      AWS_REGION: ${{ secrets.AWS_REGION }}
+      RDS_HOST: ${{ secrets.RDS_HOST }}
+      RDS_PORT: 5432
+      RDS_DB_NAME: postgres
+      RDS_USERNAME: postgres
+      RDS_PASSWORD: ${{ secrets.RDS_PASSWORD }}
+      AWS_S3_BUCKET: ${{ secrets.AWS_S3_BUCKET }}
+
     steps:
       - name: Deploy to EC2
         uses: appleboy/ssh-action@master
@@ -66,17 +77,6 @@ jobs:
 
           script: |
             set -e
-
-            IMAGE_PATH="${{ needs.build-and-push.outputs.image_path }}"
-            ECR_REGISTRY="${{ needs.build-and-push.outputs.ecr_registry }}"
-            AWS_REGION="${{ secrets.AWS_REGION }}"
-
-            RDS_HOST="${{ secrets.RDS_HOST }}"
-            RDS_PORT="5432"
-            RDS_DB_NAME="postgres"
-            RDS_USERNAME="postgres"
-            RDS_PASSWORD="${{ secrets.RDS_PASSWORD }}"
-            AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}"
 
             echo "IMAGE=$IMAGE_PATH"
             echo "REGISTRY=$ECR_REGISTRY"
@@ -99,5 +99,3 @@ jobs:
               -e CLOUD_AWS_REGION_STATIC="$AWS_REGION" \
               -e CLOUD_AWS_S3_BUCKET="$AWS_S3_BUCKET" \
               "$IMAGE_PATH"
-
-            docker image prune -f
