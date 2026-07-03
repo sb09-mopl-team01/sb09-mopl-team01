@@ -61,7 +61,7 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           envs: ECR_REGISTRY, ECR_PASSWORD
           script: |
-            aws ecr get-login-password --region ${{ secrets.AWS_REGION }} | docker login --username AWS --password-stdin $ECR_REGISTRY
+            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin $ECR_REGISTRY
             
             if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
                 echo "> 기존 도커 컨테이너 종료 및 삭제"
