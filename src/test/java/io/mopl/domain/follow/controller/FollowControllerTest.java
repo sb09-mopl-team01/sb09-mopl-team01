@@ -56,4 +56,16 @@ class FollowControllerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     verify(followService).unfollow(followerId, followId);
   }
+
+  @Test
+  @DisplayName("GET /api/follows/count - 특정 유저 팔로워 수 조회 성공")
+  void countFollowers() {
+    UUID followeeId = UUID.randomUUID();
+    given(followService.countFollowers(followeeId)).willReturn(3L);
+
+    ResponseEntity<Long> response = followController.countFollowers(followeeId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isEqualTo(3L);
+  }
 }

@@ -122,6 +122,17 @@ class FollowServiceTest {
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
   }
 
+  @Test
+  @DisplayName("특정 유저의 팔로워 수 조회 성공")
+  void countFollowers() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.countByFollowee(followee)).willReturn(3L);
+
+    long result = followService.countFollowers(followeeId);
+
+    assertThat(result).isEqualTo(3L);
+  }
+
   private User createUser(UUID id, String name) {
     User user = User.builder()
         .email(name + "@example.com")
