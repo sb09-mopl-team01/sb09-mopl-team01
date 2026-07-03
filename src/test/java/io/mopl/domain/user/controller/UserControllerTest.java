@@ -13,6 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -51,6 +52,9 @@ class UserControllerTest {
 
   @MockitoBean
   private UserService userService;
+
+  @MockitoBean
+  private TempPasswordService tempPasswordService;
 
   @Test
   @DisplayName("POST /api/users - 회원가입 요청")
