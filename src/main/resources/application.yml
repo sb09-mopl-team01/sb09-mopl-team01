@@ -40,6 +40,8 @@ management:
     prometheus:
       enabled: true
 
+  cache:
+    type: redis
 
 jwt:
   secret: ${JWT_SECRET}
