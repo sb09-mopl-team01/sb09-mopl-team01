@@ -23,6 +23,7 @@ public class CacheConfig {
     BasicPolymorphicTypeValidator ptv = BasicPolymorphicTypeValidator.builder()
         .allowIfBaseType(Object.class)
         .allowIfSubType("io.mopl.domain.")
+        .allowIfSubType("io.mopl.global.")
         .allowIfSubType("java.util.")
         .allowIfSubType("java.time.")
         .build();
