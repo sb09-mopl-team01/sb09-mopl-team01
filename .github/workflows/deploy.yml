@@ -1,11 +1,16 @@
+name: Mopl
+
 on:
   push:
-    branches: [ "dev", "chore/aws-setup" ] # 테스트용 브랜치 추가
+    branches: [ "dev", "chore/aws-setup" ]
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
-
+    outputs:
+      image_path: ${{ steps.build-image.outputs.image_path }}
+      ecr_registry: ${{ steps.login-ecr.outputs.registry }}
+      ecr_password: ${{ steps.login-ecr.outputs.docker_password }}
     steps:
       - name: Checkout source code
         uses: actions/checkout@v4
@@ -42,6 +47,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build, tag, and push image to Amazon ECR
+        id: build-image
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
@@ -49,21 +55,20 @@ jobs:
         run: |
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "image_path=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
 
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
       - name: Execute Server Application via SSH (Docker Run)
         uses: appleboy/ssh-action@master
-        env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          ECR_PASSWORD: ${{ steps.login-ecr.outputs.docker_password }}
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USERNAME }}
           key: ${{ secrets.EC2_SSH_KEY }}
-          envs: |
-            ECR_REGISTRY
-            ECR_PASSWORD
           script: |
-            echo "$ECR_PASSWORD" | docker login --username AWS --password-stdin $ECR_REGISTRY
+            echo "${{ needs.build-and-push.outputs.ecr_password }}" | docker login --username AWS --password-stdin ${{ needs.build-and-push.outputs.ecr_registry }}
             
             if [ "$(docker ps -qa -f name=mopl-backend-apps)" ]; then
                 echo "> 기존 도커 컨테이너 종료 및 삭제"
@@ -73,7 +78,7 @@ jobs:
             fi
             
             echo "> 최신 이미지 Pull"
-            docker pull $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            docker pull ${{ needs.build-and-push.outputs.image_path }}
             
             echo "> 신규 도커 컨테이너 배포 및 이륙"
             docker run -d -p 8080:8080 --name mopl-backend-apps \
@@ -85,6 +90,6 @@ jobs:
             -e RDS_PASSWORD=Moplteam01! \
             -e CLOUD_AWS_REGION_STATIC=${{ secrets.AWS_REGION }} \
             -e CLOUD_AWS_S3_BUCKET=${{ secrets.AWS_S3_BUCKET }} \
-            $ECR_REGISTRY/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+            ${{ needs.build-and-push.outputs.image_path }}
             
             docker image prune -f
