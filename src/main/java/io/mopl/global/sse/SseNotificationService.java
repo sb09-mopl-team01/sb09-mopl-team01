@@ -124,15 +124,10 @@ public class SseNotificationService {
   }
 
   private void remove(UUID receiverId, UUID emitterId) {
-    Map<UUID, SseConnection> userEmitters = emitters.get(receiverId);
-    if (userEmitters == null) {
-      return;
-    }
-
-    userEmitters.remove(emitterId);
-    if (userEmitters.isEmpty()) {
-      emitters.remove(receiverId);
-    }
+    emitters.computeIfPresent(receiverId, (id, userEmitters) -> {
+      userEmitters.remove(emitterId);
+      return userEmitters.isEmpty() ? null : userEmitters;
+    });
   }
 
   private record SseConnection(
