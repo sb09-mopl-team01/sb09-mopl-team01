@@ -3,6 +3,7 @@ package io.mopl.domain.notification.service;
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.Notification;
+import io.mopl.domain.notification.event.NotificationCreatedEvent;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.mapper.NotificationMapper;
 import io.mopl.domain.notification.repository.NotificationRepository;
@@ -46,7 +47,14 @@ public class NotificationService {
         command.level()
     );
 
-    return notificationMapper.toDto(notificationRepository.save(notification));
+    NotificationDto notificationDto = notificationMapper.toDto(notificationRepository.save(notification));
+    eventPublisher.publish(new NotificationCreatedEvent(
+        notificationDto.id(),
+        notificationDto.receiverId(),
+        notificationDto,
+        Instant.now()
+    ));
+    return notificationDto;
   }
 
   @Transactional

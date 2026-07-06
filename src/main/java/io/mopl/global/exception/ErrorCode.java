@@ -38,11 +38,6 @@ public enum ErrorCode {
   // mail
   MAIL_SEND_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL_500", "이메일 전송에 실패했습니다"),
 
-  // Direct Message
-  SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
-  CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
-  CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
-
   // 참여자 파악 여부
   NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
 
@@ -57,6 +52,7 @@ public enum ErrorCode {
   PLAYLIST_CONTENT_NOT_FOUND(HttpStatus.NOT_FOUND, "PLAYLIST_404", "플레이리스트에 해당 콘텐츠가 없습니다"),
 
   // 팔로우
+  FOLLOW_NOT_FOUND(HttpStatus.NOT_FOUND, "FOLLOW_404", "팔로우 정보를 찾을 수 없습니다."),
   ALREADY_FOLLOWING(HttpStatus.CONFLICT, "FOLLOW_409", "이미 팔로우 중인 유저입니다."),
 
   // 리뷰

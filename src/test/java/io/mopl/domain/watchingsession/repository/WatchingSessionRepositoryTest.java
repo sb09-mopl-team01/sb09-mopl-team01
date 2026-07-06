@@ -112,6 +112,24 @@ class WatchingSessionRepositoryTest {
     assertThat(result).isEqualTo(2L);
   }
 
+  @Test
+  @DisplayName("사용자가 특정 콘텐츠를 시청 중인지 확인한다")
+  void existsByWatcherIdAndContentId() {
+    Content content = saveContent("그래비티");
+    Content anotherContent = saveContent("다른 콘텐츠");
+    User watcher = saveUser("시청자");
+    saveSession(watcher, content);
+
+    assertThat(watchingSessionRepository.existsByWatcherIdAndContentId(
+        watcher.getId(),
+        content.getId()
+    )).isTrue();
+    assertThat(watchingSessionRepository.existsByWatcherIdAndContentId(
+        watcher.getId(),
+        anotherContent.getId()
+    )).isFalse();
+  }
+
   private WatchingSession saveSession(User watcher, Content content) {
     WatchingSession session = WatchingSession.start(watcher, content);
     return watchingSessionRepository.saveAndFlush(session);
