@@ -20,14 +20,13 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.web.multipart.MultipartFile;
 
 @Service
 @RequiredArgsConstructor
-@Transactional(readOnly = true)
 @Slf4j
 public class ContentService {
 
@@ -35,24 +34,33 @@ public class ContentService {
   private final ContentStatsService contentStatsService;
   private final ContentMapper contentMapper;
   private final ContentThumbnailService contentThumbnailService;
+  private final PlatformTransactionManager transactionManager;
 
-  @Transactional
   public ContentDto createContent(ContentCreateRequest request, MultipartFile thumbnail) {
     String thumbnailUrl = null;
     try {
       thumbnailUrl = contentThumbnailService.uploadRequired(thumbnail);
-      deleteThumbnailAfterRollback(thumbnailUrl);
-      Content content = contentMapper.toEntity(request, thumbnailUrl);
-      Content savedContent = contentRepository.save(content);
-      log.info("Content create completed. contentId={}", savedContent.getId());
-      return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
+      String uploadedThumbnailUrl = thumbnailUrl;
+
+      ContentDto contentDto = executeInTransaction(() -> {
+        Content content = contentMapper.toEntity(request, uploadedThumbnailUrl);
+        Content savedContent = contentRepository.save(content);
+        log.info("Content create completed. contentId={}", savedContent.getId());
+        return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
+      });
+      return contentDto;
     } catch (IllegalArgumentException e) {
       contentThumbnailService.delete(thumbnailUrl);
       log.warn("Content create rejected. title={}", request == null ? null : request.title());
       throw new BaseException(ErrorCode.INVALID_INPUT);
+    } catch (RuntimeException e) {
+      contentThumbnailService.delete(thumbnailUrl);
+      log.error("Content create failed. title={}", request == null ? null : request.title(), e);
+      throw e;
     }
   }
 
+  @Transactional(readOnly = true)
   public ContentDto findContent(UUID contentId) {
     Content content = contentRepository.findById(contentId)
         .orElseThrow(() -> {
@@ -64,6 +72,7 @@ public class ContentService {
     return contentMapper.toDto(content, stats);
   }
 
+  @Transactional(readOnly = true)
   public CursorResponse<ContentDto> findContents(
       ContentType typeEqual,
       String keywordLike,
@@ -102,7 +111,6 @@ public class ContentService {
     );
   }
 
-  @Transactional
   public ContentDto updateContent(
       UUID contentId,
       ContentUpdateRequest request,
@@ -121,32 +129,43 @@ public class ContentService {
       String thumbnailUrl = contentThumbnailService.uploadOptional(thumbnail, currentThumbnailUrl);
       if (!Objects.equals(currentThumbnailUrl, thumbnailUrl)) {
         uploadedThumbnailUrl = thumbnailUrl;
-        deleteThumbnailAfterRollback(uploadedThumbnailUrl);
       }
-      content.updateManual(
-          request.title(),
-          request.description(),
-          request.tags(),
-          thumbnailUrl
-      );
+
+      ContentDto contentDto = executeInTransaction(() -> {
+        Content targetContent = getContentOrThrow(contentId);
+        targetContent.updateManual(
+            request.title(),
+            request.description(),
+            request.tags(),
+            thumbnailUrl
+        );
+        log.info("Content update completed. contentId={}", contentId);
+        return contentMapper.toDto(targetContent, contentStatsService.getStats(targetContent));
+      });
+
       if (uploadedThumbnailUrl != null) {
-        deleteThumbnailAfterCommit(currentThumbnailUrl);
+        contentThumbnailService.delete(currentThumbnailUrl);
       }
-      log.info("Content update completed. contentId={}", contentId);
-      return contentMapper.toDto(content, contentStatsService.getStats(content));
+      return contentDto;
     } catch (IllegalArgumentException e) {
       contentThumbnailService.delete(uploadedThumbnailUrl);
       log.warn("Content update rejected. contentId={}", contentId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
+    } catch (RuntimeException e) {
+      contentThumbnailService.delete(uploadedThumbnailUrl);
+      log.error("Content update failed. contentId={}", contentId, e);
+      throw e;
     }
   }
 
-  @Transactional
   public void deleteContent(UUID contentId) {
-    Content content = getContentOrThrow(contentId);
-    String thumbnailUrl = content.getThumbnailUrl();
-    contentRepository.delete(content);
-    deleteThumbnailAfterCommit(thumbnailUrl);
+    String thumbnailUrl = executeInTransaction(() -> {
+      Content content = getContentOrThrow(contentId);
+      String currentThumbnailUrl = content.getThumbnailUrl();
+      contentRepository.delete(content);
+      return currentThumbnailUrl;
+    });
+    contentThumbnailService.delete(thumbnailUrl);
     log.info("Content delete completed. contentId={}", contentId);
   }
 
@@ -158,34 +177,8 @@ public class ContentService {
         });
   }
 
-  private void deleteThumbnailAfterCommit(String thumbnailUrl) {
-    if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
-      return;
-    }
-    if (!TransactionSynchronizationManager.isSynchronizationActive()) {
-      contentThumbnailService.delete(thumbnailUrl);
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-      @Override
-      public void afterCommit() {
-        contentThumbnailService.delete(thumbnailUrl);
-      }
-    });
-  }
-
-  private void deleteThumbnailAfterRollback(String thumbnailUrl) {
-    if (thumbnailUrl == null || thumbnailUrl.isBlank()
-        || !TransactionSynchronizationManager.isSynchronizationActive()) {
-      return;
-    }
-    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-      @Override
-      public void afterCompletion(int status) {
-        if (status != STATUS_COMMITTED) {
-          contentThumbnailService.delete(thumbnailUrl);
-        }
-      }
-    });
+  private <T> T executeInTransaction(java.util.function.Supplier<T> action) {
+    TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
+    return transactionTemplate.execute(status -> action.get());
   }
 }

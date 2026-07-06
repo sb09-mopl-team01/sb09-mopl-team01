@@ -57,3 +57,19 @@ mopl:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}
     password: ${ADMIN_PASSWORD:admin1234}
+  external:
+    timeout:
+      connect-seconds: ${EXTERNAL_API_CONNECT_TIMEOUT_SECONDS:3}
+      read-seconds: ${EXTERNAL_API_READ_TIMEOUT_SECONDS:5}
+    tmdb:
+      api-key: ${TMDB_API_KEY:}
+      base-url: https://api.themoviedb.org/3
+      image-base-url: https://image.tmdb.org/t/p/w500
+      movie-path: /movie/popular
+      tv-path: /tv/popular
+      pages: ${TMDB_SYNC_PAGES:1}
+    the-sports-db:
+      api-key: ${THE_SPORTS_DB_API_KEY:}
+      base-url: https://www.thesportsdb.com/api/v1/json
+      league-id: ${THE_SPORTS_DB_LEAGUE_ID:}
+      events-path: /{apiKey}/eventsnextleague.php

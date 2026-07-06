@@ -18,22 +18,20 @@ import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
-import org.junit.jupiter.api.DisplayName;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
-import org.springframework.mock.web.MockMultipartFile;
-import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.batch.support.transaction.ResourcelessTransactionManager;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.util.ReflectionTestUtils;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
 
-  @InjectMocks
   private ContentService contentService;
 
   @Mock
@@ -48,31 +46,26 @@ class ContentServiceTest {
   @Mock
   private ContentThumbnailService contentThumbnailService;
 
-  @Test
-  @DisplayName("콘텐츠 단건 조회 시 집계값을 조합해 DTO로 변환한다")
-  void findContent() {
-    Content content = Content.createManual(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        "https://image.example.com/movie.jpg",
-        List.of("액션")
+  @BeforeEach
+  void setUp() {
+    contentService = new ContentService(
+        contentRepository,
+        contentStatsService,
+        contentMapper,
+        contentThumbnailService,
+        new ResourcelessTransactionManager()
     );
+  }
+
+  @Test
+  void findContent() {
+    Content content = manualContent("movie", "description", "https://image.example.com/movie.jpg", Set.of("action"));
     UUID contentId = UUID.randomUUID();
     ReflectionTestUtils.setField(content, "id", contentId);
     content.updateReviewStats(4.5, 2);
     ContentStats stats = new ContentStats(4.5, 2, 0L);
-    ContentDto expectedDto = ContentDto.builder()
-        .id(contentId)
-        .type(ContentType.MOVIE)
-        .title("영화")
-        .description("영화 설명")
-        .thumbnailUrl("https://image.example.com/movie.jpg")
-        .tags(java.util.Set.of("액션"))
-        .averageRating(4.5)
-        .reviewCount(2)
-        .watcherCount(0L)
-        .build();
+    ContentDto expectedDto = dto(contentId, "movie", "description", "https://image.example.com/movie.jpg",
+        Set.of("action"), 4.5, 2);
     given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
     given(contentStatsService.getStats(content)).willReturn(stats);
     given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
@@ -83,7 +76,6 @@ class ContentServiceTest {
   }
 
   @Test
-  @DisplayName("존재하지 않는 콘텐츠 단건 조회는 예외로 처리한다")
   void rejectUnknownContent() {
     UUID contentId = UUID.randomUUID();
     given(contentRepository.findById(contentId)).willReturn(Optional.empty());
@@ -93,30 +85,13 @@ class ContentServiceTest {
   }
 
   @Test
-  @DisplayName("콘텐츠 목록 조회 시 Content 저장 집계값을 DTO에 조합한다")
   void findContents() {
-    Content content = Content.createManual(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        null,
-        List.of("액션")
-    );
+    Content content = manualContent("movie", "description", null, Set.of("action"));
     UUID contentId = UUID.randomUUID();
     ReflectionTestUtils.setField(content, "id", contentId);
     content.updateReviewStats(4.0, 3);
     ContentStats stats = new ContentStats(4.0, 3, 0L);
-    ContentDto expectedDto = ContentDto.builder()
-        .id(contentId)
-        .type(ContentType.MOVIE)
-        .title("영화")
-        .description("영화 설명")
-        .thumbnailUrl(null)
-        .tags(java.util.Set.of("액션"))
-        .averageRating(4.0)
-        .reviewCount(3)
-        .watcherCount(0L)
-        .build();
+    ContentDto expectedDto = dto(contentId, "movie", "description", null, Set.of("action"), 4.0, 3);
     CursorResponse<Content> repositoryResponse = new CursorResponse<>(
         List.of(content),
         "2026-06-29T00:00:00Z",
@@ -128,8 +103,8 @@ class ContentServiceTest {
     );
     given(contentRepository.findContentsByCursor(
         ContentType.MOVIE,
-        "영화",
-        List.of("액션"),
+        "movie",
+        List.of("action"),
         null,
         null,
         10,
@@ -142,8 +117,8 @@ class ContentServiceTest {
 
     CursorResponse<ContentDto> result = contentService.findContents(
         ContentType.MOVIE,
-        "영화",
-        List.of("액션"),
+        "movie",
+        List.of("action"),
         null,
         null,
         10,
@@ -157,42 +132,15 @@ class ContentServiceTest {
   }
 
   @Test
-  @DisplayName("관리자 콘텐츠 생성 시 MANUAL 콘텐츠를 저장하고 DTO로 반환한다")
   void createContent() {
-    ContentCreateRequest request = new ContentCreateRequest(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        java.util.Set.of("액션")
-    );
-    MockMultipartFile thumbnail = new MockMultipartFile(
-        "thumbnail",
-        "poster.jpg",
-        "image/jpeg",
-        "image".getBytes()
-    );
+    ContentCreateRequest request = createRequest("movie", "description", Set.of("action"));
+    MockMultipartFile thumbnail = thumbnail();
     String thumbnailUrl = "/content-thumbnails/poster.jpg";
-    Content content = Content.createManual(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        thumbnailUrl,
-        request.tags()
-    );
+    Content content = manualContent("movie", "description", thumbnailUrl, request.tags());
     UUID contentId = UUID.randomUUID();
     ReflectionTestUtils.setField(content, "id", contentId);
-    ContentStats stats = new ContentStats(0.0, 0, 0L);
-    ContentDto expectedDto = ContentDto.builder()
-        .id(contentId)
-        .type(ContentType.MOVIE)
-        .title("영화")
-        .description("영화 설명")
-        .thumbnailUrl(thumbnailUrl)
-        .tags(java.util.Set.of("액션"))
-        .averageRating(0.0)
-        .reviewCount(0)
-        .watcherCount(0L)
-        .build();
+    ContentStats stats = ContentStats.empty();
+    ContentDto expectedDto = dto(contentId, "movie", "description", thumbnailUrl, Set.of("action"), 0.0, 0);
     given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
     given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
     given(contentRepository.save(content)).willReturn(content);
@@ -206,91 +154,35 @@ class ContentServiceTest {
   }
 
   @Test
-  @DisplayName("관리자 콘텐츠 생성 트랜잭션 롤백 시 업로드한 썸네일을 삭제한다")
-  void deleteUploadedThumbnailWhenCreateTransactionRollsBack() {
-    TransactionSynchronizationManager.initSynchronization();
-    try {
-      ContentCreateRequest request = new ContentCreateRequest(
-          ContentType.MOVIE,
-          "영화",
-          "영화 설명",
-          java.util.Set.of("액션")
-      );
-      MockMultipartFile thumbnail = new MockMultipartFile(
-          "thumbnail",
-          "poster.jpg",
-          "image/jpeg",
-          "image".getBytes()
-      );
-      String thumbnailUrl = "/content-thumbnails/poster.jpg";
-      Content content = Content.createManual(
-          ContentType.MOVIE,
-          "영화",
-          "영화 설명",
-          thumbnailUrl,
-          request.tags()
-      );
-      UUID contentId = UUID.randomUUID();
-      ReflectionTestUtils.setField(content, "id", contentId);
-      ContentStats stats = new ContentStats(0.0, 0, 0L);
-      ContentDto expectedDto = ContentDto.builder()
-          .id(contentId)
-          .type(ContentType.MOVIE)
-          .title("영화")
-          .description("영화 설명")
-          .thumbnailUrl(thumbnailUrl)
-          .tags(java.util.Set.of("액션"))
-          .averageRating(0.0)
-          .reviewCount(0)
-          .watcherCount(0L)
-          .build();
-      given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
-      given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
-      given(contentRepository.save(content)).willReturn(content);
-      given(contentStatsService.getStats(content)).willReturn(stats);
-      given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
+  void deleteUploadedThumbnailWhenCreateFailsAfterUpload() {
+    ContentCreateRequest request = createRequest("movie", "description", Set.of("tag"));
+    MockMultipartFile thumbnail = thumbnail();
+    String thumbnailUrl = "/content-thumbnails/poster.jpg";
+    Content content = manualContent("movie", "description", thumbnailUrl, request.tags());
+    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
+    given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
+    given(contentRepository.save(content)).willThrow(new RuntimeException("db failed"));
 
-      contentService.createContent(request, thumbnail);
+    assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("db failed");
 
-      TransactionSynchronizationManager.getSynchronizations()
-          .forEach(synchronization ->
-              synchronization.afterCompletion(TransactionSynchronization.STATUS_ROLLED_BACK));
-
-      verify(contentThumbnailService).delete(thumbnailUrl);
-    } finally {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
+    verify(contentThumbnailService).delete(thumbnailUrl);
   }
 
   @Test
-  @DisplayName("관리자 콘텐츠 수정 시 thumbnail이 없으면 기존 썸네일을 유지한다")
   void updateContentWithoutThumbnailKeepsCurrentThumbnail() {
     UUID contentId = UUID.randomUUID();
     ContentUpdateRequest request = new ContentUpdateRequest(
-        "수정 제목",
-        "수정 설명",
-        java.util.Set.of("수정태그")
+        "updated title",
+        "updated description",
+        Set.of("updated-tag")
     );
-    Content content = Content.createManual(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        "/content-thumbnails/current.jpg",
-        List.of("액션")
-    );
+    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", Set.of("action"));
     ReflectionTestUtils.setField(content, "id", contentId);
-    ContentStats stats = new ContentStats(0.0, 0, 0L);
-    ContentDto expectedDto = ContentDto.builder()
-        .id(contentId)
-        .type(ContentType.MOVIE)
-        .title("수정 제목")
-        .description("수정 설명")
-        .thumbnailUrl("/content-thumbnails/current.jpg")
-        .tags(java.util.Set.of("수정태그"))
-        .averageRating(0.0)
-        .reviewCount(0)
-        .watcherCount(0L)
-        .build();
+    ContentStats stats = ContentStats.empty();
+    ContentDto expectedDto = dto(contentId, "updated title", "updated description",
+        "/content-thumbnails/current.jpg", Set.of("updated-tag"), 0.0, 0);
     given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
     given(contentThumbnailService.uploadOptional(null, "/content-thumbnails/current.jpg"))
         .willReturn("/content-thumbnails/current.jpg");
@@ -300,21 +192,14 @@ class ContentServiceTest {
     ContentDto result = contentService.updateContent(contentId, request, null);
 
     assertThat(result).isEqualTo(expectedDto);
-    assertThat(content.getTitle()).isEqualTo("수정 제목");
+    assertThat(content.getTitle()).isEqualTo("updated title");
     assertThat(content.getThumbnailUrl()).isEqualTo("/content-thumbnails/current.jpg");
   }
 
   @Test
-  @DisplayName("관리자 콘텐츠 삭제 시 콘텐츠와 썸네일을 삭제한다")
   void deleteContent() {
     UUID contentId = UUID.randomUUID();
-    Content content = Content.createManual(
-        ContentType.MOVIE,
-        "영화",
-        "영화 설명",
-        "/content-thumbnails/current.jpg",
-        List.of("액션")
-    );
+    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", Set.of("action"));
     ReflectionTestUtils.setField(content, "id", contentId);
     given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
 
@@ -325,11 +210,49 @@ class ContentServiceTest {
   }
 
   @Test
-  @DisplayName("관리자 콘텐츠 수정 시 request가 null이면 예외로 처리한다")
   void rejectNullUpdateRequest() {
     UUID contentId = UUID.randomUUID();
 
     assertThatThrownBy(() -> contentService.updateContent(contentId, null, null))
         .isInstanceOf(BaseException.class);
+  }
+
+  private ContentCreateRequest createRequest(String title, String description, Set<String> tags) {
+    return new ContentCreateRequest(ContentType.MOVIE, title, description, tags);
+  }
+
+  private Content manualContent(String title, String description, String thumbnailUrl, Set<String> tags) {
+    return Content.createManual(ContentType.MOVIE, title, description, thumbnailUrl, tags);
+  }
+
+  private ContentDto dto(
+      UUID contentId,
+      String title,
+      String description,
+      String thumbnailUrl,
+      Set<String> tags,
+      double averageRating,
+      int reviewCount
+  ) {
+    return ContentDto.builder()
+        .id(contentId)
+        .type(ContentType.MOVIE)
+        .title(title)
+        .description(description)
+        .thumbnailUrl(thumbnailUrl)
+        .tags(tags)
+        .averageRating(averageRating)
+        .reviewCount(reviewCount)
+        .watcherCount(0L)
+        .build();
+  }
+
+  private MockMultipartFile thumbnail() {
+    return new MockMultipartFile(
+        "thumbnail",
+        "poster.jpg",
+        "image/jpeg",
+        "image".getBytes()
+    );
   }
 }
