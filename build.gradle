@@ -67,6 +67,9 @@ dependencies {
 
     // SMTP
     implementation 'org.springframework.boot:spring-boot-starter-mail'
+
+    // MIME
+    implementation 'org.apache.tika:tika-core:3.0.0'
 }
 
 jacoco {
