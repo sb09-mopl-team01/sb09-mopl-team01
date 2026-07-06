@@ -10,6 +10,7 @@ import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -49,6 +50,9 @@ public class SecurityConfig {
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
 
+  @Value("${mopl.cors.allowed-origins}")
+  private List<String> allowedOrigins;
+
   @Bean
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -82,7 +86,7 @@ public class SecurityConfig {
   @Bean
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
-    //configuration.setAllowedOrigins();
+    configuration.setAllowedOrigins(allowedOrigins);
     configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
     configuration.setAllowedHeaders(List.of("*"));
     configuration.setAllowCredentials(true);

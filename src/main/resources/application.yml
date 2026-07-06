@@ -73,3 +73,6 @@ mopl:
       base-url: https://www.thesportsdb.com/api/v1/json
       league-id: ${THE_SPORTS_DB_LEAGUE_ID:}
       events-path: /{apiKey}/eventsnextleague.php
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
