@@ -19,6 +19,8 @@ public enum ErrorCode {
   EMAIL_DUPLICATION(HttpStatus.CONFLICT, "USER_409", "이메일이 이미 존재합니다"),
   LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "USER_401", "이메일 또는 비밀번호가 틀렸습니다"),
   FORBIDDEN(HttpStatus.FORBIDDEN, "USER_403", "권한이 없습니다"),
+  PROFILE_IMAGE_UPLOAD_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500", "프로필 이미지 저장에 실패했습니다."),
+  PROFILE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "USER_IMAGE_400", "올바르지 않은 이미지 형식입니다."),
 
   // Auth
   AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_401", "인증 정보가 필요합니다"),
@@ -32,8 +34,14 @@ public enum ErrorCode {
   CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
   CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
 
+
   // mail
   MAIL_SEND_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "MAIL_500", "이메일 전송에 실패했습니다"),
+
+  // Direct Message
+  SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),
+  CONVERSATION_NOT_FOUND(HttpStatus.NOT_FOUND, "DM_404", "대화를 찾을 수 없습니다"),
+  CONVERSATION_CREATE_RACE_CONDITION(HttpStatus.CONFLICT, "DM_409", "대화 생성 중 충돌이 발생했습니다"),
 
   // 참여자 파악 여부
   NOT_CHAT_PARTICIPANT(HttpStatus.FORBIDDEN, "CHAT_403","채팅방 참여자가 아닙니다."),
