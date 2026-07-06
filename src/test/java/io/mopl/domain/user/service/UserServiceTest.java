@@ -7,6 +7,8 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.mopl.domain.content.dto.ContentSummary;
+import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -19,6 +21,9 @@ import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.dto.response.UserSummary;
+import io.mopl.domain.watchingsession.dto.WatchingSessionDto;
+import io.mopl.domain.watchingsession.service.WatchingSessionService;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -48,6 +53,9 @@ class UserServiceTest {
 
   @Mock
   private PasswordEncoder passwordEncoder;
+
+  @Mock
+  private WatchingSessionService watchingSessionService;
 
   @Test
   @DisplayName("회원가입 성공")
@@ -121,6 +129,66 @@ class UserServiceTest {
 
     UserNotFoundException exception = assertThrows(UserNotFoundException.class, () -> userService.findUser(userId));
     assertThat(exception.getErrorCode()).isEqualTo(ErrorCode.USER_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("프로필 조회 시 현재 시청 중인 콘텐츠를 포함한다")
+  void findUserProfile_WithCurrentWatchingContent() {
+    UUID userId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+    User user = mock(User.class);
+    ContentSummary currentWatchingContent = ContentSummary.builder()
+        .id(contentId)
+        .type(ContentType.MOVIE)
+        .title("인터스텔라")
+        .description("우주 영화")
+        .thumbnailUrl("https://image.example.com/interstellar.jpg")
+        .tags(java.util.Set.of("SF"))
+        .averageRating(4.5)
+        .reviewCount(10)
+        .build();
+    WatchingSessionDto watchingSession = new WatchingSessionDto(
+        UUID.randomUUID(),
+        Instant.now(),
+        new UserSummary(userId, "홍길동", null),
+        currentWatchingContent
+    );
+    UserDto expected = UserDto.builder()
+        .id(userId)
+        .email("test@example.com")
+        .name("홍길동")
+        .currentWatchingContent(currentWatchingContent)
+        .build();
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(watchingSessionService.findByWatcher(userId)).willReturn(watchingSession);
+    given(userMapper.toDto(user, currentWatchingContent)).willReturn(expected);
+
+    UserDto result = userService.findUserProfile(userId);
+
+    assertThat(result.currentWatchingContent()).isEqualTo(currentWatchingContent);
+    assertThat(result.currentWatchingContent().id()).isEqualTo(contentId);
+  }
+
+  @Test
+  @DisplayName("프로필 조회 시 현재 시청 중인 콘텐츠가 없으면 null로 반환한다")
+  void findUserProfile_WithoutCurrentWatchingContent() {
+    UUID userId = UUID.randomUUID();
+    User user = mock(User.class);
+    UserDto expected = UserDto.builder()
+        .id(userId)
+        .email("test@example.com")
+        .name("홍길동")
+        .currentWatchingContent(null)
+        .build();
+
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(watchingSessionService.findByWatcher(userId)).willReturn(null);
+    given(userMapper.toDto(user, null)).willReturn(expected);
+
+    UserDto result = userService.findUserProfile(userId);
+
+    assertThat(result.currentWatchingContent()).isNull();
   }
 
   @Test

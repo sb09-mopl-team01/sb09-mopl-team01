@@ -175,7 +175,7 @@ class UserControllerTest {
     UUID userId = UUID.randomUUID();
     UserDto responseDto = UserDto.builder().id(userId).email("target@example.com").build();
 
-    given(userService.findUser(userId)).willReturn(responseDto);
+    given(userService.findUserProfile(userId)).willReturn(responseDto);
 
     mockMvc.perform(get("/api/users/{userId}", userId))
         .andDo(print())
@@ -189,7 +189,7 @@ class UserControllerTest {
   void findUser_Fail_NotFound() throws Exception {
     UUID userId = UUID.randomUUID();
 
-    given(userService.findUser(userId)).willThrow(new UserNotFoundException());
+    given(userService.findUserProfile(userId)).willThrow(new UserNotFoundException());
 
     mockMvc.perform(get("/api/users/{userId}", userId))
         .andDo(print())
