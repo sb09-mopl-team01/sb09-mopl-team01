@@ -1,4 +1,7 @@
 spring:
+#  config:
+#    import:
+#      - classpath:application-local-h2.yml
   datasource:
     url: jdbc:postgresql://${RDS_HOST:localhost}:${RDS_PORT:5432}/${RDS_DB_NAME:postgres}
     username: ${RDS_USERNAME:postgres}

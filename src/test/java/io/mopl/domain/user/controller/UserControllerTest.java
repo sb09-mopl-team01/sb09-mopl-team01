@@ -107,7 +107,7 @@ class UserControllerTest {
   @Test
   @DisplayName("POST /api/users - 회원가입 성공 시 201 반환")
   void createUser_Success() throws Exception {
-    UserCreateRequest request = new UserCreateRequest("test@example.com", "홍길동", "password123");
+    UserCreateRequest request = new UserCreateRequest("test@example.com", "password123","홍길동");
     UserDto responseDto = UserDto.builder().email(request.email()).name(request.name()).build();
 
     given(userService.createUser(any(UserCreateRequest.class))).willReturn(responseDto);
@@ -123,7 +123,7 @@ class UserControllerTest {
   @Test
   @DisplayName("POST /api/users - 이메일 중복 시 409 Conflict 반환")
   void createUser_Fail_DuplicateEmail() throws Exception {
-    UserCreateRequest request = new UserCreateRequest("duplicate@example.com", "홍길동", "password123");
+    UserCreateRequest request = new UserCreateRequest("duplicate@example.com","password123", "홍길동");
 
     given(userService.createUser(any(UserCreateRequest.class)))
         .willThrow(new DuplicateUserEmailException());

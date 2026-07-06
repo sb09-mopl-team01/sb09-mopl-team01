@@ -27,7 +27,7 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
   public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
       AuthenticationException exception) throws IOException, ServletException {
 
-    log.warn("[LoginFailureHandler] 로그인 실패 - 실패 원인: {}", exception.getMessage());
+    log.warn("LoginFailureHandler Login Fail - {}", exception.getMessage());
 
     response.setStatus(HttpStatus.UNAUTHORIZED.value());
     response.setContentType(MediaType.APPLICATION_JSON_VALUE);

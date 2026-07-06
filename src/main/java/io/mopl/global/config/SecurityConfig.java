@@ -8,7 +8,9 @@ import io.mopl.global.security.handler.LoginSuccessHandler;
 import io.mopl.global.security.handler.MoplLogoutHandler;
 import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
+import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -32,6 +34,9 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
@@ -45,6 +50,15 @@ public class SecurityConfig {
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
 
+  @Value("${mopl.cors.allowed-origins}")
+  private List<String> allowedOrigins;
+
+  @Value("${mopl.cors.allowed-methods}")
+  private List<String> allowedMethods;
+
+  @Value("${mopl.cors.allowed-headers}")
+  private List<String> allowedHeaders;
+
   @Bean
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -56,7 +70,9 @@ public class SecurityConfig {
   public SecurityFilterChain filterChain(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
 
     http
+        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(this::configureCsrf)
+        .httpBasic(this::configureHttpBasic)
         .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
         .formLogin(this::configureFormLogin)
         .logout(this::configureLogout)
@@ -73,6 +89,18 @@ public class SecurityConfig {
     return new BCryptPasswordEncoder();
   }
 
+  @Bean
+  public CorsConfigurationSource corsConfigurationSource() {
+    CorsConfiguration configuration = new CorsConfiguration();
+    configuration.setAllowedOrigins(allowedOrigins);
+    configuration.setAllowedMethods(allowedMethods);
+    configuration.setAllowedHeaders(allowedHeaders);
+    configuration.setAllowCredentials(true);
+
+    UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+    source.registerCorsConfiguration("/**", configuration);
+    return source;
+  }
 
   private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
     MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);

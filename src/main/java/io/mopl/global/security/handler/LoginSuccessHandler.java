@@ -40,7 +40,7 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
   public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response,
       Authentication authentication) throws IOException, ServletException {
 
-    log.debug("[LoginSuccessHandler] 로그인 성공 처리 완료");
+    log.debug("LoginSuccessHandler Login Success Process Complete");
 
     MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
     String email = userDetails.getUsername();

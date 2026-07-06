@@ -32,7 +32,7 @@ public class AuthService {
   private final PasswordEncoder passwordEncoder;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
-    log.info("Auth Token-Refresh Started.");
+    log.debug("Auth Token-Refresh Started.");
 
     if (currentRefreshToken == null || !jwtProvider.validateToken(currentRefreshToken)) {
       log.warn("Auth Token-Refresh Failed. Invalid refresh token.");
@@ -55,12 +55,12 @@ public class AuthService {
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
 
-    log.info("Auth Token Refresh Completed. email={}", email);
+    log.debug("Auth Token Refresh Completed. email={}", email);
     return new TokenRefreshResult(newAccessToken, newRefreshToken, userDto);
   }
 
   public void resetPassword(String email) {
-    log.info("Auth Reset Password Started. email={}", email);
+    log.debug("Auth Reset Password Started. email={}", email);
 
     userRepository.findByEmail(email)
         .orElseThrow(() -> {
@@ -75,6 +75,6 @@ public class AuthService {
 
     mailService.sendTempPasswordEmail(email, tempPassword);
 
-    log.info("Auth Reset Password Completed. email={}", email);
+    log.debug("Auth Reset Password Completed. email={}", email);
   }
 }
