@@ -46,6 +46,9 @@ public class FollowController {
   @GetMapping("/count")
   public ResponseEntity<Long> countFollowers(@RequestParam UUID followeeId) {
     long response = followService.countFollowers(followeeId);
+    return ResponseEntity.ok(response);
+  }
+
   @GetMapping("/followed-by-me")
   public ResponseEntity<FollowDto> findFollowedByMe(
       @AuthenticationPrincipal(expression = "user.id") UUID followerId,
