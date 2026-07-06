@@ -122,6 +122,47 @@ class FollowServiceTest {
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
   }
 
+  @Test
+  @DisplayName("특정 유저의 팔로워 수 조회 성공")
+  void countFollowers() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.countByFollowee(followee)).willReturn(3L);
+
+    long result = followService.countFollowers(followeeId);
+
+    assertThat(result).isEqualTo(3L);
+    
+  @Test
+  @DisplayName("내가 특정 유저를 팔로우 중이면 FollowDto를 반환")
+  void findFollowedByMe() {
+    Follow follow = Follow.create(follower, followee);
+    UUID followId = UUID.randomUUID();
+    ReflectionTestUtils.setField(follow, "id", followId);
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.findByFollowerAndFollowee(follower, followee))
+        .willReturn(Optional.of(follow));
+
+    FollowDto result = followService.findFollowedByMe(followerId, followeeId);
+
+    assertThat(result.id()).isEqualTo(followId);
+    assertThat(result.followerId()).isEqualTo(followerId);
+    assertThat(result.followeeId()).isEqualTo(followeeId);
+  }
+
+  @Test
+  @DisplayName("특정 유저를 팔로우하지 않으면 FOLLOW_NOT_FOUND 예외 발생")
+  void rejectFindFollowedByMeWhenNotFollowing() {
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.findByFollowerAndFollowee(follower, followee))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> followService.findFollowedByMe(followerId, followeeId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
+  }
+
   private User createUser(UUID id, String name) {
     User user = User.builder()
         .email(name + "@example.com")

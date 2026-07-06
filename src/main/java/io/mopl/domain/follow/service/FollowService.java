@@ -40,13 +40,26 @@ public class FollowService {
   public void unfollow(UUID followerId, UUID followId) {
     User follower = getUser(followerId);
     Follow follow = followRepository.findById(followId)
-        .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
+        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
 
     if (!follow.isFollowedBy(follower)) {
       throw new BaseException(ErrorCode.FORBIDDEN);
     }
 
     followRepository.delete(follow);
+  }
+
+  public long countFollowers(UUID followeeId) {
+    User followee = getUser(followeeId);
+    return followRepository.countByFollowee(followee);
+  public FollowDto findFollowedByMe(UUID followerId, UUID followeeId) {
+    User follower = getUser(followerId);
+    User followee = getUser(followeeId);
+
+    Follow follow = followRepository.findByFollowerAndFollowee(follower, followee)
+        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
+
+    return toDto(follow);
   }
 
   private User getUser(UUID userId) {
