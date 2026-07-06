@@ -11,6 +11,8 @@ public interface WatchingSessionRepository extends
 
   boolean existsByWatcherId(UUID watcherId);
 
+  boolean existsByWatcherIdAndContentId(UUID watcherId, UUID contentId);
+
   Optional<WatchingSession> findByWatcherId(UUID watcherId);
 
   void deleteByWatcherId(UUID watcherId);
