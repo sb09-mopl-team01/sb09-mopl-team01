@@ -11,6 +11,7 @@ import io.mopl.domain.user.service.UserService;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import io.mopl.global.security.MoplUserDetails;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -32,7 +33,7 @@ public class UserController {
   private final TempPasswordService tempPasswordService;
 
   @PostMapping
-  public ResponseEntity<UserDto> createUser(@RequestBody UserCreateRequest request) {
+  public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
     UserDto response = userService.createUser(request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
@@ -68,7 +69,7 @@ public class UserController {
   @PatchMapping("/{userId}")
   public ResponseEntity<UserDto> updateUser(
       @PathVariable UUID userId,
-      @RequestPart("request") UserUpdateRequest request,
+      @Valid @RequestPart("request") UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image
   ) {
     log.debug("User Update Profile Requested. id={}", userId);
@@ -80,7 +81,7 @@ public class UserController {
   @PatchMapping("/{userId}/role")
   public ResponseEntity<Void> updateUserRole(
       @PathVariable UUID userId,
-      @RequestBody UserRoleUpdateRequest request,
+      @Valid @RequestBody UserRoleUpdateRequest request,
       @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
     log.debug("User Update Role Requested. id={}", userId);
@@ -92,7 +93,7 @@ public class UserController {
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updateUserPassword(
       @PathVariable UUID userId,
-      @RequestBody ChangePasswordRequest request,
+      @Valid @RequestBody ChangePasswordRequest request,
       @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
     log.debug("User Update Password Requested. id={}", userId);
@@ -109,7 +110,7 @@ public class UserController {
   @PatchMapping("/{userId}/locked")
   public ResponseEntity<Void> updateUserLocked(
       @PathVariable UUID userId,
-      @RequestBody UserLockUpdateRequest request
+      @Valid @RequestBody UserLockUpdateRequest request
   ) {
     log.debug("User Update LockStatus Requested. id={}", userId);
     userService.updateUserLockStatus(userId, request);
