@@ -9,6 +9,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -22,6 +23,7 @@ public class AdminAccountInitializer implements CommandLineRunner {
   @Value("${mopl.admin.password}") private String adminPassword;
   @Value("${mopl.admin.email}") private String adminEmail;
 
+  @Transactional
   @Override
   public void run(String... args) throws Exception {
 
