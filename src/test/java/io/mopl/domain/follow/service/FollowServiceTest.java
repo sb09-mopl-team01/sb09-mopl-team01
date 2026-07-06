@@ -123,6 +123,16 @@ class FollowServiceTest {
   }
 
   @Test
+  @DisplayName("특정 유저의 팔로워 수 조회 성공")
+  void countFollowers() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.countByFollowee(followee)).willReturn(3L);
+
+    long result = followService.countFollowers(followeeId);
+
+    assertThat(result).isEqualTo(3L);
+    
+  @Test
   @DisplayName("내가 특정 유저를 팔로우 중이면 FollowDto를 반환")
   void findFollowedByMe() {
     Follow follow = Follow.create(follower, followee);

@@ -49,6 +49,9 @@ public class FollowService {
     followRepository.delete(follow);
   }
 
+  public long countFollowers(UUID followeeId) {
+    User followee = getUser(followeeId);
+    return followRepository.countByFollowee(followee);
   public FollowDto findFollowedByMe(UUID followerId, UUID followeeId) {
     User follower = getUser(followerId);
     User followee = getUser(followeeId);
