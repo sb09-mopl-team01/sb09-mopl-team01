@@ -1,14 +1,14 @@
 package io.mopl.domain.auth.service;
 
-
 import io.mopl.domain.auth.dto.TokenRefreshResult;
-import io.mopl.domain.auth.repository.RefreshTokenMemoryRepository;
 import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.mail.service.MailService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
@@ -36,13 +36,13 @@ public class AuthService {
 
     if (currentRefreshToken == null || !jwtProvider.validateToken(currentRefreshToken)) {
       log.warn("Auth Token-Refresh Failed. Invalid refresh token.");
-      throw new IllegalArgumentException("유효하지 않은 리프레시 토큰입니다.");
+      throw new BaseException(ErrorCode.INVALID_REFRESH_TOKEN);
     }
 
     String email = jwtProvider.getUsername(currentRefreshToken);
     if (!refreshTokenRepository.isValid(email, currentRefreshToken)) {
       log.warn("Auth Token-Refresh Failed. Expired or manipulated token. email={}", email);
-      throw new IllegalArgumentException("만료되었거나 조작된 리프레시 토큰입니다.");
+      throw new BaseException(ErrorCode.EXPIRED_OR_MANIPULATED_REFRESH_TOKEN);
     }
 
     refreshTokenRepository.removeToken(email, currentRefreshToken);
