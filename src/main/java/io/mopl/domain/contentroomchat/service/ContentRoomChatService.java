@@ -2,8 +2,8 @@ package io.mopl.domain.contentroomchat.service;
 
 import io.mopl.domain.contentroomchat.dto.ContentChatDto;
 import io.mopl.domain.contentroomchat.mapper.ContentChatMapper;
-import io.mopl.domain.user.entity.User;
-import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.dto.data.UserDto;
+import io.mopl.domain.user.service.UserService;
 import io.mopl.domain.watchingsession.repository.WatchingSessionRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -17,7 +17,7 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class ContentRoomChatService {
 
-  private final UserRepository userRepository;
+  private final UserService userService;
   private final WatchingSessionRepository watchingSessionRepository;
   private final ContentChatMapper contentChatMapper;
 
@@ -26,8 +26,7 @@ public class ContentRoomChatService {
     String normalizedContent = validateSendCommand(senderId, contentId, content);
     validateParticipant(senderId, contentId);
 
-    User sender = userRepository.findById(senderId)
-        .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
+    UserDto sender = userService.findUser(senderId);
 
     return contentChatMapper.toDto(sender, normalizedContent);
   }

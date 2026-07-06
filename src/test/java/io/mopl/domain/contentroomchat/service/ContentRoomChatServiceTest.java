@@ -6,12 +6,11 @@ import static org.mockito.Mockito.when;
 
 import io.mopl.domain.contentroomchat.dto.ContentChatDto;
 import io.mopl.domain.contentroomchat.mapper.ContentChatMapper;
-import io.mopl.domain.user.entity.User;
-import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.dto.data.UserDto;
+import io.mopl.domain.user.service.UserService;
 import io.mopl.domain.watchingsession.repository.WatchingSessionRepository;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
-import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -19,7 +18,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ContentRoomChatServiceTest {
@@ -28,7 +26,7 @@ class ContentRoomChatServiceTest {
   private ContentRoomChatService contentRoomChatService;
 
   @Mock
-  private UserRepository userRepository;
+  private UserService userService;
 
   @Mock
   private WatchingSessionRepository watchingSessionRepository;
@@ -38,18 +36,18 @@ class ContentRoomChatServiceTest {
 
   private UUID senderId;
   private UUID contentId;
-  private User sender;
+  private UserDto sender;
 
   @BeforeEach
   void setUp() {
     senderId = UUID.randomUUID();
     contentId = UUID.randomUUID();
-    sender = User.builder()
+    sender = UserDto.builder()
+        .id(senderId)
         .email("sender@example.com")
-        .passwordHash("hash")
         .name("sender")
+        .profileImageUrl(null)
         .build();
-    ReflectionTestUtils.setField(sender, "id", senderId);
   }
 
   @Test
@@ -58,7 +56,7 @@ class ContentRoomChatServiceTest {
 
     when(watchingSessionRepository.existsByWatcherIdAndContentId(senderId, contentId))
         .thenReturn(true);
-    when(userRepository.findById(senderId)).thenReturn(Optional.of(sender));
+    when(userService.findUser(senderId)).thenReturn(sender);
     when(contentChatMapper.toDto(sender, "hello")).thenReturn(expected);
 
     ContentChatDto result = contentRoomChatService.createChatMessage(
