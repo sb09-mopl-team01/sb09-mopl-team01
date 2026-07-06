@@ -53,6 +53,12 @@ public class SecurityConfig {
   @Value("${mopl.cors.allowed-origins}")
   private List<String> allowedOrigins;
 
+  @Value("${mopl.cors.allowed-methods}")
+  private List<String> allowedMethods;
+
+  @Value("${mopl.cors.allowed-headers}")
+  private List<String> allowedHeaders;
+
   @Bean
   public AuthenticationManager authenticationManager(
       AuthenticationConfiguration authenticationConfiguration) throws Exception {
@@ -87,8 +93,8 @@ public class SecurityConfig {
   public CorsConfigurationSource corsConfigurationSource() {
     CorsConfiguration configuration = new CorsConfiguration();
     configuration.setAllowedOrigins(allowedOrigins);
-    configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-    configuration.setAllowedHeaders(List.of("*"));
+    configuration.setAllowedMethods(allowedMethods);
+    configuration.setAllowedHeaders(allowedHeaders);
     configuration.setAllowCredentials(true);
 
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
