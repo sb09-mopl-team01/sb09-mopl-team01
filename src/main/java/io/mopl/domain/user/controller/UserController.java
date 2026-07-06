@@ -61,7 +61,7 @@ public class UserController {
   @GetMapping("/{userId}")
   public ResponseEntity<UserDto> findUser(@PathVariable UUID userId) {
     log.debug("User Single Read Requested. id={}", userId);
-    UserDto response = userService.findUser(userId);
+    UserDto response = userService.findUserProfile(userId);
     return ResponseEntity.ok(response);
   }
 

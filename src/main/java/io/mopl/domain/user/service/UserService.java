@@ -1,8 +1,11 @@
 package io.mopl.domain.user.service;
 
+import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.storage.ProfileImageStorage;
+import io.mopl.domain.watchingsession.dto.WatchingSessionDto;
+import io.mopl.domain.watchingsession.service.WatchingSessionService;
 import io.mopl.global.cache.CacheKey;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -40,6 +43,7 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final ProfileImageStorage profileImageStorage;
+  private final WatchingSessionService watchingSessionService;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -68,6 +72,22 @@ public class UserService {
         });
     log.info("User Single Read Completed. id={}", userId);
     return userMapper.toDto(user);
+  }
+
+  public UserDto findUserProfile(UUID userId) {
+    User user = userRepository.findById(userId)
+        .orElseThrow(() -> {
+          log.warn("User Profile Read Failed. User not found. id={}", userId);
+          return new UserNotFoundException();
+        });
+
+    WatchingSessionDto currentWatchingSession = watchingSessionService.findByWatcher(userId);
+    ContentSummary currentWatchingContent = currentWatchingSession == null
+        ? null
+        : currentWatchingSession.content();
+
+    log.info("User Profile Read Completed. id={}", userId);
+    return userMapper.toDto(user, currentWatchingContent);
   }
 
   @CachePut(value = CacheKey.USER, key = "#userId")

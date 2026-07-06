@@ -1,5 +1,6 @@
 package io.mopl.domain.user.dto.data;
 
+import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.user.entity.Role;
 import java.time.Instant;
 import java.util.UUID;
@@ -14,5 +15,6 @@ public record UserDto(
     Role role,
     boolean locked,
     Instant createdAt,
-    Instant updatedAt
+    Instant updatedAt,
+    ContentSummary currentWatchingContent
 ) {}
