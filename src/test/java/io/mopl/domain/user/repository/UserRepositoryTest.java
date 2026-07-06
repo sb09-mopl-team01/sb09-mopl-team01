@@ -64,14 +64,10 @@ class UserRepositoryTest {
     );
 
     assertThat(response.data()).hasSize(1);
-
     assertThat(response.data().get(0).getName()).isEqualTo("가나다");
-
     assertThat(response.hasNext()).isTrue();
-
     assertThat(response.nextCursor()).isEqualTo("가나다");
     assertThat(response.nextIdAfter()).isEqualTo(user1.getId());
-
     assertThat(response.totalCount()).isEqualTo(2L);
   }
 }
