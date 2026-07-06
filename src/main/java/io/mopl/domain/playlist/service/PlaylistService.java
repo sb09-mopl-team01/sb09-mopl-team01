@@ -14,6 +14,7 @@ import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.repository.ContentRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -22,6 +23,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,8 +40,7 @@ public class PlaylistService {
   private final ContentRepository contentRepository;
   private final PlaylistMapper playlistMapper;
 
-  // 임시 / 공동 발행 로직 추가시 변경 후 활성화
-  //private final ApplicationEventPublisher eventPublisher;
+//  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public void createPlaylist(UUID userId, PlaylistCreateRequest request) {
@@ -86,13 +87,14 @@ public class PlaylistService {
     }
 
     playlistSubscriptionRepository.save(new PlaylistSubscription(playlist, subscriber));
-    playlist.increaseSubscriberCount();
+
+    playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
 
 //    로직 추가시 반영
 //    내 플리 구독 발생 / 이벤트 발행
-//    eventPublisher.publishEvent(new PlaylistSubscribedEvent(
+//    eventPublisher.publish(new PlaylistSubscribedEvent(
 //        playlist.getOwner().getId(),
 //        subscriber.getName(),
 //        playlist.getTitle()
@@ -114,7 +116,7 @@ public class PlaylistService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     playlistSubscriptionRepository.delete(subscription);
-    playlist.decreaseSubscriberCount();
+    playlistRepository.decreaseSubscriberCount(playlistId);
 
     log.info("Playlist unsubscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);  }
 

@@ -15,7 +15,7 @@ public class S3Service {
 
   private final S3Template s3Template;
 
-  @Value("${cloud.aws.s3.bucket}")
+  @Value("${spring.cloud.aws.s3.bucket}")
   private String bucket;
 
   public String uploadFile(MultipartFile file) throws IOException {
