@@ -66,11 +66,15 @@ public class WatchingSessionService {
 
   @Transactional
   public void endWatching(UUID watcherId) {
-    endWatching(watcherId, null);
+    endWatchingInternal(watcherId, null);
   }
 
   @Transactional
   public void endWatching(UUID watcherId, UUID contentId) {
+    endWatchingInternal(watcherId, contentId);
+  }
+
+  private void endWatchingInternal(UUID watcherId, UUID contentId) {
     if (watcherId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
