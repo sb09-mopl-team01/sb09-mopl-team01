@@ -131,7 +131,8 @@ class FollowServiceTest {
     long result = followService.countFollowers(followeeId);
 
     assertThat(result).isEqualTo(3L);
-    
+  }
+
   @Test
   @DisplayName("내가 특정 유저를 팔로우 중이면 FollowDto를 반환")
   void findFollowedByMe() {

@@ -67,6 +67,9 @@ class FollowControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isEqualTo(3L);
+  }
+
+  @Test
   @DisplayName("GET /api/follows/followed-by-me - 특정 유저 팔로잉 여부 조회 성공")
   void findFollowedByMe() {
     UUID followerId = UUID.randomUUID();
