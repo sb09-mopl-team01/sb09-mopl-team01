@@ -43,13 +43,15 @@ public class AuthController {
 
   @GetMapping("/csrf-token")
   public ResponseEntity<Void> getCsrfToken() {
-
+    log.debug("Auth Get CsrfToken Requested.");
     return ResponseEntity.noContent().build();
   }
 
   @PostMapping("/refresh")
   public ResponseEntity<?> refresh(
       @CookieValue(name = "REFRESH_TOKEN", required = false) String currentRefreshToken) {
+
+    log.debug("Auth Token Refresh Requested.");
 
     try {
       TokenRefreshResult result = authService.refreshTokens(currentRefreshToken);
@@ -66,15 +68,18 @@ public class AuthController {
           .body(tokenRefreshRequest);
 
     } catch (IllegalArgumentException e) {
+      log.warn("Auth Token-Refresh Failed. message={}", e.getMessage());
       return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(e.getMessage());
     }
   }
 
   @PostMapping("/reset-password")
   public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequest request) {
+    log.debug("Auth Reset Password Requested. email={}", request.email());
 
     authService.resetPassword(request.email());
 
+    log.debug("Auth Reset Password Completed. email={}", request.email());
     return ResponseEntity.noContent().build();
   }
 }

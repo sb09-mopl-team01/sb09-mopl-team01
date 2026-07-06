@@ -15,6 +15,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -36,6 +37,7 @@ public class UserController {
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @GetMapping
   public ResponseEntity<CursorResponse<UserDto>> findUsers(
       @RequestParam(required = false) String emailLike,
@@ -47,74 +49,70 @@ public class UserController {
       @RequestParam String sortBy,
       @RequestParam SortDirection sortDirection
   ) {
-    log.info("[사용자 관리] 사용자 다건 조회 요청 수신. emailLike={}, roleEqual={}, isLocked={}"
-            + ", idAfter={}, limit={}, sortBy={}, sortDirection={}", emailLike, roleEqual, isLocked
-        , idAfter, limit, sortBy, sortDirection);
+    log.debug("User Multiple Read Requested. emailLike={}, roleEqual={}, isLocked={}, cursor={}, idAfter={}, limit={}, sortBy={}, sortDirection={}",
+        emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection);
     CursorResponse<UserDto> response = userService.findUsers(
         emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection
     );
-    log.debug("[사용자 관리] 사용자 다건 조회 요청 처리 완료. emailLike={}, roleEqual={}, isLocked={}"
-            + ", idAfter={}, limit={}, sortBy={}, sortDirection={}", emailLike, roleEqual, isLocked
-        , idAfter, limit, sortBy, sortDirection);
     return ResponseEntity.ok(response);
   }
 
   @GetMapping("/{userId}")
   public ResponseEntity<UserDto> findUser(@PathVariable UUID userId) {
-    log.info("[사용자 관리] 사용자 조회 요청 수신. id={}", userId);
+    log.debug("User Single Read Requested. id={}", userId);
     UserDto response = userService.findUser(userId);
-    log.debug("[사용자 관리] 사용자 조회 요청 처리 완료. id={}", userId);
     return ResponseEntity.ok(response);
   }
 
+  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
   @PatchMapping("/{userId}")
   public ResponseEntity<UserDto> updateUser(
       @PathVariable UUID userId,
       @RequestPart("request") UserUpdateRequest request,
       @RequestPart(value = "image", required = false) MultipartFile image
   ) {
-    log.info("[사용자 관리] 사용자 프로필 수정 요청 수신. id={}", userId);
+    log.debug("User Update Profile Requested. id={}", userId);
     UserDto response = userService.updateProfile(userId, request, image);
-    log.debug("[사용자 관리] 사용자 프로필 수정 요청 처리 완료. id={}", userId);
     return ResponseEntity.ok(response);
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PatchMapping("/{userId}/role")
   public ResponseEntity<Void> updateUserRole(
       @PathVariable UUID userId,
-      @RequestBody UserRoleUpdateRequest request
+      @RequestBody UserRoleUpdateRequest request,
+      @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
-    log.info("[사용자 관리] 사용자 권한 변경 요청 수신. id={}", userId);
+    log.debug("User Update Role Requested. id={}", userId);
     userService.updateUserRole(userId, request);
-    log.debug("[사용자 관리] 사용자 권한 변경 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 
+  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updateUserPassword(
       @PathVariable UUID userId,
       @RequestBody ChangePasswordRequest request,
       @AuthenticationPrincipal MoplUserDetails userDetails
   ) {
-    log.info("[사용자 관리] 사용자 비밀번호 수정 요청 수신. id={}", userId);
+    log.debug("User Update Password Requested. id={}", userId);
     userService.changePassword(userId, request);
 
     if (userDetails != null) {
       tempPasswordService.deleteTempPassword(userDetails.getUsername());
     }
 
-    log.debug("[사용자 관리] 사용자 비밀번호 수정 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 
+  @PreAuthorize("hasRole('ADMIN')")
   @PatchMapping("/{userId}/locked")
   public ResponseEntity<Void> updateUserLocked(
       @PathVariable UUID userId,
       @RequestBody UserLockUpdateRequest request
   ) {
-    log.info("[사용자 관리] 사용자 잠금 요청 수신. id={}", userId);
+    log.debug("User Update LockStatus Requested. id={}", userId);
     userService.updateUserLockStatus(userId, request);
-    log.debug("[사용자 관리] 사용자 잠금 요청 처리 완료. id={}", userId);
     return ResponseEntity.noContent().build();
   }
 }

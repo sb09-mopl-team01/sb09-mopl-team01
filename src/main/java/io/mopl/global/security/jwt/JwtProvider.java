@@ -7,6 +7,8 @@ import com.nimbusds.jose.crypto.MACSigner;
 import com.nimbusds.jose.crypto.MACVerifier;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Base64;
@@ -80,10 +82,8 @@ public class JwtProvider {
 
     } catch (Exception e) {
 
-      throw new RuntimeException(
-          "JWT 생성 실패",
-          e
-      );
+      log.error("JwtProvider Refresh Token Create Fail", e);
+      throw new BaseException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 
@@ -114,7 +114,8 @@ public class JwtProvider {
           .getSubject();
 
     } catch (ParseException e) {
-      throw new RuntimeException(e);
+      log.error("JwtProvider Token Parsing Fail", e);
+      throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
     }
   }
 
@@ -135,7 +136,8 @@ public class JwtProvider {
       return signedJWT.serialize();
 
     } catch (Exception e) {
-      throw new RuntimeException("Refresh Token 생성 실패", e);
+      log.error("JwtProvider Refresh Token Create Fail", e);
+      throw new BaseException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 }
