@@ -42,8 +42,8 @@ public class NotificationService {
 
     Notification notification = Notification.create(
         command.receiverId(),
-        command.title(),
-        command.content(),
+        command.title().trim(),
+        command.content().trim(),
         command.level()
     );
 
@@ -77,12 +77,14 @@ public class NotificationService {
       throw new BaseException(ErrorCode.FORBIDDEN);
     }
 
-    notification.markAsRead();
-    eventPublisher.publish(new NotificationReadEvent(
-        notification.getId(),
-        notification.getReceiverId(),
-        Instant.now()
-    ));
+    boolean changed = notification.markAsRead();
+    if (changed) {
+      eventPublisher.publish(new NotificationReadEvent(
+          notification.getId(),
+          notification.getReceiverId(),
+          Instant.now()
+      ));
+    }
   }
 
   @Transactional(readOnly = true)
@@ -150,6 +152,10 @@ public class NotificationService {
         || !StringUtils.hasText(command.title())
         || !StringUtils.hasText(command.content())
         || command.level() == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+    if (command.title().trim().length() > Notification.TITLE_MAX_LENGTH
+        || command.content().trim().length() > Notification.CONTENT_MAX_LENGTH) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }

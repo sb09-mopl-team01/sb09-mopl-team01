@@ -3,6 +3,7 @@ package io.mopl.domain.notification.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.notification.dto.NotificationCreateCommand;
@@ -76,6 +77,23 @@ class NotificationServiceTest {
   }
 
   @Test
+  @DisplayName("알림 제목과 내용은 앞뒤 공백을 제거해서 저장한다")
+  void createNotificationTrimsText() {
+    UUID receiverId = UUID.randomUUID();
+    NotificationCreateCommand command = new NotificationCreateCommand(
+        receiverId,
+        "  새 알림  ",
+        "  알림 내용  ",
+        NotificationLevel.INFO
+    );
+
+    NotificationDto result = notificationService.create(command);
+
+    assertThat(result.title()).isEqualTo("새 알림");
+    assertThat(result.content()).isEqualTo("알림 내용");
+  }
+
+  @Test
   @DisplayName("필수 값이 비어 있으면 알림을 생성하지 않는다")
   void createNotificationWithInvalidCommand() {
     NotificationCreateCommand command = new NotificationCreateCommand(
@@ -86,6 +104,30 @@ class NotificationServiceTest {
     );
 
     assertThatThrownBy(() -> notificationService.create(command))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  @DisplayName("알림 제목과 내용이 컬럼 길이를 초과하면 생성하지 않는다")
+  void createNotificationWithTooLongText() {
+    assertThatThrownBy(() -> notificationService.create(new NotificationCreateCommand(
+        UUID.randomUUID(),
+        "가".repeat(101),
+        "알림 내용",
+        NotificationLevel.INFO
+    )))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+
+    assertThatThrownBy(() -> notificationService.create(new NotificationCreateCommand(
+        UUID.randomUUID(),
+        "알림 제목",
+        "가".repeat(501),
+        NotificationLevel.INFO
+    )))
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.INVALID_INPUT);
@@ -199,6 +241,8 @@ class NotificationServiceTest {
 
     Notification result = notificationRepository.findById(notification.id()).orElseThrow();
     assertThat(result.isRead()).isTrue();
+    verify(eventPublisher, times(1)).publish(argThat(event -> event instanceof NotificationReadEvent
+        && ((NotificationReadEvent) event).notificationId().equals(notification.id())));
   }
 
   @Test
