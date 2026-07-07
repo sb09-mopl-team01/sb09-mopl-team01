@@ -17,13 +17,16 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Notification extends BaseEntity {
 
+  public static final int TITLE_MAX_LENGTH = 100;
+  public static final int CONTENT_MAX_LENGTH = 500;
+
   @Column(nullable = false)
   private UUID receiverId;
 
-  @Column(nullable = false, length = 100)
+  @Column(nullable = false, length = TITLE_MAX_LENGTH)
   private String title;
 
-  @Column(nullable = false, length = 500)
+  @Column(nullable = false, length = CONTENT_MAX_LENGTH)
   private String content;
 
   @Enumerated(EnumType.STRING)
@@ -52,7 +55,11 @@ public class Notification extends BaseEntity {
   /**
    * API는 DELETE로 정의되어 있지만, 알림 이력 보존을 위해 읽음 상태만 변경합니다.
    */
-  public void markAsRead() {
+  public boolean markAsRead() {
+    if (read) {
+      return false;
+    }
     this.read = true;
+    return true;
   }
 }

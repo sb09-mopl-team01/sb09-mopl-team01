@@ -8,6 +8,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
@@ -34,7 +35,13 @@ public class LoginFailureHandler implements AuthenticationFailureHandler {
     response.setCharacterEncoding("UTF-8");
 
     Map<String, String> errorResponse = new HashMap<>();
-    errorResponse.put("error", "이메일 또는 비밀번호가 일치하지 않습니다.");
+    if (exception instanceof LockedException) {
+      errorResponse.put("code", "ACCOUNT_LOCKED");
+      errorResponse.put("message", "계정이 잠금 처리되었습니다.");
+    } else {
+      errorResponse.put("code", "LOGIN_FAILED");
+      errorResponse.put("message", "아이디 또는 비밀번호가 일치하지 않습니다.");
+    }
 
     objectMapper.writeValue(response.getWriter(), errorResponse);
   }
