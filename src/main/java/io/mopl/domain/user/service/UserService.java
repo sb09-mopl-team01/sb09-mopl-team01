@@ -1,5 +1,6 @@
 package io.mopl.domain.user.service;
 
+import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.storage.ProfileImageStorage;
@@ -26,6 +27,8 @@ import org.springframework.cache.annotation.Cacheable;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.UUID;
@@ -40,6 +43,7 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final ProfileImageStorage profileImageStorage;
+  private final TempPasswordService tempPasswordService;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -128,6 +132,19 @@ public class UserService {
 
     String newPasswordHash = passwordEncoder.encode(request.password());
     user.changePassword(newPasswordHash);
+
+    // 임시
+    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+      @Override
+      public void afterCommit() {
+        try {
+          tempPasswordService.deleteTempPassword(user.getEmail());
+        } catch (Exception e) {
+          log.warn("Redis TempPassword deletion failed after DB commit. email={}", user.getEmail(), e);
+        }
+      }
+    });
+
     log.info("User Update Password Completed. id={}", userId);
   }
 

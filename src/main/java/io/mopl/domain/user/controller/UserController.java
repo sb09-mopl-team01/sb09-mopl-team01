@@ -15,6 +15,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -30,7 +31,6 @@ import java.util.UUID;
 public class UserController {
 
   private final UserService userService;
-  private final TempPasswordService tempPasswordService;
 
   @PostMapping
   public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
@@ -65,8 +65,8 @@ public class UserController {
     return ResponseEntity.ok(response);
   }
 
-  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
-  @PatchMapping("/{userId}")
+  @PreAuthorize("#userId == authentication.principal.user.id or hasRole('ADMIN')")
+  @PatchMapping(value ="/{userId}" , consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
   public ResponseEntity<UserDto> updateUser(
       @PathVariable UUID userId,
       @Valid @RequestPart("request") UserUpdateRequest request,
@@ -89,7 +89,7 @@ public class UserController {
     return ResponseEntity.noContent().build();
   }
 
-  @PreAuthorize("#userId.toString() == authentication.principal.user.id.toString() or hasRole('ADMIN')")
+  @PreAuthorize("#userId== authentication.principal.user.id or hasRole('ADMIN')")
   @PatchMapping("/{userId}/password")
   public ResponseEntity<Void> updateUserPassword(
       @PathVariable UUID userId,
@@ -98,10 +98,6 @@ public class UserController {
   ) {
     log.debug("User Update Password Requested. id={}", userId);
     userService.changePassword(userId, request);
-
-    if (userDetails != null) {
-      tempPasswordService.deleteTempPassword(userDetails.getUsername());
-    }
 
     return ResponseEntity.noContent().build();
   }
