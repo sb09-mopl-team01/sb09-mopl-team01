@@ -3,10 +3,12 @@ package io.mopl.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
@@ -34,7 +36,13 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
+import java.time.Duration;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -53,6 +61,15 @@ class UserServiceTest {
 
   @Mock
   private TempPasswordService tempPasswordService;
+
+  @Mock
+  private StringRedisTemplate redisTemplate;
+
+  @Mock
+  private RefreshTokenRepository refreshTokenRepository;
+
+  @Mock
+  private ValueOperations<String, String> valueOperations;
 
   @Test
   @DisplayName("회원가입 성공")
@@ -194,29 +211,56 @@ class UserServiceTest {
   @Test
   @DisplayName("계정 잠금 설정 성공")
   void updateUserLockStatus_Lock_Success() {
-    UUID userId = UUID.randomUUID();
-    UserLockUpdateRequest request = new UserLockUpdateRequest(true);
-    User user = mock(User.class);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      UUID userId = UUID.randomUUID();
+      UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+      User user = mock(User.class);
 
-    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      given(user.getEmail()).willReturn("test@example.com");
+      given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
-    userService.updateUserLockStatus(userId, request);
+      given(redisTemplate.opsForValue()).willReturn(valueOperations);
 
-    verify(user).lockAccount();
+      userService.updateUserLockStatus(userId, request);
+
+      verify(user).lockAccount();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+
+      verify(valueOperations).set(eq("locked:user:test@example.com"), eq("true"), any(Duration.class));
+      verify(refreshTokenRepository).deleteByEmail("test@example.com");
+
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   @Test
   @DisplayName("계정 잠금 해제 성공")
   void updateUserLockStatus_Unlock_Success() {
-    UUID userId = UUID.randomUUID();
-    UserLockUpdateRequest request = new UserLockUpdateRequest(false);
-    User user = mock(User.class);
+    TransactionSynchronizationManager.initSynchronization();
+    try {
+      UUID userId = UUID.randomUUID();
+      UserLockUpdateRequest request = new UserLockUpdateRequest(false);
+      User user = mock(User.class);
 
-    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      given(user.getEmail()).willReturn("test@example.com");
+      given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
-    userService.updateUserLockStatus(userId, request);
+      userService.updateUserLockStatus(userId, request);
 
-    verify(user).unlockAccount();
+      verify(user).unlockAccount();
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(TransactionSynchronization::afterCommit);
+
+      verify(redisTemplate).delete("locked:user:test@example.com");
+
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   @Test

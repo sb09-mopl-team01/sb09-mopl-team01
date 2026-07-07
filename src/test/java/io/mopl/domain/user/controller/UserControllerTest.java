@@ -48,6 +48,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.MethodParameter;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -116,6 +117,9 @@ class UserControllerTest {
 
   @MockitoBean
   private MoplUserDetailsService moplUserDetailsService;
+
+  @MockitoBean
+  private StringRedisTemplate stringRedisTemplate;
 
   @Test
   @DisplayName("POST /api/users - 회원가입 성공 시 201 반환")
