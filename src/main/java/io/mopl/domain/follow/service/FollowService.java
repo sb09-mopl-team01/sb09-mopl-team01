@@ -58,10 +58,9 @@ public class FollowService {
     User follower = getUser(followerId);
     User followee = getUser(followeeId);
 
-    Follow follow = followRepository.findByFollowerAndFollowee(follower, followee)
-        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
-
-    return toDto(follow);
+    return followRepository.findByFollowerAndFollowee(follower, followee)
+        .map(this::toDto)
+        .orElse(null);
   }
 
   private User getUser(UUID userId) {

@@ -152,16 +152,48 @@ class FollowServiceTest {
   }
 
   @Test
-  @DisplayName("특정 유저를 팔로우하지 않으면 FOLLOW_NOT_FOUND 예외 발생")
-  void rejectFindFollowedByMeWhenNotFollowing() {
+  @DisplayName("특정 유저를 팔로우하지 않으면 null을 반환")
+  void findFollowedByMeWhenNotFollowing() {
     given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
     given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
     given(followRepository.findByFollowerAndFollowee(follower, followee))
         .willReturn(Optional.empty());
 
+    FollowDto result = followService.findFollowedByMe(followerId, followeeId);
+
+    assertThat(result).isNull();
+  }
+
+  @Test
+  @DisplayName("특정 유저 팔로잉 여부 조회 시 대상 유저가 없으면 USER_NOT_FOUND 예외 발생")
+  void rejectFindFollowedByMeWhenFolloweeNotFound() {
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
     assertThatThrownBy(() -> followService.findFollowedByMe(followerId, followeeId))
         .isInstanceOf(BaseException.class)
-        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("특정 유저의 팔로워 수가 0이면 0을 반환")
+  void countFollowersZero() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.countByFollowee(followee)).willReturn(0L);
+
+    long result = followService.countFollowers(followeeId);
+
+    assertThat(result).isZero();
+  }
+
+  @Test
+  @DisplayName("특정 유저 팔로워 수 조회 시 대상 유저가 없으면 USER_NOT_FOUND 예외 발생")
+  void rejectCountFollowersWhenFolloweeNotFound() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> followService.countFollowers(followeeId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
   }
 
   private User createUser(UUID id, String name) {
