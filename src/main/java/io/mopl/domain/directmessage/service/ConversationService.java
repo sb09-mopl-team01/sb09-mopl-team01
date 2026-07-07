@@ -3,6 +3,7 @@ package io.mopl.domain.directmessage.service;
 import io.mopl.domain.directmessage.dto.ConversationCreateRequest;
 import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
+import io.mopl.domain.directmessage.dto.DirectMessageSendRequest;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.entity.DirectMessage;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
@@ -170,6 +171,32 @@ public class ConversationService {
   }
 
   @Transactional
+  public DirectMessageDto sendDirectMessage(
+      UUID senderId,
+      UUID conversationId,
+      DirectMessageSendRequest request
+  ) {
+    if (request == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+    User sender = getUser(senderId);
+    Conversation conversation = getConversation(conversationId);
+    UUID receiverId = conversation.getOtherParticipantId(sender.getId());
+    User receiver = getUser(receiverId);
+    String content = validateMessageContent(request.content());
+
+    DirectMessage directMessage = DirectMessage.create(
+        conversation,
+        sender.getId(),
+        receiver.getId(),
+        content
+    );
+    DirectMessage savedDirectMessage = directMessageRepository.save(directMessage);
+
+    return directMessageMapper.toDto(savedDirectMessage, sender, receiver);
+  }
+
+  @Transactional
   public void readDirectMessage(UUID requesterId, UUID conversationId, UUID directMessageId) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
@@ -228,6 +255,19 @@ public class ConversationService {
         || !directMessage.getReceiverId().equals(requesterId)) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
+  }
+
+  private String validateMessageContent(String content) {
+    if (!StringUtils.hasText(content)) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
+    String trimmedContent = content.trim();
+    if (trimmedContent.length() > 1000) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
+    return trimmedContent;
   }
 
   private Instant parseCursor(String cursor) {
