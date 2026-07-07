@@ -16,7 +16,7 @@ public class CookieProvider {
         .secure(false) // https 적용 시 수정 필요
         .path("/")
         .maxAge(REFRESH_TOKEN_MAX_AGE)
-        .sameSite("Strict")
+        .sameSite("Lax")
         .build();
   }
 }

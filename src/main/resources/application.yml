@@ -3,6 +3,10 @@ spring:
     name: mopl
   profiles:
     active: dev
+  storage:
+    type: ${STORAGE_TYPE:local}
+    file:
+      upload-dir: ${PROFILE_IMAGE_DIR:uploads/images/profile}
 
   jpa:
     hibernate:
