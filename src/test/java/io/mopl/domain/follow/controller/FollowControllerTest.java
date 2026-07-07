@@ -86,4 +86,17 @@ class FollowControllerTest {
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
     assertThat(response.getBody()).isEqualTo(expected);
   }
+
+  @Test
+  @DisplayName("GET /api/follows/followed-by-me - 팔로우하지 않은 경우에도 200 응답")
+  void findFollowedByMeWhenNotFollowing() {
+    UUID followerId = UUID.randomUUID();
+    UUID followeeId = UUID.randomUUID();
+    given(followService.findFollowedByMe(followerId, followeeId)).willReturn(null);
+
+    ResponseEntity<FollowDto> response = followController.findFollowedByMe(followerId, followeeId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+    assertThat(response.getBody()).isNull();
+  }
 }
