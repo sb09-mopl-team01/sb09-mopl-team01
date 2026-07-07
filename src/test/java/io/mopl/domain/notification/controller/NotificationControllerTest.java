@@ -1,6 +1,7 @@
 package io.mopl.domain.notification.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -10,6 +11,8 @@ import io.mopl.domain.notification.entity.NotificationLevel;
 import io.mopl.domain.notification.service.NotificationService;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import io.mopl.global.security.MoplUserDetails;
@@ -100,6 +103,44 @@ class NotificationControllerTest {
 
     assertThat(result.getStatusCode().value()).isEqualTo(204);
     verify(notificationService).readNotification(notificationId, receiverId);
+  }
+
+  @Test
+  @DisplayName("인증 사용자의 User 정보가 없으면 알림 목록을 조회하지 않는다")
+  void getNotificationsRequiresUserInPrincipal() {
+    NotificationController notificationController = new NotificationController(notificationService);
+
+    assertThatThrownBy(() -> notificationController.getNotifications(
+        new MoplUserDetails(null),
+        null,
+        null,
+        10,
+        "createdAt",
+        SortDirection.DESCENDING
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED);
+  }
+
+  @Test
+  @DisplayName("인증 사용자의 ID가 없으면 알림을 읽음 처리하지 않는다")
+  void readNotificationRequiresUserIdInPrincipal() {
+    NotificationController notificationController = new NotificationController(notificationService);
+    User user = User.builder()
+        .email("user-without-id@example.com")
+        .passwordHash("password")
+        .name("사용자")
+        .role(Role.USER)
+        .build();
+
+    assertThatThrownBy(() -> notificationController.readNotification(
+        new MoplUserDetails(user),
+        UUID.randomUUID()
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.AUTHENTICATION_REQUIRED);
   }
 
   private MoplUserDetails userDetails(UUID userId) {
