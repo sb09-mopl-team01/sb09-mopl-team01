@@ -30,6 +30,7 @@ import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
+import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.jwt.JwtProvider;
 
 import java.nio.charset.StandardCharsets;
@@ -43,6 +44,7 @@ import org.springframework.boot.actuate.autoconfigure.security.servlet.Managemen
 import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfiguration;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.MethodParameter;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
@@ -81,6 +83,19 @@ class UserControllerTest {
         }
       });
     }
+
+    @Bean
+    public CsrfCookieFilter csrfCookieFilter() {
+      return new CsrfCookieFilter(null) {
+        @Override
+        protected void doFilterInternal(jakarta.servlet.http.HttpServletRequest request,
+            jakarta.servlet.http.HttpServletResponse response,
+            jakarta.servlet.FilterChain filterChain)
+            throws jakarta.servlet.ServletException, java.io.IOException {
+          filterChain.doFilter(request, response);
+        }
+      };
+    }
   }
 
   @Autowired
@@ -92,8 +107,6 @@ class UserControllerTest {
   @MockitoBean
   private UserService userService;
 
-  @MockitoBean
-  private TempPasswordService tempPasswordService;
 
   @MockitoBean
   private JpaMetamodelMappingContext jpaMetamodelMappingContext;
@@ -272,7 +285,6 @@ class UserControllerTest {
         .andExpect(status().isNoContent());
 
     verify(userService).changePassword(eq(userId), any(ChangePasswordRequest.class));
-    verify(tempPasswordService).deleteTempPassword("test@example.com");
   }
 
   @Test
