@@ -2,11 +2,17 @@ package io.mopl.domain.content.storage;
 
 import java.nio.file.Path;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 @Configuration
+@ConditionalOnProperty(
+    name = "mopl.content.thumbnail.storage-type",
+    havingValue = "local",
+    matchIfMissing = true
+)
 public class ContentThumbnailResourceConfig implements WebMvcConfigurer {
 
   private final Path storagePath;

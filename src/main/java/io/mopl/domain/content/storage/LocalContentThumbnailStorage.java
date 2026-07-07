@@ -6,11 +6,17 @@ import java.nio.file.Path;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 
 @Component
+@ConditionalOnProperty(
+    name = "mopl.content.thumbnail.storage-type",
+    havingValue = "local",
+    matchIfMissing = true
+)
 @Slf4j
 public class LocalContentThumbnailStorage implements ContentThumbnailStorage {
 

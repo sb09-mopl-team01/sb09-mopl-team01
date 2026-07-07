@@ -75,6 +75,10 @@ mopl:
       events-path: /{apiKey}/eventsnextleague.php
 
   content:
+    thumbnail:
+      storage-type: ${CONTENT_THUMBNAIL_STORAGE_TYPE:local}
+      s3:
+        key-prefix: ${CONTENT_THUMBNAIL_S3_KEY_PREFIX:uploads/contents/thumbnails}
     batch:
       external-sync:
         cron: ${CONTENT_EXTERNAL_SYNC_CRON:0 0 3 * * *}
