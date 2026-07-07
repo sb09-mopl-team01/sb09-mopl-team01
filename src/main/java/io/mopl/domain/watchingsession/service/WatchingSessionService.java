@@ -53,15 +53,15 @@ public class WatchingSessionService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     WatchingSession session = WatchingSession.start(watcher, content);
-    WatchingSession savedSession = watchingSessionRepository.save(session);
+    WatchingSession savedSession = watchingSessionRepository.saveAndFlush(session);
+    WatchingSessionDto savedSessionDto = watchingSessionMapper.toDto(savedSession);
     domainEventPublisher.publish(new WatchingSessionEnteredEvent(
-        savedSession.getId(),
-        watcherId,
-        contentId,
+        savedSessionDto,
+        watchingSessionRepository.countByContentId(contentId, null),
         Instant.now()
     ));
 
-    return watchingSessionMapper.toDto(savedSession);
+    return savedSessionDto;
   }
 
   @Transactional
@@ -84,11 +84,13 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND);
     }
 
+    WatchingSessionDto deletedSessionDto = watchingSessionMapper.toDto(session);
+    UUID deletedContentId = session.getContent().getId();
     watchingSessionRepository.delete(session);
+    watchingSessionRepository.flush();
     domainEventPublisher.publish(new WatchingSessionLeftEvent(
-        session.getId(),
-        watcherId,
-        session.getContent().getId(),
+        deletedSessionDto,
+        watchingSessionRepository.countByContentId(deletedContentId, null),
         Instant.now()
     ));
   }
