@@ -1,5 +1,6 @@
 package io.mopl.domain.user.service;
 
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
@@ -18,12 +19,15 @@ import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import java.time.Duration;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -44,6 +48,11 @@ public class UserService {
   private final PasswordEncoder passwordEncoder;
   private final ProfileImageStorage profileImageStorage;
   private final TempPasswordService tempPasswordService;
+  private final StringRedisTemplate redisTemplate;
+  private final RefreshTokenRepository refreshTokenRepository;
+
+  @Value("${jwt.access-token-validity-seconds}")
+  long accessTokenValiditySeconds;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -159,10 +168,37 @@ public class UserService {
 
     if (request.locked()) {
       user.lockAccount();
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCommit() {
+          try {
+            redisTemplate.opsForValue().set(
+                "locked:user:" + user.getEmail(),
+                "true",
+                Duration.ofSeconds(accessTokenValiditySeconds)
+            );
+
+            refreshTokenRepository.deleteByEmail(user.getEmail());
+
+          } catch (Exception e) {
+            log.error("Redis Lock status update failed for user={}", user.getEmail(), e);
+          }
+        }
+      });
+
     } else {
       user.unlockAccount();
+      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+        @Override
+        public void afterCommit() {
+          try {
+            redisTemplate.delete("locked:user:" + user.getEmail());
+          } catch (Exception e) {
+            log.error("Redis Unlock status update failed for user={}", user.getEmail(), e);
+          }
+        }
+      });
     }
-
     log.info("User Update LockStatus Completed. id={}", userId);
   }
 
