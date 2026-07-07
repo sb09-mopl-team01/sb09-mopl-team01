@@ -11,7 +11,7 @@ public class ContentExternalSyncBatchTask implements BatchTask {
 
   private final Job contentExternalSyncJob;
 
-  @Value("${mopl.content.batch.external-sync.cron}")
+  @Value("${mopl.content.batch.external-sync.cron:0 0 3 * * *}")
   private String cron;
 
   public ContentExternalSyncBatchTask(@Qualifier("contentExternalSyncJob") Job contentExternalSyncJob) {

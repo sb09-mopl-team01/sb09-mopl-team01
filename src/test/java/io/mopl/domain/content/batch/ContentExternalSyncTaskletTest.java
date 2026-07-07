@@ -46,6 +46,23 @@ class ContentExternalSyncTaskletTest {
   }
 
   @Test
+  void execute_doesNotStoreSyncedAtWhenSyncedAtIsNull() throws Exception {
+    given(contentExternalSyncService.syncExternalContents())
+        .willReturn(new ExternalContentSyncResult(2, 3, 1, null));
+    ExecutionContext executionContext = new ExecutionContext();
+    ChunkContext chunkContext = chunkContext(executionContext);
+    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
+
+    RepeatStatus status = tasklet.execute(null, chunkContext);
+
+    assertThat(status).isEqualTo(RepeatStatus.FINISHED);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.CREATED_COUNT_KEY)).isEqualTo(2);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.SKIPPED_COUNT_KEY)).isEqualTo(3);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(1);
+    assertThat(executionContext.containsKey(ContentExternalSyncTasklet.SYNCED_AT_KEY)).isFalse();
+  }
+
+  @Test
   void execute_propagatesSyncFailure() {
     RuntimeException failure = new RuntimeException("external sync failed");
     given(contentExternalSyncService.syncExternalContents()).willThrow(failure);
