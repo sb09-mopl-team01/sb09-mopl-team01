@@ -1,19 +1,19 @@
 package io.mopl.domain.content.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.repository.ContentRepository;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.Comparator;
@@ -79,14 +79,16 @@ class ContentAdminControllerIntegrationTest {
 
   @Test
   @WithMockUser(roles = "ADMIN")
-  @DisplayName("관리자는 콘텐츠를 등록, 수정, 삭제할 수 있다")
+  @DisplayName("관리자는 명세 기준 type 값으로 콘텐츠를 등록, 수정, 삭제할 수 있다")
   void manageContentCrud() throws Exception {
-    ContentCreateRequest createRequest = new ContentCreateRequest(
-        ContentType.MOVIE,
-        "등록 제목",
-        "등록 설명",
-        Set.of("등록태그", "영화")
-    );
+    String createRequest = """
+        {
+          "type": "movie",
+          "title": "등록 제목",
+          "description": "등록 설명",
+          "tags": ["등록태그", "영화"]
+        }
+        """;
     MockMultipartFile createRequestPart = jsonPart("request", createRequest);
     MockMultipartFile createThumbnail = imagePart("thumbnail", "create.jpg");
 
@@ -95,6 +97,7 @@ class ContentAdminControllerIntegrationTest {
             .file(createThumbnail)
             .with(csrf()))
         .andExpect(status().isCreated())
+        .andExpect(jsonPath("$.type").value("movie"))
         .andExpect(jsonPath("$.title").value("등록 제목"))
         .andExpect(jsonPath("$.thumbnailUrl").exists())
         .andReturn();
@@ -105,6 +108,7 @@ class ContentAdminControllerIntegrationTest {
     transactionTemplate.executeWithoutResult(status -> {
       Content createdContent = contentRepository.findById(contentId).orElseThrow();
       assertThat(createdContent.getSource()).isEqualTo(ContentSource.MANUAL);
+      assertThat(createdContent.getType()).isEqualTo(ContentType.MOVIE);
       assertThat(createdContent.getTags()).containsExactlyInAnyOrder("등록태그", "영화");
       assertThat(createdContent.getThumbnailUrl()).startsWith("/content-thumbnails/");
     });
@@ -145,11 +149,15 @@ class ContentAdminControllerIntegrationTest {
   }
 
   private MockMultipartFile jsonPart(String name, Object value) throws Exception {
+    byte[] content = value instanceof String text
+        ? text.getBytes(StandardCharsets.UTF_8)
+        : objectMapper.writeValueAsBytes(value);
+
     return new MockMultipartFile(
         name,
         "",
         MediaType.APPLICATION_JSON_VALUE,
-        objectMapper.writeValueAsBytes(value)
+        content
     );
   }
 
@@ -158,7 +166,7 @@ class ContentAdminControllerIntegrationTest {
         name,
         filename,
         MediaType.IMAGE_JPEG_VALUE,
-        "thumbnail".getBytes()
+        "thumbnail".getBytes(StandardCharsets.UTF_8)
     );
   }
 }
