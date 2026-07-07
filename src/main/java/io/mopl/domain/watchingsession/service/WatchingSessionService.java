@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -53,7 +54,7 @@ public class WatchingSessionService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     WatchingSession session = WatchingSession.start(watcher, content);
-    WatchingSession savedSession = watchingSessionRepository.saveAndFlush(session);
+    WatchingSession savedSession = saveSession(session, watcherId);
     WatchingSessionDto savedSessionDto = watchingSessionMapper.toDto(savedSession);
     domainEventPublisher.publish(new WatchingSessionEnteredEvent(
         savedSessionDto,
@@ -148,6 +149,15 @@ public class WatchingSessionService {
   private void validateIds(UUID watcherId, UUID contentId) {
     if (watcherId == null || contentId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private WatchingSession saveSession(WatchingSession session, UUID watcherId) {
+    try {
+      return watchingSessionRepository.saveAndFlush(session);
+    } catch (DataIntegrityViolationException e) {
+      log.warn("Watching session unique constraint violated. watcherId={}", watcherId);
+      throw new BaseException(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
     }
   }
 
