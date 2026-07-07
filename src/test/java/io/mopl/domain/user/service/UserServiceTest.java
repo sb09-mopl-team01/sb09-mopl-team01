@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -33,6 +34,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -48,6 +50,9 @@ class UserServiceTest {
 
   @Mock
   private PasswordEncoder passwordEncoder;
+
+  @Mock
+  private TempPasswordService tempPasswordService;
 
   @Test
   @DisplayName("회원가입 성공")
@@ -161,16 +166,29 @@ class UserServiceTest {
   @Test
   @DisplayName("비밀번호 변경 성공")
   void changePassword_Success() {
-    UUID userId = UUID.randomUUID();
-    ChangePasswordRequest request = new ChangePasswordRequest("newPassword123!");
-    User user = mock(User.class);
+    TransactionSynchronizationManager.initSynchronization();
 
-    given(userRepository.findById(userId)).willReturn(Optional.of(user));
-    given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
+    try {
+      UUID userId = UUID.randomUUID();
+      ChangePasswordRequest request = new ChangePasswordRequest("newPassword123!");
+      User user = mock(User.class);
 
-    userService.changePassword(userId, request);
+      given(user.getEmail()).willReturn("test@example.com");
+      given(userRepository.findById(userId)).willReturn(Optional.of(user));
+      given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
 
-    verify(user).changePassword("new_encoded_password");
+      userService.changePassword(userId, request);
+
+      verify(user).changePassword("new_encoded_password");
+
+      TransactionSynchronizationManager.getSynchronizations()
+          .forEach(sync -> sync.afterCommit());
+
+      verify(tempPasswordService).deleteTempPassword("test@example.com");
+
+    } finally {
+      TransactionSynchronizationManager.clearSynchronization();
+    }
   }
 
   @Test
