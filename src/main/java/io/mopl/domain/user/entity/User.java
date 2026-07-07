@@ -8,18 +8,30 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "users")
+@Table(
+    name = "users",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_users_email",
+            columnNames = {"email"}
+        )
+    },
+    indexes = {
+        @Index(name = "idx_users_created_at", columnList = "created_at"),
+        @Index(name = "idx_users_name", columnList = "name"),
+    }
+)
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseUpdatableEntity {
 
-  @Column(nullable = false, unique = true)
+  @Column(nullable = false, unique = true, length = 50)
   private String email;
 
   @Column(nullable = false)
   private String passwordHash;
 
-  @Column(length = 50)
+  @Column(length = 20)
   private String name;
 
   @Column(columnDefinition = "TEXT")
