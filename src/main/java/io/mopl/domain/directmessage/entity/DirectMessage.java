@@ -18,6 +18,8 @@ import lombok.NoArgsConstructor;
 @Table(name = "direct_messages")
 public class DirectMessage extends BaseEntity {
 
+  public static final int CONTENT_MAX_LENGTH = 1000;
+
   @ManyToOne(fetch = FetchType.LAZY, optional = false)
   @JoinColumn(name = "conversation_id", nullable = false)
   private Conversation conversation;
@@ -28,7 +30,7 @@ public class DirectMessage extends BaseEntity {
   @Column(name = "receiver_id", nullable = false)
   private UUID receiverId;
 
-  @Column(nullable = false, length = 1000)
+  @Column(nullable = false, length = CONTENT_MAX_LENGTH)
   private String content;
 
   @Column(nullable = false)
