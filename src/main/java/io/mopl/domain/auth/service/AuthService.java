@@ -12,6 +12,7 @@ import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
+import javax.security.auth.login.AccountLockedException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -48,6 +49,15 @@ public class AuthService {
     refreshTokenRepository.removeToken(email, currentRefreshToken);
 
     MoplUserDetails userDetails = (MoplUserDetails) userDetailsService.loadUserByUsername(email);
+
+    if (!userDetails.isAccountNonLocked()) {
+      log.warn("Auth Token-Refresh Failed. Account is locked. email={}", email);
+
+      refreshTokenRepository.removeToken(email, currentRefreshToken);
+
+      throw new BaseException(ErrorCode.ACCOUNT_LOCKED);
+    }
+
     String newAccessToken = jwtProvider.generateAccessToken(userDetails);
     String newRefreshToken = jwtProvider.generateRefreshToken(email);
 

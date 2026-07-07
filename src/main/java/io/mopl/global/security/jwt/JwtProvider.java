@@ -9,6 +9,7 @@ import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
+import io.mopl.global.security.MoplUserDetails;
 import java.text.ParseException;
 import java.time.Instant;
 import java.util.Base64;
@@ -66,23 +67,25 @@ public class JwtProvider {
           .map(GrantedAuthority::getAuthority)
           .toList();
 
+      MoplUserDetails moplUser = (MoplUserDetails) userDetails;
+      String userIdStr = moplUser.getUser().getId().toString();
+
       JWTClaimsSet claimsSet = new JWTClaimsSet.Builder()
           .subject(userDetails.getUsername())
           .issueTime(Date.from(now))
           .expirationTime(Date.from(expiration))
           .jwtID(UUID.randomUUID().toString())
           .claim("authorities", authorities)
+          .claim("userId", userIdStr)
           .build();
 
       SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
-
       signedJWT.sign(signer);
 
       return signedJWT.serialize();
 
     } catch (Exception e) {
-
-      log.error("JwtProvider Refresh Token Create Fail", e);
+      log.error("JwtProvider Access Token Create Fail", e);
       throw new BaseException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
@@ -116,6 +119,20 @@ public class JwtProvider {
     } catch (ParseException e) {
       log.error("JwtProvider Token Parsing Fail", e);
       throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
+    }
+  }
+
+  public UUID getUserId(String token) {
+    try {
+      SignedJWT signedJWT = SignedJWT.parse(token);
+
+      String userIdStr = signedJWT.getJWTClaimsSet().getStringClaim("userId");
+
+      return UUID.fromString(userIdStr);
+
+    } catch (Exception e) {
+      log.error("Failed to extract userId from token", e);
+      throw new BaseException(ErrorCode.INTERNAL_SERVER_ERROR);
     }
   }
 

@@ -173,7 +173,7 @@ public class UserService {
         public void afterCommit() {
           try {
             redisTemplate.opsForValue().set(
-                "locked:user:" + user.getEmail(),
+                "blacklist:access_token:" + user.getId(),
                 "true",
                 Duration.ofSeconds(accessTokenValiditySeconds)
             );
@@ -192,7 +192,7 @@ public class UserService {
         @Override
         public void afterCommit() {
           try {
-            redisTemplate.delete("locked:user:" + user.getEmail());
+            redisTemplate.delete("blacklist:access_token:" + user.getId());
           } catch (Exception e) {
             log.error("Redis Unlock status update failed for user={}", user.getEmail(), e);
           }
