@@ -3,15 +3,19 @@ package io.mopl.domain.follow.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.follow.dto.FollowCreateRequest;
 import io.mopl.domain.follow.dto.FollowDto;
 import io.mopl.domain.follow.entity.Follow;
+import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import java.util.Optional;
@@ -36,6 +40,9 @@ class FollowServiceTest {
 
   @Mock
   private UserRepository userRepository;
+
+  @Mock
+  private DomainEventPublisher eventPublisher;
 
   private UUID followerId;
   private UUID followeeId;
@@ -67,6 +74,16 @@ class FollowServiceTest {
     assertThat(result.followerId()).isEqualTo(followerId);
     assertThat(result.followeeId()).isEqualTo(followeeId);
     verify(followRepository).save(any(Follow.class));
+    verify(eventPublisher).publish(argThat(event -> {
+      if (!(event instanceof FollowCreatedEvent followCreatedEvent)) {
+        return false;
+      }
+      return followCreatedEvent.followId().equals(followId)
+          && followCreatedEvent.followerId().equals(followerId)
+          && followCreatedEvent.followerName().equals("follower")
+          && followCreatedEvent.followeeId().equals(followeeId)
+          && followCreatedEvent.occurredAt() != null;
+    }));
   }
 
   @Test
@@ -78,6 +95,7 @@ class FollowServiceTest {
     assertThatThrownBy(() -> followService.follow(followerId, new FollowCreateRequest(followerId)))
         .isInstanceOf(BaseException.class)
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT);
+    verify(eventPublisher, never()).publish(any());
   }
 
   @Test
@@ -90,6 +108,7 @@ class FollowServiceTest {
     assertThatThrownBy(() -> followService.follow(followerId, new FollowCreateRequest(followeeId)))
         .isInstanceOf(BaseException.class)
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.ALREADY_FOLLOWING);
+    verify(eventPublisher, never()).publish(any());
   }
 
   @Test
@@ -152,16 +171,48 @@ class FollowServiceTest {
   }
 
   @Test
-  @DisplayName("특정 유저를 팔로우하지 않으면 FOLLOW_NOT_FOUND 예외 발생")
-  void rejectFindFollowedByMeWhenNotFollowing() {
+  @DisplayName("특정 유저를 팔로우하지 않으면 null을 반환")
+  void findFollowedByMeWhenNotFollowing() {
     given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
     given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
     given(followRepository.findByFollowerAndFollowee(follower, followee))
         .willReturn(Optional.empty());
 
+    FollowDto result = followService.findFollowedByMe(followerId, followeeId);
+
+    assertThat(result).isNull();
+  }
+
+  @Test
+  @DisplayName("특정 유저 팔로잉 여부 조회 시 대상 유저가 없으면 USER_NOT_FOUND 예외 발생")
+  void rejectFindFollowedByMeWhenFolloweeNotFound() {
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
     assertThatThrownBy(() -> followService.findFollowedByMe(followerId, followeeId))
         .isInstanceOf(BaseException.class)
-        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("특정 유저의 팔로워 수가 0이면 0을 반환")
+  void countFollowersZero() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
+    given(followRepository.countByFollowee(followee)).willReturn(0L);
+
+    long result = followService.countFollowers(followeeId);
+
+    assertThat(result).isZero();
+  }
+
+  @Test
+  @DisplayName("특정 유저 팔로워 수 조회 시 대상 유저가 없으면 USER_NOT_FOUND 예외 발생")
+  void rejectCountFollowersWhenFolloweeNotFound() {
+    given(userRepository.findById(followeeId)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> followService.countFollowers(followeeId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.USER_NOT_FOUND);
   }
 
   private User createUser(UUID id, String name) {

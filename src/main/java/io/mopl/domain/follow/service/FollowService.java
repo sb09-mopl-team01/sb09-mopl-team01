@@ -3,16 +3,18 @@ package io.mopl.domain.follow.service;
 import io.mopl.domain.follow.dto.FollowCreateRequest;
 import io.mopl.domain.follow.dto.FollowDto;
 import io.mopl.domain.follow.entity.Follow;
+import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
+import java.time.Instant;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.util.UUID;
 
 @Service
 @RequiredArgsConstructor
@@ -21,6 +23,7 @@ public class FollowService {
 
   private final FollowRepository followRepository;
   private final UserRepository userRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public FollowDto follow(UUID followerId, FollowCreateRequest request) {
@@ -33,6 +36,13 @@ public class FollowService {
     }
 
     Follow follow = followRepository.save(Follow.create(follower, followee));
+    eventPublisher.publish(new FollowCreatedEvent(
+        follow.getId(),
+        follower.getId(),
+        follower.getName(),
+        followee.getId(),
+        Instant.now()
+    ));
     return toDto(follow);
   }
 
@@ -58,10 +68,9 @@ public class FollowService {
     User follower = getUser(followerId);
     User followee = getUser(followeeId);
 
-    Follow follow = followRepository.findByFollowerAndFollowee(follower, followee)
-        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
-
-    return toDto(follow);
+    return followRepository.findByFollowerAndFollowee(follower, followee)
+        .map(this::toDto)
+        .orElse(null);
   }
 
   private User getUser(UUID userId) {
