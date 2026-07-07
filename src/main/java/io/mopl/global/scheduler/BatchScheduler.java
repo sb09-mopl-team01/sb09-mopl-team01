@@ -4,6 +4,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
@@ -52,6 +53,7 @@ public class BatchScheduler implements SchedulingConfigurer {
 
       JobParameters params = new JobParametersBuilder()
           .addLong("runTime", System.currentTimeMillis())
+          .addString("requestId", UUID.randomUUID().toString())
           .toJobParameters();
 
       JobExecution execution = timer.recordCallable(() -> jobLauncher.run(job, params));

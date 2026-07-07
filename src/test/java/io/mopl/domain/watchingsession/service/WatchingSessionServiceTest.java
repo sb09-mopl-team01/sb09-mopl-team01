@@ -66,9 +66,10 @@ class WatchingSessionServiceTest {
     assertThat(applicationEvents.stream(WatchingSessionEnteredEvent.class))
         .singleElement()
         .satisfies(event -> {
-          assertThat(event.sessionId()).isEqualTo(result.id());
-          assertThat(event.watcherId()).isEqualTo(watcher.getId());
-          assertThat(event.contentId()).isEqualTo(content.getId());
+          assertThat(event.watchingSession()).isEqualTo(result);
+          assertThat(event.watchingSession().watcher().userId()).isEqualTo(watcher.getId());
+          assertThat(event.watchingSession().content().id()).isEqualTo(content.getId());
+          assertThat(event.watcherCount()).isEqualTo(1L);
           assertThat(event.occurredAt()).isNotNull();
         });
   }
@@ -101,9 +102,10 @@ class WatchingSessionServiceTest {
     assertThat(applicationEvents.stream(WatchingSessionLeftEvent.class))
         .singleElement()
         .satisfies(event -> {
-          assertThat(event.sessionId()).isEqualTo(created.id());
-          assertThat(event.watcherId()).isEqualTo(watcher.getId());
-          assertThat(event.contentId()).isEqualTo(content.getId());
+          assertThat(event.watchingSession()).isEqualTo(created);
+          assertThat(event.watchingSession().watcher().userId()).isEqualTo(watcher.getId());
+          assertThat(event.watchingSession().content().id()).isEqualTo(content.getId());
+          assertThat(event.watcherCount()).isZero();
           assertThat(event.occurredAt()).isNotNull();
         });
   }

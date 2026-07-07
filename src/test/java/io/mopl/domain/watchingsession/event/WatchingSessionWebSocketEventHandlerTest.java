@@ -5,8 +5,14 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import io.mopl.domain.watchingsession.dto.WatchingSessionEventMessage;
+import io.mopl.domain.content.dto.ContentSummary;
+import io.mopl.domain.content.entity.ContentType;
+import io.mopl.domain.user.dto.response.UserSummary;
+import io.mopl.domain.watchingsession.dto.WatchingSessionChange;
+import io.mopl.domain.watchingsession.dto.WatchingSessionChangeType;
+import io.mopl.domain.watchingsession.dto.WatchingSessionDto;
 import java.time.Instant;
+import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,18 +31,19 @@ class WatchingSessionWebSocketEventHandlerTest {
     UUID sessionId = UUID.randomUUID();
     UUID watcherId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
+    WatchingSessionDto watchingSession = watchingSession(sessionId, watcherId, contentId);
     Instant occurredAt = Instant.now();
 
-    eventHandler.handleEntered(new WatchingSessionEnteredEvent(sessionId, watcherId, contentId, occurredAt));
+    eventHandler.handleEntered(new WatchingSessionEnteredEvent(watchingSession, 3L, occurredAt));
 
-    ArgumentCaptor<WatchingSessionEventMessage> messageCaptor =
-        ArgumentCaptor.forClass(WatchingSessionEventMessage.class);
+    ArgumentCaptor<WatchingSessionChange> messageCaptor =
+        ArgumentCaptor.forClass(WatchingSessionChange.class);
     verify(messagingTemplate).convertAndSend(
-        eq("/sub/contents/" + contentId + "/watching-sessions"),
+        eq("/sub/contents/" + contentId + "/watch"),
         messageCaptor.capture()
     );
     assertThat(messageCaptor.getValue())
-        .isEqualTo(new WatchingSessionEventMessage("ENTERED", sessionId, watcherId, contentId, occurredAt));
+        .isEqualTo(new WatchingSessionChange(WatchingSessionChangeType.JOIN, watchingSession, 3L));
   }
 
   @Test
@@ -45,17 +52,36 @@ class WatchingSessionWebSocketEventHandlerTest {
     UUID sessionId = UUID.randomUUID();
     UUID watcherId = UUID.randomUUID();
     UUID contentId = UUID.randomUUID();
+    WatchingSessionDto watchingSession = watchingSession(sessionId, watcherId, contentId);
     Instant occurredAt = Instant.now();
 
-    eventHandler.handleLeft(new WatchingSessionLeftEvent(sessionId, watcherId, contentId, occurredAt));
+    eventHandler.handleLeft(new WatchingSessionLeftEvent(watchingSession, 2L, occurredAt));
 
-    ArgumentCaptor<WatchingSessionEventMessage> messageCaptor =
-        ArgumentCaptor.forClass(WatchingSessionEventMessage.class);
+    ArgumentCaptor<WatchingSessionChange> messageCaptor =
+        ArgumentCaptor.forClass(WatchingSessionChange.class);
     verify(messagingTemplate).convertAndSend(
-        eq("/sub/contents/" + contentId + "/watching-sessions"),
+        eq("/sub/contents/" + contentId + "/watch"),
         messageCaptor.capture()
     );
     assertThat(messageCaptor.getValue())
-        .isEqualTo(new WatchingSessionEventMessage("LEFT", sessionId, watcherId, contentId, occurredAt));
+        .isEqualTo(new WatchingSessionChange(WatchingSessionChangeType.LEAVE, watchingSession, 2L));
+  }
+
+  private WatchingSessionDto watchingSession(UUID sessionId, UUID watcherId, UUID contentId) {
+    return new WatchingSessionDto(
+        sessionId,
+        Instant.now(),
+        new UserSummary(watcherId, "사용자", "https://example.com/profile.png"),
+        ContentSummary.builder()
+            .id(contentId)
+            .type(ContentType.MOVIE)
+            .title("콘텐츠")
+            .description("설명")
+            .thumbnailUrl("https://example.com/thumbnail.png")
+            .tags(Set.of("tag"))
+            .averageRating(4.5)
+            .reviewCount(10)
+            .build()
+    );
   }
 }

@@ -1,4 +1,10 @@
 spring:
+  file:
+    upload-dir: build/test-uploads/images
+  cloud:
+    aws:
+      s3:
+        bucket: test-bucket
   datasource:
     url: jdbc:h2:mem:mopl-test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
     driver-class-name: org.h2.Driver
@@ -14,6 +20,8 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+  cache:
+    type: simple
   sql:
     init:
       mode: never
