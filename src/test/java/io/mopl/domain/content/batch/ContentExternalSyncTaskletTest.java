@@ -40,8 +40,9 @@ class ContentExternalSyncTaskletTest {
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.CREATED_COUNT_KEY)).isEqualTo(2);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.SKIPPED_COUNT_KEY)).isEqualTo(3);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(1);
-    assertThat(executionContext.getString(ContentExternalSyncTasklet.SYNCED_AT_KEY))
-        .isEqualTo("2026-07-06T00:00:00Z");
+    String storedSyncedAt = executionContext.getString(ContentExternalSyncTasklet.SYNCED_AT_KEY);
+    assertThat(storedSyncedAt).isEqualTo("2026-07-06T00:00:00Z");
+    assertThat(Instant.parse(storedSyncedAt)).isEqualTo(syncedAt);
     verify(contentExternalSyncService).syncExternalContents();
   }
 
