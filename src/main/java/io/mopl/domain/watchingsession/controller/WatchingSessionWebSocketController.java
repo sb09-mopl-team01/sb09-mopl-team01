@@ -39,6 +39,9 @@ public class WatchingSessionWebSocketController {
   private UUID resolveWatcherId(Principal principal) {
     if (principal instanceof Authentication authentication
         && authentication.getPrincipal() instanceof MoplUserDetails userDetails) {
+      if (userDetails.getUser() == null || userDetails.getUser().getId() == null) {
+        throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
+      }
       return userDetails.getUser().getId();
     }
 
