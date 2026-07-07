@@ -19,4 +19,6 @@ public interface ConversationRepositoryCustom {
   );
 
   long countMyConversations(UUID requesterId, String keywordLike);
+
+  boolean existsByIdAndParticipantId(UUID conversationId, UUID participantId);
 }
