@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 
 import io.awspring.cloud.s3.ObjectMetadata;
 import io.awspring.cloud.s3.S3Template;
+import io.mopl.infra.s3.S3Service.S3StoredFile;
 import java.io.InputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,15 +35,15 @@ class S3ServiceTest {
   }
 
   @Test
-  void uploadFile_storesFileUnderPrefixAndReturnsPublicUrl() throws Exception {
+  void uploadFileWithKey_storesFileUnderPrefixAndReturnsPublicUrlAndKey() throws Exception {
     MockMultipartFile file = new MockMultipartFile(
         "thumbnail",
-        "poster.PNG",
+        "한글 파일 !@#.PNG",
         "image/png",
         "image".getBytes()
     );
 
-    String url = s3Service.uploadFile(file, "/uploads/contents/thumbnails/");
+    S3StoredFile storedFile = s3Service.uploadFileWithKey(file, "/uploads/contents/thumbnails/");
 
     ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
     verify(s3Template).upload(
@@ -55,11 +56,37 @@ class S3ServiceTest {
 
     assertThat(key).startsWith("uploads/contents/thumbnails/");
     assertThat(key).endsWith(".png");
-    assertThat(url).isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key);
+    assertThat(storedFile.key()).isEqualTo(key);
+    assertThat(storedFile.url()).isEqualTo("https://test-bucket.s3.ap-northeast-2.amazonaws.com/" + key);
   }
 
   @Test
-  void deleteFile_deletesObjectExtractedFromPublicUrl() {
+  void uploadFileWithKey_normalizesPrefixSlash() throws Exception {
+    MockMultipartFile file = new MockMultipartFile(
+        "thumbnail",
+        "poster.webp",
+        "image/webp",
+        "image".getBytes()
+    );
+
+    s3Service.uploadFileWithKey(file, "uploads/contents/thumbnails");
+
+    ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+    verify(s3Template).upload(eq("test-bucket"), keyCaptor.capture(), any(InputStream.class), any(ObjectMetadata.class));
+    assertThat(keyCaptor.getValue()).startsWith("uploads/contents/thumbnails/");
+  }
+
+  @Test
+  void deleteFileByKey_deletesObjectByKey() {
+    String key = "uploads/contents/thumbnails/poster.png";
+
+    s3Service.deleteFileByKey(key);
+
+    verify(s3Template).deleteObject("test-bucket", key);
+  }
+
+  @Test
+  void deleteFile_deletesObjectExtractedFromPublicUrlForBackwardCompatibility() {
     String url = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/uploads/contents/thumbnails/poster.png";
 
     s3Service.deleteFile(url);

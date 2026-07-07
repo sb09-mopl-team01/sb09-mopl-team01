@@ -4,6 +4,7 @@ import io.awspring.cloud.s3.ObjectMetadata;
 import io.awspring.cloud.s3.S3Template;
 import java.io.IOException;
 import java.net.URI;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,10 @@ public class S3Service {
   }
 
   public String uploadFile(MultipartFile file, String keyPrefix) throws IOException {
+    return uploadFileWithKey(file, keyPrefix).url();
+  }
+
+  public S3StoredFile uploadFileWithKey(MultipartFile file, String keyPrefix) throws IOException {
     String key = buildObjectKey(file, keyPrefix);
     ObjectMetadata metadata = ObjectMetadata.builder()
         .contentType(file.getContentType())
@@ -36,21 +41,25 @@ public class S3Service {
 
     s3Template.upload(bucket, key, file.getInputStream(), metadata);
 
-    return getPublicUrl(key);
+    return new S3StoredFile(getPublicUrl(key), key);
   }
 
-  public void deleteFile(String fileUrl) {
-    String key = extractObjectKey(fileUrl);
+  public void deleteFileByKey(String key) {
     if (key == null || key.isBlank()) {
       return;
     }
     s3Template.deleteObject(bucket, key);
   }
 
+  public void deleteFile(String fileUrl) {
+    String key = extractObjectKey(fileUrl);
+    deleteFileByKey(key);
+  }
+
   private String buildObjectKey(MultipartFile file, String keyPrefix) {
     String extension = StringUtils.getFilenameExtension(file.getOriginalFilename());
     String fileName = UUID.randomUUID()
-        + (extension == null || extension.isBlank() ? "" : "." + extension.toLowerCase());
+        + (extension == null || extension.isBlank() ? "" : "." + extension.toLowerCase(Locale.ROOT));
     String normalizedPrefix = normalizeKeyPrefix(keyPrefix);
     return normalizedPrefix.isBlank() ? fileName : normalizedPrefix + "/" + fileName;
   }
@@ -103,5 +112,10 @@ public class S3Service {
       return null;
     }
   }
-}
 
+  public record S3StoredFile(
+      String url,
+      String key
+  ) {
+  }
+}

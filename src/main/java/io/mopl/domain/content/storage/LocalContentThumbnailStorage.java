@@ -3,6 +3,7 @@ package io.mopl.domain.content.storage;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,40 +33,41 @@ public class LocalContentThumbnailStorage implements ContentThumbnailStorage {
   }
 
   @Override
-  public String upload(MultipartFile thumbnail) {
+  public ContentThumbnailFile upload(MultipartFile thumbnail) {
     try {
       Files.createDirectories(storagePath);
       String extension = StringUtils.getFilenameExtension(thumbnail.getOriginalFilename());
       String storedFileName = UUID.randomUUID()
-          + (extension == null || extension.isBlank() ? "" : "." + extension.toLowerCase());
+          + (extension == null || extension.isBlank() ? "" : "." + extension.toLowerCase(Locale.ROOT));
       Path targetPath = storagePath.resolve(storedFileName).normalize();
       thumbnail.transferTo(targetPath);
-      return urlPrefix + "/" + storedFileName;
+      String thumbnailUrl = urlPrefix + "/" + storedFileName;
+      log.info("Content thumbnail upload completed. storage=local thumbnailKey={}", storedFileName);
+      return new ContentThumbnailFile(thumbnailUrl, storedFileName);
     } catch (IOException e) {
-      log.error("Content thumbnail upload failed. originalFilename={}",
+      log.error("Content thumbnail upload failed. storage=local originalFilename={}",
           thumbnail == null ? null : thumbnail.getOriginalFilename(), e);
       throw new IllegalStateException("콘텐츠 썸네일 저장에 실패했습니다.", e);
     }
   }
 
   @Override
-  public void delete(String thumbnailUrl) {
-    if (thumbnailUrl == null || thumbnailUrl.isBlank()
-        || !thumbnailUrl.startsWith(urlPrefix + "/")) {
+  public void delete(String thumbnailKey) {
+    if (thumbnailKey == null || thumbnailKey.isBlank()) {
       return;
     }
 
-    String storedFileName = thumbnailUrl.substring((urlPrefix + "/").length());
-    Path targetPath = storagePath.resolve(storedFileName).normalize();
+    Path targetPath = storagePath.resolve(thumbnailKey).normalize();
     if (!targetPath.startsWith(storagePath)) {
-      log.warn("Content thumbnail delete rejected. thumbnailUrl={}", thumbnailUrl);
+      log.warn("Content thumbnail delete rejected. storage=local thumbnailKey={}", thumbnailKey);
       return;
     }
 
     try {
       Files.deleteIfExists(targetPath);
+      log.info("Content thumbnail delete completed. storage=local thumbnailKey={}", thumbnailKey);
     } catch (IOException e) {
-      log.warn("Content thumbnail delete failed. thumbnailUrl={}", thumbnailUrl, e);
+      log.warn("Content thumbnail delete failed. storage=local thumbnailKey={}", thumbnailKey, e);
     }
   }
 

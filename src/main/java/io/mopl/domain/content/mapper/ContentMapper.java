@@ -5,6 +5,7 @@ import io.mopl.domain.content.dto.ContentStats;
 import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.entity.Content;
+import io.mopl.domain.content.storage.ContentThumbnailFile;
 import java.util.LinkedHashSet;
 import org.mapstruct.Mapper;
 
@@ -17,6 +18,17 @@ public interface ContentMapper {
         request.title(),
         request.description(),
         thumbnailUrl,
+        request.tags()
+    );
+  }
+
+  default Content toEntity(ContentCreateRequest request, ContentThumbnailFile thumbnailFile) {
+    return Content.createManual(
+        request.type(),
+        request.title(),
+        request.description(),
+        thumbnailFile.url(),
+        thumbnailFile.key(),
         request.tags()
     );
   }

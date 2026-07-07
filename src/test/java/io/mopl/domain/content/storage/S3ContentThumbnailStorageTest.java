@@ -1,12 +1,14 @@
 package io.mopl.domain.content.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import io.mopl.infra.s3.S3Service;
+import io.mopl.infra.s3.S3Service.S3StoredFile;
 import java.io.IOException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -34,18 +36,21 @@ class S3ContentThumbnailStorageTest {
   void upload_delegatesToS3ServiceWithContentThumbnailPrefix() throws Exception {
     MockMultipartFile thumbnail = thumbnail();
     String uploadedUrl = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/uploads/contents/thumbnails/poster.png";
-    given(s3Service.uploadFile(thumbnail, "uploads/contents/thumbnails")).willReturn(uploadedUrl);
+    String uploadedKey = "uploads/contents/thumbnails/poster.png";
+    given(s3Service.uploadFileWithKey(thumbnail, "uploads/contents/thumbnails"))
+        .willReturn(new S3StoredFile(uploadedUrl, uploadedKey));
 
-    String result = storage.upload(thumbnail);
+    ContentThumbnailFile result = storage.upload(thumbnail);
 
-    assertThat(result).isEqualTo(uploadedUrl);
-    verify(s3Service).uploadFile(thumbnail, "uploads/contents/thumbnails");
+    assertThat(result.url()).isEqualTo(uploadedUrl);
+    assertThat(result.key()).isEqualTo(uploadedKey);
+    verify(s3Service).uploadFileWithKey(thumbnail, "uploads/contents/thumbnails");
   }
 
   @Test
   void upload_throwsIllegalStateExceptionWhenUploadFails() throws Exception {
     MockMultipartFile thumbnail = thumbnail();
-    given(s3Service.uploadFile(thumbnail, "uploads/contents/thumbnails"))
+    given(s3Service.uploadFileWithKey(thumbnail, "uploads/contents/thumbnails"))
         .willThrow(new IOException("s3 upload failed"));
 
     assertThatThrownBy(() -> storage.upload(thumbnail))
@@ -54,19 +59,28 @@ class S3ContentThumbnailStorageTest {
   }
 
   @Test
-  void delete_delegatesToS3Service() {
-    String thumbnailUrl = "https://test-bucket.s3.ap-northeast-2.amazonaws.com/uploads/contents/thumbnails/poster.png";
+  void delete_delegatesToS3ServiceWithKey() {
+    String thumbnailKey = "uploads/contents/thumbnails/poster.png";
 
-    storage.delete(thumbnailUrl);
+    storage.delete(thumbnailKey);
 
-    verify(s3Service).deleteFile(thumbnailUrl);
+    verify(s3Service).deleteFileByKey(thumbnailKey);
   }
 
   @Test
-  void delete_ignoresBlankUrl() {
+  void delete_ignoresBlankKey() {
     storage.delete(" ");
 
     verifyNoInteractions(s3Service);
+  }
+
+  @Test
+  void delete_doesNotPropagateS3DeleteFailure() {
+    String thumbnailKey = "uploads/contents/thumbnails/poster.png";
+    org.mockito.Mockito.doThrow(new RuntimeException("network failed"))
+        .when(s3Service).deleteFileByKey(thumbnailKey);
+
+    assertThatCode(() -> storage.delete(thumbnailKey)).doesNotThrowAnyException();
   }
 
   private MockMultipartFile thumbnail() {

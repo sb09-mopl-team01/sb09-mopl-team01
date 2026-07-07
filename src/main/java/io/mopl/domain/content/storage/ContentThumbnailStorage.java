@@ -4,7 +4,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 public interface ContentThumbnailStorage {
 
-  String upload(MultipartFile thumbnail);
+  ContentThumbnailFile upload(MultipartFile thumbnail);
 
-  void delete(String thumbnailUrl);
+  void delete(String thumbnailKey);
 }
