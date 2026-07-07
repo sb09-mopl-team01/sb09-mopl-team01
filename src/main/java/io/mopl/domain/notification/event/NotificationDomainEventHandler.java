@@ -16,14 +16,23 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class NotificationDomainEventHandler {
 
+  private static final String DEFAULT_DISPLAY_NAME = "사용자";
+  private static final String FOLLOW_TITLE = "새 팔로워가 생겼습니다";
+  private static final String FOLLOW_CONTENT_FORMAT = "%s님이 회원님을 팔로우했습니다.";
+  private static final String PLAYLIST_SUBSCRIBED_TITLE = "플레이리스트를 구독했습니다";
+  private static final String PLAYLIST_SUBSCRIBED_CONTENT_FORMAT =
+      "%s님이 '%s' 플레이리스트를 구독했습니다.";
+  private static final String DIRECT_MESSAGE_TITLE = "새 DM이 도착했습니다";
+  private static final String DIRECT_MESSAGE_CONTENT_FORMAT = "%s님이 메시지를 보냈습니다.";
+
   private final NotificationService notificationService;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleFollowCreated(FollowCreatedEvent event) {
     notificationService.create(new NotificationCreateCommand(
         event.followeeId(),
-        "새 팔로워가 생겼습니다",
-        displayName(event.followerName()) + "님이 회원님을 팔로우했습니다.",
+        FOLLOW_TITLE,
+        FOLLOW_CONTENT_FORMAT.formatted(displayName(event.followerName())),
         NotificationLevel.INFO
     ));
   }
@@ -32,8 +41,11 @@ public class NotificationDomainEventHandler {
   public void handlePlaylistSubscribed(PlaylistSubscribedEvent event) {
     notificationService.create(new NotificationCreateCommand(
         event.ownerId(),
-        "플레이리스트를 구독했습니다",
-        displayName(event.subscriberName()) + "님이 '" + event.playlistTitle() + "' 플레이리스트를 구독했습니다.",
+        PLAYLIST_SUBSCRIBED_TITLE,
+        PLAYLIST_SUBSCRIBED_CONTENT_FORMAT.formatted(
+            displayName(event.subscriberName()),
+            event.playlistTitle()
+        ),
         NotificationLevel.INFO
     ));
   }
@@ -42,13 +54,13 @@ public class NotificationDomainEventHandler {
   public void handleDirectMessageSent(DirectMessageSentEvent event) {
     notificationService.create(new NotificationCreateCommand(
         event.receiverId(),
-        "새 DM이 도착했습니다",
-        displayName(event.senderName()) + "님이 메시지를 보냈습니다.",
+        DIRECT_MESSAGE_TITLE,
+        DIRECT_MESSAGE_CONTENT_FORMAT.formatted(displayName(event.senderName())),
         NotificationLevel.INFO
     ));
   }
 
   private String displayName(String name) {
-    return StringUtils.hasText(name) ? name : "사용자";
+    return StringUtils.hasText(name) ? name : DEFAULT_DISPLAY_NAME;
   }
 }
