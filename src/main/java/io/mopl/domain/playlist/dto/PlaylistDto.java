@@ -1,5 +1,6 @@
 package io.mopl.domain.playlist.dto;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.user.dto.response.UserSummary;
 import java.time.Instant;
@@ -13,6 +14,8 @@ public record PlaylistDto(
     String description,
     Instant updatedAt,
     Long subscriberCount,
+
     boolean subscribedByMe,
+
     List<ContentSummary> contents
 ) {}

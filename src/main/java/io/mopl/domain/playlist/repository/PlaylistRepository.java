@@ -16,4 +16,6 @@ public interface PlaylistRepository extends JpaRepository<Playlist, UUID>, Playl
   @Modifying(clearAutomatically = true)
   @Query("UPDATE Playlist p SET p.subscriberCount = p.subscriberCount - 1 WHERE p.id = :id AND p.subscriberCount > 0")
   void decreaseSubscriberCount(@Param("id") UUID id);
+
+  java.util.Optional<io.mopl.domain.playlist.entity.Playlist> findFirstByOwnerIdOrderByCreatedAtDesc(java.util.UUID ownerId);
 }
