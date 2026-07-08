@@ -23,6 +23,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -62,7 +63,12 @@ public class ConversationService {
         .orElseGet(() -> saveConversation(key));
     validateConversationParticipant(conversation, requester.getId());
 
-    return conversationMapper.toDto(conversation, withUser);
+    return conversationMapper.toDto(
+        conversation,
+        withUser,
+        findLastestMessageDto(conversation),
+        false
+    );
   }
 
   @Transactional(readOnly = true)
@@ -76,7 +82,12 @@ public class ConversationService {
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
         .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
 
-    return conversationMapper.toDto(conversation, withUser);
+    return conversationMapper.toDto(
+        conversation,
+        withUser,
+        findLastestMessageDto(conversation),
+        false
+    );
   }
 
   //대화방 목록 조회
@@ -108,10 +119,13 @@ public class ConversationService {
         .limit(limit)
         .toList();
     Map<UUID, User> usersById = findOtherParticipants(requester.getId(), pageData);
+    Map<UUID, DirectMessageDto> lastestMessagesByConversationId = findLastestMessageDtos(pageData);
     List<ConversationDto> data = pageData.stream()
         .map(conversation -> conversationMapper.toDto(
             conversation,
-            getOtherUser(usersById, conversation.getOtherParticipantId(requester.getId()))
+            getOtherUser(usersById, conversation.getOtherParticipantId(requester.getId())),
+            lastestMessagesByConversationId.get(conversation.getId()),
+            false
         ))
         .toList();
 
@@ -138,7 +152,12 @@ public class ConversationService {
         conversation.getOtherParticipantId(requester.getId())
     );
 
-    return conversationMapper.toDto(conversation, withUser);
+    return conversationMapper.toDto(
+        conversation,
+        withUser,
+        findLastestMessageDto(conversation),
+        false
+    );
   }
 
   @Transactional(readOnly = true)
@@ -366,5 +385,39 @@ public class ConversationService {
 
     return userRepository.findAllById(userIds).stream()
         .collect(Collectors.toMap(User::getId, Function.identity()));
+  }
+
+  private Map<UUID, DirectMessageDto> findLastestMessageDtos(List<Conversation> conversations) {
+    List<DirectMessage> lastestMessages = conversations.stream()
+        .map(conversation -> directMessageRepository
+            .findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()))
+        .flatMap(Optional::stream)
+        .toList();
+
+    if (lastestMessages.isEmpty()) {
+      return Map.of();
+    }
+
+    Map<UUID, User> usersById = findMessageParticipants(lastestMessages);
+    return lastestMessages.stream()
+        .collect(Collectors.toMap(
+            directMessage -> directMessage.getConversation().getId(),
+            directMessage -> directMessageMapper.toDto(
+                directMessage,
+                getOtherUser(usersById, directMessage.getSenderId()),
+                getOtherUser(usersById, directMessage.getReceiverId())
+            )
+        ));
+  }
+
+  private DirectMessageDto findLastestMessageDto(Conversation conversation) {
+    return directMessageRepository
+        .findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId())
+        .map(directMessage -> directMessageMapper.toDto(
+            directMessage,
+            getUser(directMessage.getSenderId()),
+            getUser(directMessage.getReceiverId())
+        ))
+        .orElse(null);
   }
 }
