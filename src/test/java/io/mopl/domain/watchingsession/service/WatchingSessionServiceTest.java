@@ -89,6 +89,42 @@ class WatchingSessionServiceTest {
   }
 
   @Test
+  @DisplayName("구독 기반 시청 시작은 같은 콘텐츠 중복 구독을 기존 세션으로 처리한다")
+  void startWatchingBySubscriptionWithSameContent() {
+    User watcher = saveUser("고양이");
+    Content content = saveContent("인터스텔라");
+    WatchingSessionDto created =
+        watchingSessionService.startWatchingBySubscription(watcher.getId(), content.getId());
+
+    WatchingSessionDto result =
+        watchingSessionService.startWatchingBySubscription(watcher.getId(), content.getId());
+
+    assertThat(result.id()).isEqualTo(created.id());
+    assertThat(watchingSessionRepository.countByContentId(content.getId(), null)).isEqualTo(1L);
+    assertThat(applicationEvents.stream(WatchingSessionEnteredEvent.class)).hasSize(1);
+  }
+
+  @Test
+  @DisplayName("구독 기반 시청 시작은 다른 콘텐츠로 이동하면 기존 세션을 종료하고 새 세션을 생성한다")
+  void startWatchingBySubscriptionWithDifferentContent() {
+    User watcher = saveUser("고양이");
+    Content firstContent = saveContent("첫 번째 콘텐츠");
+    Content secondContent = saveContent("두 번째 콘텐츠");
+    watchingSessionService.startWatchingBySubscription(watcher.getId(), firstContent.getId());
+
+    WatchingSessionDto result =
+        watchingSessionService.startWatchingBySubscription(watcher.getId(), secondContent.getId());
+
+    assertThat(result.content().id()).isEqualTo(secondContent.getId());
+    assertThat(watchingSessionRepository.existsByWatcherIdAndContentId(
+        watcher.getId(), firstContent.getId())).isFalse();
+    assertThat(watchingSessionRepository.existsByWatcherIdAndContentId(
+        watcher.getId(), secondContent.getId())).isTrue();
+    assertThat(applicationEvents.stream(WatchingSessionEnteredEvent.class)).hasSize(2);
+    assertThat(applicationEvents.stream(WatchingSessionLeftEvent.class)).hasSize(1);
+  }
+
+  @Test
   @DisplayName("시청 세션을 종료하면 사용자 기준 조회 결과가 null이다")
   void endWatching() {
     User watcher = saveUser("고양이");
@@ -117,6 +153,14 @@ class WatchingSessionServiceTest {
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.WATCHING_SESSION_NOT_FOUND);
+  }
+
+  @Test
+  @DisplayName("구독 기반 시청 종료는 세션이 없어도 예외를 던지지 않는다")
+  void endWatchingIfPresentWithoutSession() {
+    watchingSessionService.endWatchingIfPresent(UUID.randomUUID(), UUID.randomUUID());
+
+    assertThat(applicationEvents.stream(WatchingSessionLeftEvent.class)).isEmpty();
   }
 
   @Test
@@ -238,7 +282,7 @@ class WatchingSessionServiceTest {
 
   private User saveUser(String name) {
     return userRepository.saveAndFlush(User.builder()
-        .email(name + "-" + UUID.randomUUID() + "@example.com")
+        .email("u-" + UUID.randomUUID().toString().substring(0, 8) + "@ex.com")
         .passwordHash("hash")
         .name(name)
         .build());

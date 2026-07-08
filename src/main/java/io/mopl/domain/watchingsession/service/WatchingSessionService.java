@@ -48,6 +48,24 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
     }
 
+    return startNewWatchingSession(watcherId, contentId);
+  }
+
+  @Transactional
+  public WatchingSessionDto startWatchingBySubscription(UUID watcherId, UUID contentId) {
+    validateIds(watcherId, contentId);
+    return watchingSessionRepository.findByWatcherId(watcherId)
+        .map(existingSession -> {
+          if (existingSession.getContent().getId().equals(contentId)) {
+            return watchingSessionMapper.toDto(existingSession);
+          }
+          endWatchingSession(existingSession);
+          return startNewWatchingSession(watcherId, contentId);
+        })
+        .orElseGet(() -> startNewWatchingSession(watcherId, contentId));
+  }
+
+  private WatchingSessionDto startNewWatchingSession(UUID watcherId, UUID contentId) {
     User watcher = userRepository.findById(watcherId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
     Content content = contentRepository.findById(contentId)
@@ -75,6 +93,16 @@ public class WatchingSessionService {
     endWatchingInternal(watcherId, contentId);
   }
 
+  @Transactional
+  public void endWatchingIfPresent(UUID watcherId, UUID contentId) {
+    if (watcherId == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+    watchingSessionRepository.findByWatcherId(watcherId)
+        .filter(session -> contentId == null || session.getContent().getId().equals(contentId))
+        .ifPresent(this::endWatchingSession);
+  }
+
   private void endWatchingInternal(UUID watcherId, UUID contentId) {
     if (watcherId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
@@ -85,6 +113,10 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND);
     }
 
+    endWatchingSession(session);
+  }
+
+  private void endWatchingSession(WatchingSession session) {
     WatchingSessionDto deletedSessionDto = watchingSessionMapper.toDto(session);
     UUID deletedContentId = session.getContent().getId();
     watchingSessionRepository.delete(session);
