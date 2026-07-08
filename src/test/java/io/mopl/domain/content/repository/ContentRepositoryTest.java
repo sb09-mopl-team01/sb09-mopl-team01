@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
+import io.mopl.domain.user.entity.User;
+import io.mopl.domain.watchingsession.entity.WatchingSession;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
@@ -245,8 +247,8 @@ class ContentRepositoryTest {
   }
 
   @Test
-  @DisplayName("임시 watcherCount 정렬은 0 커서와 ID 보조 정렬로 동작한다")
-  void findContentsByTemporaryWatcherCountSort() {
+  @DisplayName("watcherCount 정렬은 현재 시청 세션 수 기준으로 동작한다")
+  void findContentsByWatcherCountSort() {
     Content firstContent = contentRepository.saveAndFlush(Content.createManual(
         ContentType.MOVIE,
         "첫 번째 영화",
@@ -261,6 +263,9 @@ class ContentRepositoryTest {
         null,
         List.of("영화")
     ));
+    saveSession(saveUser("첫 번째 시청자"), firstContent);
+    saveSession(saveUser("두 번째 시청자"), firstContent);
+    saveSession(saveUser("세 번째 시청자"), secondContent);
     entityManager.clear();
 
     CursorResponse<Content> result = contentRepository.findContentsByCursor(
@@ -271,12 +276,27 @@ class ContentRepositoryTest {
         null,
         1,
         "watcherCount",
-        SortDirection.ASCENDING
+        SortDirection.DESCENDING
     );
 
-    assertThat(result.data()).hasSize(1);
-    assertThat(result.nextCursor()).isEqualTo("0");
-    assertThat(result.nextIdAfter()).isNotNull();
+    assertThat(result.data())
+        .extracting(Content::getId)
+        .containsExactly(firstContent.getId());
+    assertThat(result.nextCursor()).isEqualTo("2");
     assertThat(result.sortBy()).isEqualTo("watcherCount");
+  }
+
+  private WatchingSession saveSession(User watcher, Content content) {
+    WatchingSession session = WatchingSession.start(watcher, content);
+    return entityManager.persistFlushFind(session);
+  }
+
+  private User saveUser(String name) {
+    User user = User.builder()
+        .email(name + "@example.com")
+        .passwordHash("hash")
+        .name(name)
+        .build();
+    return entityManager.persistFlushFind(user);
   }
 }
