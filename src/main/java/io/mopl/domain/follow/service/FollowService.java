@@ -70,7 +70,7 @@ public class FollowService {
 
     return followRepository.findByFollowerAndFollowee(follower, followee)
         .map(this::toDto)
-        .orElse(null);
+        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
   }
 
   private User getUser(UUID userId) {
