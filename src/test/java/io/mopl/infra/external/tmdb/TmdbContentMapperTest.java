@@ -49,7 +49,7 @@ class TmdbContentMapperTest {
     assertThat(candidate.title()).isEqualTo("Fight Club");
     assertThat(candidate.description()).isEqualTo("A ticking-time-bomb insomniac...");
     assertThat(candidate.thumbnailUrl()).isEqualTo("https://image.tmdb.org/t/p/w500/poster.jpg");
-    assertThat(candidate.tags()).containsExactly("genre:18", "genre:53");
+    assertThat(candidate.tags()).containsExactly("\uB4DC\uB77C\uB9C8", "\uC2A4\uB9B4\uB7EC");
   }
 
   @Test
@@ -87,6 +87,38 @@ class TmdbContentMapperTest {
     assertThat(candidate.title()).isEqualTo("Game of Thrones");
     assertThat(candidate.description()).isEqualTo("Seven noble families fight...");
     assertThat(candidate.thumbnailUrl()).isEqualTo("https://image.tmdb.org/t/p/w500/backdrop.jpg");
-    assertThat(candidate.tags()).containsExactly("genre:10765", "genre:18");
+    assertThat(candidate.tags()).containsExactly("SF & \uD310\uD0C0\uC9C0", "\uB4DC\uB77C\uB9C8");
   }
+
+  @Test
+  void ignoreUnknownGenreIds() throws Exception {
+    String json = """
+        {
+          "results": [
+            {
+              "id": 1,
+              "title": "Unknown Genre Movie",
+              "overview": "overview",
+              "poster_path": "/poster.jpg",
+              "backdrop_path": null,
+              "genre_ids": [999999, 35, 999999]
+            }
+          ]
+        }
+        """;
+
+    TmdbContentResponse<TmdbMovieItem> response = objectMapper.readValue(
+        json,
+        new TypeReference<>() {
+        }
+    );
+
+    ExternalContentCandidate candidate = mapper.toMovieCandidate(
+        response.results().get(0),
+        "https://image.tmdb.org/t/p/w500"
+    );
+
+    assertThat(candidate.tags()).containsExactly("\uCF54\uBBF8\uB514");
+  }
+
 }
