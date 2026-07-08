@@ -1,5 +1,6 @@
 package io.mopl.domain.content.service;
 
+import io.mopl.domain.content.storage.ContentThumbnailFile;
 import io.mopl.domain.content.storage.ContentThumbnailStorage;
 import java.util.Locale;
 import java.util.Set;
@@ -23,24 +24,24 @@ public class ContentThumbnailService {
 
   private final ContentThumbnailStorage contentThumbnailStorage;
 
-  public String uploadRequired(MultipartFile thumbnail) {
+  public ContentThumbnailFile uploadRequired(MultipartFile thumbnail) {
     validateThumbnail(thumbnail, true);
     return contentThumbnailStorage.upload(thumbnail);
   }
 
-  public String uploadOptional(MultipartFile thumbnail, String currentThumbnailUrl) {
+  public ContentThumbnailFile uploadOptional(MultipartFile thumbnail) {
     if (thumbnail == null || thumbnail.isEmpty()) {
-      return currentThumbnailUrl;
+      return null;
     }
     validateThumbnail(thumbnail, false);
     return contentThumbnailStorage.upload(thumbnail);
   }
 
-  public void delete(String thumbnailUrl) {
-    if (thumbnailUrl == null || thumbnailUrl.isBlank()) {
+  public void delete(String thumbnailKey) {
+    if (thumbnailKey == null || thumbnailKey.isBlank()) {
       return;
     }
-    contentThumbnailStorage.delete(thumbnailUrl);
+    contentThumbnailStorage.delete(thumbnailKey);
   }
 
   private void validateThumbnail(MultipartFile thumbnail, boolean required) {
