@@ -12,10 +12,11 @@ import org.mapstruct.Mapping;
 public interface ReviewMapper {
 
   @Mapping(source = "content.id", target = "contentId")
+  @Mapping(source = "author", target = "author")
   ReviewDto toDto(Review review);
 
   @Mapping(source = "id", target = "userId")
-  @Mapping(target = "name", constant = "임시유저")
-  @Mapping(target = "profileImageUrl", constant = "임시URL")
+  @Mapping(source = "name", target = "name")
+  @Mapping(source = "profileImageUrl", target = "profileImageUrl")
   UserSummary toUserSummary(User user);
 }

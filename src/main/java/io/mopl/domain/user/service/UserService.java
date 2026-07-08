@@ -14,13 +14,18 @@ import io.mopl.domain.user.dto.request.UserCreateRequest;
 import io.mopl.domain.user.dto.request.UserLockUpdateRequest;
 import io.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
+import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.event.UserRoleChangedEvent;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Duration;
+import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,8 +40,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
-import java.util.UUID;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -50,6 +53,7 @@ public class UserService {
   private final TempPasswordService tempPasswordService;
   private final StringRedisTemplate redisTemplate;
   private final RefreshTokenRepository refreshTokenRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Value("${jwt.access-token-validity-seconds}")
   long accessTokenValiditySeconds;
@@ -126,7 +130,15 @@ public class UserService {
           log.warn("User Update Role Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
+    Role previousRole = user.getRole();
     user.updateRole(request.role());
+    if (previousRole != request.role()) {
+      eventPublisher.publish(new UserRoleChangedEvent(
+          user.getId(),
+          user.getRole(),
+          Instant.now()
+      ));
+    }
     log.info("User Update Role Completed. id={}, role={}", userId, user.getRole());
   }
 

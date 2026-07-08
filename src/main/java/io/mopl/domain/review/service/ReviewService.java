@@ -58,6 +58,7 @@ public class ReviewService {
 
     Review savedReview = reviewRepository.save(review);
 
+    content.increaseReviewCount();
     syncContentAverageRating(content);
 
     log.info("리뷰 생성 완료: reviewId={}, userId={}", savedReview.getId(), userId);
@@ -130,6 +131,7 @@ public class ReviewService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
+    review.getContent().decreaseReviewCount();
     Content content = review.getContent();
     reviewRepository.delete(review);
 
