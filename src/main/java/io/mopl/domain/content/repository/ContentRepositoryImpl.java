@@ -1,9 +1,11 @@
 package io.mopl.domain.content.repository;
 
 import static io.mopl.domain.content.entity.QContent.content;
+import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSession;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
@@ -39,6 +41,18 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   ) {
     String resolvedSortBy = resolveSortBy(sortBy);
     SortDirection resolvedDirection = sortDirection == null ? SortDirection.DESCENDING : sortDirection;
+
+    if (SORT_BY_WATCHER_COUNT.equals(resolvedSortBy)) {
+      return findContentsByWatcherCountCursor(
+          typeEqual,
+          keywordLike,
+          tagsIn,
+          cursor,
+          idAfter,
+          limit,
+          resolvedDirection
+      );
+    }
 
     List<Content> contents = queryFactory
         .selectFrom(content)
@@ -90,6 +104,60 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     );
   }
 
+  private CursorResponse<Content> findContentsByWatcherCountCursor(
+      ContentType typeEqual,
+      String keywordLike,
+      Collection<String> tagsIn,
+      String cursor,
+      UUID idAfter,
+      int limit,
+      SortDirection sortDirection
+  ) {
+    NumberExpression<Long> watcherCount = watchingSession.id.count();
+    List<Content> contents = queryFactory
+        .selectFrom(content)
+        .leftJoin(watchingSession).on(watchingSession.content.id.eq(content.id))
+        .where(
+            eqType(typeEqual),
+            containsKeyword(keywordLike),
+            containsAnyTag(tagsIn)
+        )
+        .groupBy(content.id)
+        .having(watcherCountCursorCondition(cursor, idAfter, sortDirection))
+        .orderBy(
+            sortDirection == SortDirection.ASCENDING ? watcherCount.asc() : watcherCount.desc(),
+            createIdOrderSpecifier(sortDirection)
+        )
+        .limit(limit + 1)
+        .fetch();
+
+    boolean hasNext = contents.size() > limit;
+    if (hasNext) {
+      contents.remove(limit);
+    }
+
+    Content lastContent = contents.isEmpty() ? null : contents.get(contents.size() - 1);
+    Long totalCount = queryFactory
+        .select(content.id.countDistinct())
+        .from(content)
+        .where(
+            eqType(typeEqual),
+            containsKeyword(keywordLike),
+            containsAnyTag(tagsIn)
+        )
+        .fetchOne();
+
+    return new CursorResponse<>(
+        contents,
+        hasNext && lastContent != null ? String.valueOf(countWatchers(lastContent.getId())) : null,
+        hasNext && lastContent != null ? lastContent.getId() : null,
+        hasNext,
+        totalCount == null ? 0L : totalCount,
+        SORT_BY_WATCHER_COUNT,
+        sortDirection
+    );
+  }
+
   private String resolveSortBy(String sortBy) {
     if (sortBy == null || sortBy.isBlank()) {
       return SORT_BY_CREATED_AT;
@@ -134,9 +202,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
     if (SORT_BY_RATE.equals(sortBy)) {
       return rateCursorCondition(cursor, idAfter, sortDirection);
-    }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return watcherCountCursorCondition(idAfter, sortDirection);
     }
     return createdAtCursorCondition(cursor, idAfter, sortDirection);
   }
@@ -184,15 +249,29 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   private BooleanExpression watcherCountCursorCondition(
+      String cursor,
       UUID idAfter,
       SortDirection sortDirection
   ) {
-    if (idAfter == null) {
+    if (cursor == null || cursor.isBlank()) {
       return null;
     }
-    return sortDirection == SortDirection.ASCENDING
-        ? content.id.gt(idAfter)
-        : content.id.lt(idAfter);
+
+    long cursorWatcherCount = Long.parseLong(cursor);
+    NumberExpression<Long> watcherCount = watchingSession.id.count();
+    if (sortDirection == SortDirection.ASCENDING) {
+      BooleanExpression afterCursor = watcherCount.gt(cursorWatcherCount);
+      if (idAfter == null) {
+        return afterCursor;
+      }
+      return afterCursor.or(watcherCount.eq(cursorWatcherCount).and(content.id.gt(idAfter)));
+    }
+
+    BooleanExpression beforeCursor = watcherCount.lt(cursorWatcherCount);
+    if (idAfter == null) {
+      return beforeCursor;
+    }
+    return beforeCursor.or(watcherCount.eq(cursorWatcherCount).and(content.id.lt(idAfter)));
   }
 
   private OrderSpecifier<?> createOrderSpecifier(String sortBy, SortDirection sortDirection) {
@@ -200,11 +279,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       return sortDirection == SortDirection.ASCENDING
           ? content.averageRating.asc()
           : content.averageRating.desc();
-    }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return sortDirection == SortDirection.ASCENDING
-          ? content.id.asc()
-          : content.id.desc();
     }
     return sortDirection == SortDirection.ASCENDING
         ? content.createdAt.asc()
@@ -222,8 +296,17 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       return String.valueOf(content.getAverageRating());
     }
     if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return "0";
+      return String.valueOf(countWatchers(content.getId()));
     }
     return content.getCreatedAt().toString();
+  }
+
+  private long countWatchers(UUID contentId) {
+    Long count = queryFactory
+        .select(watchingSession.id.count())
+        .from(watchingSession)
+        .where(watchingSession.content.id.eq(contentId))
+        .fetchOne();
+    return count == null ? 0L : count;
   }
 }

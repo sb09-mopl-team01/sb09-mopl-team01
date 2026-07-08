@@ -3,6 +3,7 @@ package io.mopl.domain.watchingsession.repository;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.springframework.data.domain.Pageable;
 
@@ -25,4 +26,6 @@ public interface WatchingSessionRepositoryCustom {
   );
 
   long countByContentId(UUID contentId, String watcherNameLike);
+
+  Map<UUID, Long> countByContentIds(List<UUID> contentIds);
 }
