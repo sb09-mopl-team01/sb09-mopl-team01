@@ -217,10 +217,8 @@ class NotificationServiceTest {
         "createdAt",
         SortDirection.DESCENDING
     );
-    assertThat(notifications.data())
-        .singleElement()
-        .extracting(NotificationDto::read)
-        .isEqualTo(true);
+    assertThat(notifications.data()).isEmpty();
+    assertThat(notifications.totalCount()).isZero();
     verify(eventPublisher).publish(argThat(event -> {
       if (!(event instanceof NotificationReadEvent readEvent)) {
         return false;

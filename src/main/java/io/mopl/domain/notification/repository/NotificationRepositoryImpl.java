@@ -29,6 +29,7 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
         .selectFrom(notification)
         .where(
             notification.receiverId.eq(receiverId),
+            notification.read.isFalse(),
             cursorConditionDesc(cursor, idAfter)
         )
         .orderBy(notification.createdAt.desc(), notification.id.desc())
@@ -47,6 +48,7 @@ public class NotificationRepositoryImpl implements NotificationRepositoryCustom 
         .selectFrom(notification)
         .where(
             notification.receiverId.eq(receiverId),
+            notification.read.isFalse(),
             cursorConditionAsc(cursor, idAfter)
         )
         .orderBy(notification.createdAt.asc(), notification.id.asc())

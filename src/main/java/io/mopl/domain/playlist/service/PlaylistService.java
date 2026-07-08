@@ -2,12 +2,15 @@ package io.mopl.domain.playlist.service;
 
 import static io.mopl.domain.user.entity.QUser.user;
 
+import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.playlist.dto.PlaylistDto;
 import io.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
 import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.PlaylistContent;
 import io.mopl.domain.playlist.entity.PlaylistSubscription;
+import io.mopl.domain.playlist.event.PlaylistContentAddedEvent;
+import io.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import io.mopl.domain.playlist.mapper.PlaylistMapper;
 import io.mopl.domain.playlist.repository.PlaylistContentRepository;
@@ -41,6 +44,7 @@ public class PlaylistService {
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
+  private final FollowRepository followRepository;
   private final PlaylistMapper playlistMapper;
   private final DomainEventPublisher eventPublisher;
 
@@ -56,7 +60,18 @@ public class PlaylistService {
         request.description()
     );
 
-    playlistRepository.save(playlist);
+    Playlist savedPlaylist = playlistRepository.save(playlist);
+    List<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(owner.getId());
+    if (!followerIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistCreatedEvent(
+          savedPlaylist.getId(),
+          savedPlaylist.getTitle(),
+          owner.getId(),
+          owner.getName(),
+          followerIds,
+          Instant.now()
+      ));
+    }
 
     log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, playlist.getId(), playlist.getTitle());
 
@@ -147,13 +162,19 @@ public class PlaylistService {
     playlistContentRepository.save(new PlaylistContent(playlist, content));
 
     log.info("Content added to playlist successfully: playlistId={}, contentId={}", playlistId, contentId);
-//    로직 추가시 반영
-//    구독 중인 플리에 신규 콘텐츠 추가 / 이벤트 발행
-//    eventPublisher.publishEvent(new PlaylistContentAddedEvent(
-//        playlistId,
-//        playlist.getTitle(),
-//        content.getTitle()
-//    ));
+    List<UUID> subscriberIds = playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(
+        playlist.getId()
+    );
+    if (!subscriberIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistContentAddedEvent(
+          playlist.getId(),
+          playlist.getTitle(),
+          content.getId(),
+          content.getTitle(),
+          subscriberIds,
+          Instant.now()
+      ));
+    }
   }
 
   @Transactional
