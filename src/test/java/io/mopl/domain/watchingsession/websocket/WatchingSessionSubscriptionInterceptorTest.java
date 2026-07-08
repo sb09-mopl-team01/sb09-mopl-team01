@@ -19,8 +19,10 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 class WatchingSessionSubscriptionInterceptorTest {
 
+  private final WatchingSessionSubscriptionResolver subscriptionResolver =
+      new WatchingSessionSubscriptionResolver();
   private final WatchingSessionSubscriptionInterceptor interceptor =
-      new WatchingSessionSubscriptionInterceptor();
+      new WatchingSessionSubscriptionInterceptor(subscriptionResolver);
 
   private UUID watcherId;
   private UUID contentId;

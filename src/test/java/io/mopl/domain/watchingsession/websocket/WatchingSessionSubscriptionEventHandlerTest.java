@@ -1,5 +1,6 @@
 package io.mopl.domain.watchingsession.websocket;
 
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -26,8 +27,14 @@ class WatchingSessionSubscriptionEventHandlerTest {
   private final WatchingSessionService watchingSessionService = mock(WatchingSessionService.class);
   private final WatchingSessionSubscriptionRegistry subscriptionRegistry =
       new WatchingSessionSubscriptionRegistry();
+  private final WatchingSessionSubscriptionResolver subscriptionResolver =
+      new WatchingSessionSubscriptionResolver();
   private final WatchingSessionSubscriptionEventHandler eventHandler =
-      new WatchingSessionSubscriptionEventHandler(watchingSessionService, subscriptionRegistry);
+      new WatchingSessionSubscriptionEventHandler(
+          watchingSessionService,
+          subscriptionRegistry,
+          subscriptionResolver
+      );
 
   private UUID watcherId;
   private UUID contentId;
@@ -129,6 +136,36 @@ class WatchingSessionSubscriptionEventHandlerTest {
     eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message));
 
     verify(watchingSessionService, never()).startWatchingBySubscription(watcherId, contentId);
+  }
+
+  @Test
+  void handleSubscribeIgnoresInvalidContentIdWatchSubscription() {
+    Message<byte[]> message = message(
+        StompCommand.SUBSCRIBE,
+        "/sub/contents/not-a-uuid/watch",
+        "session-1",
+        "sub-1",
+        authentication
+    );
+
+    eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message));
+
+    verify(watchingSessionService, never()).startWatchingBySubscription(any(), any());
+  }
+
+  @Test
+  void handleSubscribeIgnoresUnauthenticatedWatchSubscription() {
+    Message<byte[]> message = message(
+        StompCommand.SUBSCRIBE,
+        "/sub/contents/%s/watch".formatted(contentId),
+        "session-1",
+        "sub-1",
+        null
+    );
+
+    eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message));
+
+    verify(watchingSessionService, never()).startWatchingBySubscription(any(), any());
   }
 
   private Message<byte[]> message(

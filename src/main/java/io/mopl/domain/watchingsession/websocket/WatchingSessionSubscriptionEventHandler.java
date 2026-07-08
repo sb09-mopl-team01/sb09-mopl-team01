@@ -1,15 +1,13 @@
 package io.mopl.domain.watchingsession.websocket;
 
 import io.mopl.domain.watchingsession.service.WatchingSessionService;
-import io.mopl.global.security.MoplUserDetails;
-import java.security.Principal;
+import java.util.Optional;
 import java.util.UUID;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
-import org.springframework.security.core.Authentication;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 import org.springframework.web.socket.messaging.SessionSubscribeEvent;
@@ -17,32 +15,32 @@ import org.springframework.web.socket.messaging.SessionUnsubscribeEvent;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WatchingSessionSubscriptionEventHandler {
-
-  private static final Pattern WATCH_SUBSCRIPTION_PATTERN =
-      Pattern.compile("^/sub/contents/([^/]+)/watch$");
 
   private final WatchingSessionService watchingSessionService;
   private final WatchingSessionSubscriptionRegistry subscriptionRegistry;
+  private final WatchingSessionSubscriptionResolver subscriptionResolver;
 
   @EventListener
   public void handleSubscribe(SessionSubscribeEvent event) {
     StompHeaderAccessor accessor = StompHeaderAccessor.wrap(event.getMessage());
-    String destination = accessor.getDestination();
-    Matcher matcher = WATCH_SUBSCRIPTION_PATTERN.matcher(destination == null ? "" : destination);
-    if (!matcher.matches()) {
+    Optional<UUID> contentId = resolveContentId(accessor);
+    if (contentId.isEmpty()) {
       return;
     }
 
-    UUID contentId = parseContentId(matcher.group(1));
-    UUID watcherId = resolveWatcherId(accessor.getUser());
+    UUID watcherId = resolveWatcherId(accessor);
+    if (watcherId == null) {
+      return;
+    }
     subscriptionRegistry.register(
         accessor.getSessionId(),
         accessor.getSubscriptionId(),
         watcherId,
-        contentId
+        contentId.get()
     );
-    watchingSessionService.startWatchingBySubscription(watcherId, contentId);
+    watchingSessionService.startWatchingBySubscription(watcherId, contentId.get());
   }
 
   @EventListener
@@ -63,18 +61,23 @@ public class WatchingSessionSubscriptionEventHandler {
     watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
   }
 
-  private UUID parseContentId(String value) {
-    return UUID.fromString(value);
+  private Optional<UUID> resolveContentId(StompHeaderAccessor accessor) {
+    try {
+      return subscriptionResolver.resolveContentId(accessor.getDestination());
+    } catch (IllegalArgumentException e) {
+      log.warn("Invalid watching session subscription destination. destination={}",
+          accessor.getDestination());
+      return Optional.empty();
+    }
   }
 
-  private UUID resolveWatcherId(Principal principal) {
-    if (principal instanceof Authentication authentication
-        && authentication.getPrincipal() instanceof MoplUserDetails userDetails
-        && userDetails.getUser() != null
-        && userDetails.getUser().getId() != null) {
-      return userDetails.getUser().getId();
+  private UUID resolveWatcherId(StompHeaderAccessor accessor) {
+    try {
+      return subscriptionResolver.resolveWatcherId(accessor.getUser());
+    } catch (AuthenticationException e) {
+      log.warn("Watching session subscription ignored because user is not authenticated. sessionId={}",
+          accessor.getSessionId());
+      return null;
     }
-
-    throw new IllegalStateException("WebSocket 인증 정보가 필요합니다.");
   }
 }
