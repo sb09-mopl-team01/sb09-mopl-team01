@@ -1,13 +1,15 @@
 package io.mopl.domain.playlist.service;
 
-import static io.mopl.domain.user.entity.QUser.user;
-
+import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.playlist.dto.PlaylistDto;
 import io.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
 import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.PlaylistContent;
 import io.mopl.domain.playlist.entity.PlaylistSubscription;
+import io.mopl.domain.playlist.event.PlaylistContentAddedEvent;
+import io.mopl.domain.playlist.event.PlaylistCreatedEvent;
+import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import io.mopl.domain.playlist.mapper.PlaylistMapper;
 import io.mopl.domain.playlist.repository.PlaylistContentRepository;
 import io.mopl.domain.playlist.repository.PlaylistRepository;
@@ -21,11 +23,11 @@ import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,9 +42,9 @@ public class PlaylistService {
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
+  private final FollowRepository followRepository;
   private final PlaylistMapper playlistMapper;
-
-//  private final DomainEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public UUID createPlaylist(UUID userId, PlaylistCreateRequest request) {
@@ -56,11 +58,22 @@ public class PlaylistService {
         request.description()
     );
 
-    playlistRepository.save(playlist);
+    Playlist savedPlaylist = playlistRepository.save(playlist);
+    List<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(owner.getId());
+    if (!followerIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistCreatedEvent(
+          savedPlaylist.getId(),
+          savedPlaylist.getTitle(),
+          owner.getId(),
+          owner.getName(),
+          followerIds,
+          Instant.now()
+      ));
+    }
 
-    log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, playlist.getId(), playlist.getTitle());
+    log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, savedPlaylist.getId(), savedPlaylist.getTitle());
 
-    return playlist.getId();
+    return savedPlaylist.getId();
   }
 
   @Transactional
@@ -87,7 +100,7 @@ public class PlaylistService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
-    if (playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId)) {
+    if (playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, subscriber)) {
       log.warn("이미 구독 중인 플레이리스트입니다. userId={}, playlistId={}", userId, playlistId);
       throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
     }
@@ -99,14 +112,14 @@ public class PlaylistService {
     playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
-
-//    로직 추가시 반영
-//    내 플리 구독 발생 / 이벤트 발행
-//    eventPublisher.publish(new PlaylistSubscribedEvent(
-//        playlist.getOwner().getId(),
-//        subscriber.getName(),
-//        playlist.getTitle()
-//    ));
+    eventPublisher.publish(new PlaylistSubscribedEvent(
+        playlist.getId(),
+        playlist.getTitle(),
+        playlist.getOwner().getId(),
+        subscriber.getId(),
+        subscriber.getName(),
+        Instant.now()
+    ));
   }
 
   @Transactional
@@ -147,13 +160,19 @@ public class PlaylistService {
     playlistContentRepository.save(new PlaylistContent(playlist, content));
 
     log.info("Content added to playlist successfully: playlistId={}, contentId={}", playlistId, contentId);
-//    로직 추가시 반영
-//    구독 중인 플리에 신규 콘텐츠 추가 / 이벤트 발행
-//    eventPublisher.publishEvent(new PlaylistContentAddedEvent(
-//        playlistId,
-//        playlist.getTitle(),
-//        content.getTitle()
-//    ));
+    List<UUID> subscriberIds = playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(
+        playlist.getId()
+    );
+    if (!subscriberIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistContentAddedEvent(
+          playlist.getId(),
+          playlist.getTitle(),
+          content.getId(),
+          content.getTitle(),
+          subscriberIds,
+          Instant.now()
+      ));
+    }
   }
 
   @Transactional
