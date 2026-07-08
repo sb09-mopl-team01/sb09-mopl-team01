@@ -2,7 +2,6 @@ package io.mopl.domain.user.repository;
 
 import static io.mopl.domain.user.entity.QUser.user;
 
-import com.querydsl.core.types.EntityPath;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
@@ -90,9 +89,16 @@ public class UserRepositoryImpl implements UserRepositoryCustom {
 
     if ("isLocked".equalsIgnoreCase(sortBy)) {
       Boolean cursorLocked = Boolean.valueOf(cursor);
-      return isAsc
-          ? user.locked.stringValue().gt(String.valueOf(cursorLocked)).or(user.locked.eq(cursorLocked).and(user.id.gt(idAfter)))
-          : user.locked.stringValue().lt(String.valueOf(cursorLocked)).or(user.locked.eq(cursorLocked).and(user.id.gt(idAfter)));
+
+      if (isAsc) {
+        return cursorLocked
+            ? user.locked.eq(true).and(user.id.gt(idAfter))
+            : user.locked.eq(true).or(user.locked.eq(false).and(user.id.gt(idAfter)));
+      } else {
+        return cursorLocked
+            ? user.locked.eq(false).or(user.locked.eq(true).and(user.id.gt(idAfter)))
+            : user.locked.eq(false).and(user.id.gt(idAfter));
+      }
     }
 
     if ("role".equalsIgnoreCase(sortBy)) {
