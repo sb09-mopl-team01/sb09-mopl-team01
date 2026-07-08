@@ -140,7 +140,7 @@ public class NotificationService {
         hasNext && lastNotification != null ? lastNotification.getCreatedAt().toString() : null,
         hasNext && lastNotification != null ? lastNotification.getId() : null,
         hasNext,
-        notificationRepository.countByReceiverId(receiverId),
+        notificationRepository.countByReceiverIdAndReadFalse(receiverId),
         sortBy,
         sortDirection
     );
