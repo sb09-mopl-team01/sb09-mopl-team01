@@ -294,6 +294,51 @@ class ConversationServiceTest {
   }
 
   @Test
+  void findDirectMessagesRejectsWhenRequesterIsNotParticipant() {
+    UUID otherUserId = UUID.randomUUID();
+    Conversation conversation = Conversation.between(withUserId, otherUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+
+    assertThatThrownBy(() -> conversationService.findDirectMessages(
+        requesterId,
+        conversationId,
+        null,
+        null,
+        1,
+        SortDirection.ASCENDING,
+        "createdAt"
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.NOT_CHAT_PARTICIPANT);
+  }
+
+  @Test
+  void findDirectMessagesThrowsConversationNotFoundWhenConversationDoesNotExist() {
+    UUID conversationId = UUID.randomUUID();
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> conversationService.findDirectMessages(
+        requesterId,
+        conversationId,
+        null,
+        null,
+        1,
+        SortDirection.ASCENDING,
+        "createdAt"
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+  }
+
+  @Test
   void sendDirectMessageSavesMessageWhenSenderIsParticipant() {
     Conversation conversation = Conversation.between(requesterId, withUserId);
     UUID conversationId = UUID.randomUUID();
