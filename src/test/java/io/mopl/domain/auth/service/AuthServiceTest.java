@@ -52,6 +52,11 @@ class AuthServiceTest {
     when(jwtProvider.getUsername(oldRefreshToken)).thenReturn(email);
     when(refreshTokenRepository.isValid(email, oldRefreshToken)).thenReturn(true);
     when(userDetailsService.loadUserByUsername(email)).thenReturn(mockUserDetails);
+
+    when(mockUserDetails.isAccountNonLocked()).thenReturn(true);
+
+    when(mockUserDetails.getUser()).thenReturn(mock(io.mopl.domain.user.entity.User.class));
+
     when(jwtProvider.generateAccessToken(mockUserDetails)).thenReturn("new-access-token");
     when(jwtProvider.generateRefreshToken(email)).thenReturn("new-refresh-token");
     when(userMapper.toDto(any())).thenReturn(mock(UserDto.class));

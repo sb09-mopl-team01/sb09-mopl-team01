@@ -166,6 +166,9 @@ public class UserService {
           return new UserNotFoundException();
         });
 
+    String email = user.getEmail();
+    UUID id = user.getId();
+
     if (request.locked()) {
       user.lockAccount();
       TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
@@ -173,15 +176,15 @@ public class UserService {
         public void afterCommit() {
           try {
             redisTemplate.opsForValue().set(
-                "blacklist:access_token:" + user.getId(),
+                "blacklist:access_token:" + id,
                 "true",
                 Duration.ofSeconds(accessTokenValiditySeconds)
             );
 
-            refreshTokenRepository.deleteByEmail(user.getEmail());
+            refreshTokenRepository.deleteByEmail(email);
 
           } catch (Exception e) {
-            log.error("Redis Lock status update failed for user={}", user.getEmail(), e);
+            log.error("Redis Lock status update failed for user={}", email, e);
           }
         }
       });
@@ -192,9 +195,9 @@ public class UserService {
         @Override
         public void afterCommit() {
           try {
-            redisTemplate.delete("blacklist:access_token:" + user.getId());
+            redisTemplate.delete("blacklist:access_token:" + id);
           } catch (Exception e) {
-            log.error("Redis Unlock status update failed for user={}", user.getEmail(), e);
+            log.error("Redis Unlock status update failed for user={}", email, e);
           }
         }
       });

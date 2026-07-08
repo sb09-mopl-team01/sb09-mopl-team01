@@ -40,8 +40,6 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import java.time.Duration;
 
 @ExtendWith(MockitoExtension.class)
@@ -217,6 +215,7 @@ class UserServiceTest {
       UserLockUpdateRequest request = new UserLockUpdateRequest(true);
       User user = mock(User.class);
 
+      given(user.getId()).willReturn(userId);
       given(user.getEmail()).willReturn("test@example.com");
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
@@ -229,7 +228,7 @@ class UserServiceTest {
       TransactionSynchronizationManager.getSynchronizations()
           .forEach(TransactionSynchronization::afterCommit);
 
-      verify(valueOperations).set(eq("locked:user:test@example.com"), eq("true"), any(Duration.class));
+      verify(valueOperations).set(eq("blacklist:access_token:" + userId), eq("true"), any(Duration.class));
       verify(refreshTokenRepository).deleteByEmail("test@example.com");
 
     } finally {
@@ -245,7 +244,7 @@ class UserServiceTest {
       UUID userId = UUID.randomUUID();
       UserLockUpdateRequest request = new UserLockUpdateRequest(false);
       User user = mock(User.class);
-
+      given(user.getId()).willReturn(userId);
       given(user.getEmail()).willReturn("test@example.com");
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
@@ -256,7 +255,7 @@ class UserServiceTest {
       TransactionSynchronizationManager.getSynchronizations()
           .forEach(TransactionSynchronization::afterCommit);
 
-      verify(redisTemplate).delete("locked:user:test@example.com");
+      verify(redisTemplate).delete("blacklist:access_token:" + userId);
 
     } finally {
       TransactionSynchronizationManager.clearSynchronization();
