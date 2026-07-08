@@ -1,12 +1,15 @@
 package io.mopl.domain.follow.controller;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.follow.dto.FollowCreateRequest;
 import io.mopl.domain.follow.dto.FollowDto;
 import io.mopl.domain.follow.service.FollowService;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -88,15 +91,15 @@ class FollowControllerTest {
   }
 
   @Test
-  @DisplayName("GET /api/follows/followed-by-me - 팔로우하지 않은 경우에도 200 응답")
+  @DisplayName("GET /api/follows/followed-by-me - 팔로우하지 않으면 FOLLOW_NOT_FOUND 예외 발생")
   void findFollowedByMeWhenNotFollowing() {
     UUID followerId = UUID.randomUUID();
     UUID followeeId = UUID.randomUUID();
-    given(followService.findFollowedByMe(followerId, followeeId)).willReturn(null);
+    given(followService.findFollowedByMe(followerId, followeeId))
+        .willThrow(new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
 
-    ResponseEntity<FollowDto> response = followController.findFollowedByMe(followerId, followeeId);
-
-    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-    assertThat(response.getBody()).isNull();
+    assertThatThrownBy(() -> followController.findFollowedByMe(followerId, followeeId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
   }
 }

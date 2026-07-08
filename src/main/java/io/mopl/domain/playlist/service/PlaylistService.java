@@ -1,11 +1,16 @@
 package io.mopl.domain.playlist.service;
 
+import static io.mopl.domain.user.entity.QUser.user;
+
+import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.playlist.dto.PlaylistDto;
 import io.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
 import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.PlaylistContent;
 import io.mopl.domain.playlist.entity.PlaylistSubscription;
+import io.mopl.domain.playlist.event.PlaylistContentAddedEvent;
+import io.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import io.mopl.domain.playlist.mapper.PlaylistMapper;
 import io.mopl.domain.playlist.repository.PlaylistContentRepository;
@@ -39,11 +44,12 @@ public class PlaylistService {
   private final PlaylistSubscriptionRepository playlistSubscriptionRepository;
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
+  private final FollowRepository followRepository;
   private final PlaylistMapper playlistMapper;
   private final DomainEventPublisher eventPublisher;
 
   @Transactional
-  public void createPlaylist(UUID userId, PlaylistCreateRequest request) {
+  public UUID createPlaylist(UUID userId, PlaylistCreateRequest request) {
     log.info("Attempting to create playlist: userId={}, title={}", userId, request.title());
     User owner = userRepository.findById(userId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
@@ -54,9 +60,22 @@ public class PlaylistService {
         request.description()
     );
 
-    playlistRepository.save(playlist);
+    Playlist savedPlaylist = playlistRepository.save(playlist);
+    List<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(owner.getId());
+    if (!followerIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistCreatedEvent(
+          savedPlaylist.getId(),
+          savedPlaylist.getTitle(),
+          owner.getId(),
+          owner.getName(),
+          followerIds,
+          Instant.now()
+      ));
+    }
 
     log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, playlist.getId(), playlist.getTitle());
+
+    return playlist.getId();
   }
 
   @Transactional
@@ -73,6 +92,7 @@ public class PlaylistService {
 
   @Transactional
   public void subscribePlaylist(UUID userId, UUID playlistId) {
+
     Playlist playlist = playlistRepository.findById(playlistId)
         .orElseThrow(() -> new BaseException(ErrorCode.PLAYLIST_NOT_FOUND));
     User subscriber = userRepository.findById(userId)
@@ -82,12 +102,15 @@ public class PlaylistService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
-    if (playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, subscriber)) {
+    if (playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId)) {
+      log.warn("이미 구독 중인 플레이리스트입니다. userId={}, playlistId={}", userId, playlistId);
       throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
     }
 
-    playlistSubscriptionRepository.save(new PlaylistSubscription(playlist, subscriber));
+    PlaylistSubscription subscription = new PlaylistSubscription(playlist, subscriber);
+    playlistSubscriptionRepository.save(subscription);
 
+    playlistSubscriptionRepository.flush();
     playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
@@ -116,9 +139,12 @@ public class PlaylistService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     playlistSubscriptionRepository.delete(subscription);
+    playlistSubscriptionRepository.flush();
     playlistRepository.decreaseSubscriberCount(playlistId);
 
-    log.info("Playlist unsubscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);  }
+    log.info("Playlist unsubscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
+
+  }
 
   @Transactional
   public void addContentToPlaylist(UUID userId, UUID playlistId, UUID contentId) {
@@ -136,13 +162,19 @@ public class PlaylistService {
     playlistContentRepository.save(new PlaylistContent(playlist, content));
 
     log.info("Content added to playlist successfully: playlistId={}, contentId={}", playlistId, contentId);
-//    로직 추가시 반영
-//    구독 중인 플리에 신규 콘텐츠 추가 / 이벤트 발행
-//    eventPublisher.publishEvent(new PlaylistContentAddedEvent(
-//        playlistId,
-//        playlist.getTitle(),
-//        content.getTitle()
-//    ));
+    List<UUID> subscriberIds = playlistSubscriptionRepository.findSubscriberIdsByPlaylistId(
+        playlist.getId()
+    );
+    if (!subscriberIds.isEmpty()) {
+      eventPublisher.publish(new PlaylistContentAddedEvent(
+          playlist.getId(),
+          playlist.getTitle(),
+          content.getId(),
+          content.getTitle(),
+          subscriberIds,
+          Instant.now()
+      ));
+    }
   }
 
   @Transactional
@@ -190,8 +222,8 @@ public class PlaylistService {
 
     Playlist playlist = playlistRepository.findById(playlistId)
         .orElseThrow(() -> new BaseException(ErrorCode.PLAYLIST_NOT_FOUND));
+    boolean subscribedByMe = playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId);
 
-    boolean subscribedByMe = isSubscribedBy(playlist, userId);
     return playlistMapper.toDto(playlist, subscribedByMe);
   }
 
@@ -242,6 +274,28 @@ public class PlaylistService {
     User requester = userRepository.findById(userId).orElse(null);
     if (requester == null) return false;
 
-    return playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, requester);
+
+    return playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlist.getId(), userId);
+  }
+
+  @org.springframework.transaction.annotation.Transactional
+  public void addContentToPlaylistWithFallback(java.util.UUID userId, String playlistId, java.util.UUID contentId) {
+    java.util.UUID targetId;
+
+    if ("undefined".equals(playlistId)) {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+
+      targetId = playlistRepository.findFirstByOwnerIdOrderByCreatedAtDesc(userId)
+          .orElseThrow(() -> new io.mopl.global.exception.BaseException(io.mopl.global.exception.ErrorCode.PLAYLIST_NOT_FOUND))
+          .getId();
+    } else {
+      targetId = java.util.UUID.fromString(playlistId);
+    }
+
+    addContentToPlaylist(userId, targetId, contentId);
   }
 }

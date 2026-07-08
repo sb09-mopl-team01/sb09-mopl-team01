@@ -45,8 +45,8 @@ public class PlaylistMapper {
         content.getDescription(),
         content.getThumbnailUrl(),
         new HashSet<>(content.getTags()),
-        0.0, // .averageRating(content.getAverageRating()) 추후 추가
-        0 // .reviewCount(content.getReviewCount()) 추후 추가
+        content.getAverageRating(),
+        content.getReviewCount()
     );
   }
 }

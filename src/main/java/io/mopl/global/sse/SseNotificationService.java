@@ -19,7 +19,7 @@ public class SseNotificationService {
   private static final long DEFAULT_TIMEOUT_MILLIS = 60L * 60L * 1000L;
   private static final int MAX_EMITTERS_PER_USER = 3;
   private static final String CONNECT_EVENT_NAME = "connect";
-  private static final String NOTIFICATION_EVENT_NAME = "notification";
+  static final String NOTIFICATION_EVENT_NAME = "notifications";
   private static final String HEARTBEAT_EVENT_NAME = "ping";
 
   private final Map<UUID, Map<UUID, SseConnection>> emitters = new ConcurrentHashMap<>();

@@ -246,4 +246,13 @@ public class Content extends BaseUpdatableEntity {
     this.averageRating = averageRating;
     this.reviewCount = reviewCount;
   }
+
+  // 리뷰 수 증감
+  public void increaseReviewCount() {
+    this.reviewCount++;
+  }
+
+  public void decreaseReviewCount() {
+    if (this.reviewCount > 0) this.reviewCount--;
+  }
 }

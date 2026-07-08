@@ -5,6 +5,7 @@ import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.Index;
 import jakarta.persistence.Table;
 import jakarta.persistence.UniqueConstraint;
 import java.util.UUID;
@@ -15,15 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(  //유니크 제약 추가
-    name = "conversations",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_conversation_participants",
-            columnNames = {"participant_a_id", "participant_b_id"}
-        )
-    }
-)
+@Table(name = "conversations")
 public class Conversation extends BaseEntity {
 
   @Column(name = "participant_a_id", nullable = false)

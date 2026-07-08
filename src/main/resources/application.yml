@@ -50,11 +50,7 @@ management:
   cache:
     type: redis
 
-jwt:
-  secret: ${JWT_SECRET}
-  access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:3600}
-  refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:604800}
-  max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
+
 
 mopl:
   admin:
