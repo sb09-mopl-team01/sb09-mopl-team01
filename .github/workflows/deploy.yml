@@ -1,8 +1,8 @@
-name: Mopl-dev
+name: Mopl-deve
 
 on:
   push:
-    branches: [ "dev", "chore/aws-setup" ]
+    branches: [ "dev", "chore/CICD-test" ]
 
 jobs:
   build-and-deploy:
@@ -81,6 +81,10 @@ jobs:
               -e RDS_DB_NAME="${{ secrets.RDS_DB_NAME }}" \
               -e RDS_USERNAME="${{ secrets.RDS_USERNAME }}" \
               -e RDS_PASSWORD="${{ secrets.RDS_PASSWORD }}" \
+              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
+              -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
+              -e AWS_ACCESS_KEY="${{ secrets.AWS_ACCESS_KEY_ID }}" \
+              -e AWS_SECRET_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
               -e CLOUD_AWS_REGION_STATIC="${{ secrets.AWS_REGION }}" \
               -e CLOUD_AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}" \
               "${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest"

@@ -7,9 +7,11 @@ import io.mopl.domain.review.service.ReviewService;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
+import io.mopl.global.security.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -17,6 +19,7 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.UUID;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/reviews")
 @RequiredArgsConstructor
@@ -27,8 +30,12 @@ public class ReviewController {
   @PostMapping
   public ResponseEntity<ReviewDto> createReview(
 
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @Valid @RequestBody ReviewCreateRequest request) {
+
+    UUID userId = userDetails.getUser().getId();
+
+    log.info("컨트롤러 확인 - userId: {}", userId); // 여기서 로그 확인
 
     ReviewDto response = reviewService.createReview(userId, request);
     return ResponseEntity.status(HttpStatus.CREATED).body(response);
@@ -37,10 +44,11 @@ public class ReviewController {
   @PatchMapping("/{reviewId}")
   public ResponseEntity<ReviewDto> updateReview(
 
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails, // UUID 대신 객체 사용
       @PathVariable UUID reviewId,
       @Valid @RequestBody ReviewUpdateRequest request) {
 
+    UUID userId = userDetails.getUser().getId(); // 여기서 ID 추출
     ReviewDto response = reviewService.updateReview(userId, reviewId, request);
     return ResponseEntity.ok(response);
   }
@@ -76,9 +84,10 @@ public class ReviewController {
   @DeleteMapping("/{reviewId}")
   public ResponseEntity<Void> deleteReview(
 
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails, // UUID 대신 객체 사용
       @PathVariable UUID reviewId) {
 
+    UUID userId = userDetails.getUser().getId(); // 여기서 ID 추출
     reviewService.deleteReview(userId, reviewId);
     return ResponseEntity.ok().build();
   }

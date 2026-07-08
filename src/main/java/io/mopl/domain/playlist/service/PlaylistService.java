@@ -1,12 +1,13 @@
 package io.mopl.domain.playlist.service;
 
+import static io.mopl.domain.user.entity.QUser.user;
+
 import io.mopl.domain.playlist.dto.PlaylistDto;
 import io.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
 import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.PlaylistContent;
 import io.mopl.domain.playlist.entity.PlaylistSubscription;
-import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import io.mopl.domain.playlist.mapper.PlaylistMapper;
 import io.mopl.domain.playlist.repository.PlaylistContentRepository;
 import io.mopl.domain.playlist.repository.PlaylistRepository;
@@ -20,11 +21,11 @@ import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
-import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -40,10 +41,11 @@ public class PlaylistService {
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
   private final PlaylistMapper playlistMapper;
-  private final DomainEventPublisher eventPublisher;
+
+//  private final DomainEventPublisher eventPublisher;
 
   @Transactional
-  public void createPlaylist(UUID userId, PlaylistCreateRequest request) {
+  public UUID createPlaylist(UUID userId, PlaylistCreateRequest request) {
     log.info("Attempting to create playlist: userId={}, title={}", userId, request.title());
     User owner = userRepository.findById(userId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
@@ -57,6 +59,8 @@ public class PlaylistService {
     playlistRepository.save(playlist);
 
     log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, playlist.getId(), playlist.getTitle());
+
+    return playlist.getId();
   }
 
   @Transactional
@@ -73,6 +77,7 @@ public class PlaylistService {
 
   @Transactional
   public void subscribePlaylist(UUID userId, UUID playlistId) {
+
     Playlist playlist = playlistRepository.findById(playlistId)
         .orElseThrow(() -> new BaseException(ErrorCode.PLAYLIST_NOT_FOUND));
     User subscriber = userRepository.findById(userId)
@@ -82,23 +87,26 @@ public class PlaylistService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
-    if (playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, subscriber)) {
+    if (playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId)) {
+      log.warn("이미 구독 중인 플레이리스트입니다. userId={}, playlistId={}", userId, playlistId);
       throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
     }
 
-    playlistSubscriptionRepository.save(new PlaylistSubscription(playlist, subscriber));
+    PlaylistSubscription subscription = new PlaylistSubscription(playlist, subscriber);
+    playlistSubscriptionRepository.save(subscription);
 
+    playlistSubscriptionRepository.flush();
     playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
-    eventPublisher.publish(new PlaylistSubscribedEvent(
-        playlist.getId(),
-        playlist.getTitle(),
-        playlist.getOwner().getId(),
-        subscriber.getId(),
-        subscriber.getName(),
-        Instant.now()
-    ));
+
+//    로직 추가시 반영
+//    내 플리 구독 발생 / 이벤트 발행
+//    eventPublisher.publish(new PlaylistSubscribedEvent(
+//        playlist.getOwner().getId(),
+//        subscriber.getName(),
+//        playlist.getTitle()
+//    ));
   }
 
   @Transactional
@@ -116,9 +124,12 @@ public class PlaylistService {
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     playlistSubscriptionRepository.delete(subscription);
+    playlistSubscriptionRepository.flush();
     playlistRepository.decreaseSubscriberCount(playlistId);
 
-    log.info("Playlist unsubscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);  }
+    log.info("Playlist unsubscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
+
+  }
 
   @Transactional
   public void addContentToPlaylist(UUID userId, UUID playlistId, UUID contentId) {
@@ -190,8 +201,8 @@ public class PlaylistService {
 
     Playlist playlist = playlistRepository.findById(playlistId)
         .orElseThrow(() -> new BaseException(ErrorCode.PLAYLIST_NOT_FOUND));
+    boolean subscribedByMe = playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId);
 
-    boolean subscribedByMe = isSubscribedBy(playlist, userId);
     return playlistMapper.toDto(playlist, subscribedByMe);
   }
 
@@ -242,6 +253,28 @@ public class PlaylistService {
     User requester = userRepository.findById(userId).orElse(null);
     if (requester == null) return false;
 
-    return playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, requester);
+
+    return playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlist.getId(), userId);
+  }
+
+  @org.springframework.transaction.annotation.Transactional
+  public void addContentToPlaylistWithFallback(java.util.UUID userId, String playlistId, java.util.UUID contentId) {
+    java.util.UUID targetId;
+
+    if ("undefined".equals(playlistId)) {
+      try {
+        Thread.sleep(200);
+      } catch (InterruptedException e) {
+        Thread.currentThread().interrupt();
+      }
+
+      targetId = playlistRepository.findFirstByOwnerIdOrderByCreatedAtDesc(userId)
+          .orElseThrow(() -> new io.mopl.global.exception.BaseException(io.mopl.global.exception.ErrorCode.PLAYLIST_NOT_FOUND))
+          .getId();
+    } else {
+      targetId = java.util.UUID.fromString(playlistId);
+    }
+
+    addContentToPlaylist(userId, targetId, contentId);
   }
 }

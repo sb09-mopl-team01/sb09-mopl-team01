@@ -15,19 +15,7 @@ import lombok.NoArgsConstructor;
 
 @Getter
 @Entity
-@Table(
-    name = "follows",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_follows_follower_followee",
-            columnNames = {"follower_id", "followee_id"}
-        )
-    },
-    indexes = {
-        @Index(name = "idx_follows_follower_id", columnList = "follower_id"),
-        @Index(name = "idx_follows_followee_id", columnList = "followee_id")
-    }
-)
+@Table(name = "follows")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class Follow extends BaseEntity {
 
