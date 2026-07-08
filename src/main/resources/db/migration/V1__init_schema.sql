@@ -26,6 +26,7 @@ CREATE TABLE contents (
                           title VARCHAR(255) NOT NULL,
                           description VARCHAR(2000) NOT NULL,
                           thumbnail_url VARCHAR(2048),
+                          thumbnail_key VARCHAR(512),
                           source VARCHAR(30) NOT NULL,
                           external_id VARCHAR(100),
                           last_synced_at TIMESTAMPTZ,
