@@ -3,12 +3,15 @@ package io.mopl.domain.watchingsession.repository;
 import static io.mopl.domain.user.entity.QUser.user;
 import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSession;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -77,6 +80,30 @@ public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryC
         )
         .fetchOne();
     return count == null ? 0L : count;
+  }
+
+  @Override
+  public Map<UUID, Long> countByContentIds(List<UUID> contentIds) {
+    if (contentIds == null || contentIds.isEmpty()) {
+      return Map.of();
+    }
+
+    List<Tuple> rows = queryFactory
+        .select(watchingSession.content.id, watchingSession.id.count())
+        .from(watchingSession)
+        .where(watchingSession.content.id.in(contentIds))
+        .groupBy(watchingSession.content.id)
+        .fetch();
+
+    Map<UUID, Long> countsByContentId = new HashMap<>();
+    for (Tuple row : rows) {
+      UUID contentId = row.get(watchingSession.content.id);
+      Long count = row.get(watchingSession.id.count());
+      if (contentId != null) {
+        countsByContentId.put(contentId, count == null ? 0L : count);
+      }
+    }
+    return countsByContentId;
   }
 
   private BooleanExpression watcherNameContains(String watcherNameLike) {

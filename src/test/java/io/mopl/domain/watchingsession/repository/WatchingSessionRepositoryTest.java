@@ -7,6 +7,7 @@ import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
 import java.util.List;
+import java.util.Map;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -110,6 +111,28 @@ class WatchingSessionRepositoryTest {
     long result = watchingSessionRepository.countByContentId(content.getId(), null);
 
     assertThat(result).isEqualTo(2L);
+  }
+
+  @Test
+  @DisplayName("콘텐츠 목록 기준 현재 시청 세션 수를 한 번에 조회한다")
+  void countByContentIds() {
+    Content firstContent = saveContent("첫 번째 콘텐츠");
+    Content secondContent = saveContent("두 번째 콘텐츠");
+    Content emptyContent = saveContent("시청자 없는 콘텐츠");
+    saveSession(saveUser("첫 번째 시청자"), firstContent);
+    saveSession(saveUser("두 번째 시청자"), firstContent);
+    saveSession(saveUser("세 번째 시청자"), secondContent);
+
+    Map<UUID, Long> result = watchingSessionRepository.countByContentIds(List.of(
+        firstContent.getId(),
+        secondContent.getId(),
+        emptyContent.getId()
+    ));
+
+    assertThat(result)
+        .containsEntry(firstContent.getId(), 2L)
+        .containsEntry(secondContent.getId(), 1L)
+        .doesNotContainKey(emptyContent.getId());
   }
 
   @Test
