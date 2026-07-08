@@ -6,6 +6,7 @@ import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.dto.DirectMessageSendRequest;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.entity.DirectMessage;
+import io.mopl.domain.directmessage.event.DirectMessageSentEvent;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.mapper.DirectMessageMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
@@ -13,6 +14,7 @@ import io.mopl.domain.directmessage.repository.DirectMessageRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -42,9 +44,14 @@ public class ConversationService {
   private final UserRepository userRepository;
   private final ConversationMapper conversationMapper;
   private final DirectMessageMapper directMessageMapper;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public ConversationDto createConversation(UUID requesterId, ConversationCreateRequest request) {
+    if (request == null || request.withUserId() == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
     User requester = getUser(requesterId);
     User withUser = getUser(request.withUserId());
     validateParticipants(requester.getId(), withUser.getId());
@@ -54,6 +61,20 @@ public class ConversationService {
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
         .orElseGet(() -> saveConversation(key));
     validateConversationParticipant(conversation, requester.getId());
+
+    return conversationMapper.toDto(conversation, withUser);
+  }
+
+  @Transactional(readOnly = true)
+  public ConversationDto findConversationWithUser(UUID requesterId, UUID userId) {
+    User requester = getUser(requesterId);
+    User withUser = getUser(userId);
+    validateParticipants(requester.getId(), withUser.getId());
+
+    Conversation key = Conversation.between(requester.getId(), withUser.getId());
+    Conversation conversation = conversationRepository
+        .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
+        .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
 
     return conversationMapper.toDto(conversation, withUser);
   }
@@ -192,6 +213,7 @@ public class ConversationService {
         content
     );
     DirectMessage savedDirectMessage = directMessageRepository.save(directMessage);
+    publishDirectMessageSent(savedDirectMessage, sender, receiver);
 
     return directMessageMapper.toDto(savedDirectMessage, sender, receiver);
   }
@@ -263,11 +285,26 @@ public class ConversationService {
     }
 
     String trimmedContent = content.trim();
-    if (trimmedContent.length() > 1000) {
+    if (trimmedContent.length() > DirectMessage.CONTENT_MAX_LENGTH) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
     return trimmedContent;
+  }
+
+  private void publishDirectMessageSent(
+      DirectMessage directMessage,
+      User sender,
+      User receiver
+  ) {
+    eventPublisher.publish(new DirectMessageSentEvent(
+        directMessage.getId(),
+        directMessage.getConversation().getId(),
+        sender.getId(),
+        sender.getName(),
+        receiver.getId(),
+        Instant.now()
+    ));
   }
 
   private Instant parseCursor(String cursor) {
@@ -283,11 +320,19 @@ public class ConversationService {
   }
 
   private User getUser(UUID userId) {
+    if (userId == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
     return userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
   }
 
   private Conversation getConversation(UUID conversationId) {
+    if (conversationId == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
     return conversationRepository.findById(conversationId)
         .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
   }
