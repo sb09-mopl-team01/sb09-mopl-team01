@@ -33,6 +33,9 @@ class NotificationRepositoryTest {
     UUID anotherReceiverId = UUID.randomUUID();
     Notification first = saveNotification(receiverId, "첫 번째 알림");
     Notification second = saveNotification(receiverId, "두 번째 알림");
+    Notification readNotification = saveNotification(receiverId, "읽은 알림");
+    readNotification.markAsRead();
+    notificationRepository.saveAndFlush(readNotification);
     saveNotification(anotherReceiverId, "다른 사용자 알림");
 
     List<Notification> result = notificationRepository.findByReceiverIdWithCursorDesc(
@@ -91,14 +94,17 @@ class NotificationRepositoryTest {
   }
 
   @Test
-  @DisplayName("수신자 기준 총 알림 수를 조회한다")
-  void countByReceiverId() {
+  @DisplayName("수신자 기준 읽지 않은 알림 수를 조회한다")
+  void countByReceiverIdAndReadFalse() {
     UUID receiverId = UUID.randomUUID();
     saveNotification(receiverId, "첫 번째 알림");
     saveNotification(receiverId, "두 번째 알림");
+    Notification readNotification = saveNotification(receiverId, "읽은 알림");
+    readNotification.markAsRead();
+    notificationRepository.saveAndFlush(readNotification);
     saveNotification(UUID.randomUUID(), "다른 사용자 알림");
 
-    long result = notificationRepository.countByReceiverId(receiverId);
+    long result = notificationRepository.countByReceiverIdAndReadFalse(receiverId);
 
     assertThat(result).isEqualTo(2);
   }
