@@ -9,4 +9,6 @@ public interface NotificationRepository extends
     NotificationRepositoryCustom {
 
   long countByReceiverId(UUID receiverId);
+
+  long countByReceiverIdAndReadFalse(UUID receiverId);
 }

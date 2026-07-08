@@ -171,16 +171,16 @@ class FollowServiceTest {
   }
 
   @Test
-  @DisplayName("특정 유저를 팔로우하지 않으면 null을 반환")
+  @DisplayName("특정 유저를 팔로우하지 않으면 FOLLOW_NOT_FOUND 예외 발생")
   void findFollowedByMeWhenNotFollowing() {
     given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
     given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
     given(followRepository.findByFollowerAndFollowee(follower, followee))
         .willReturn(Optional.empty());
 
-    FollowDto result = followService.findFollowedByMe(followerId, followeeId);
-
-    assertThat(result).isNull();
+    assertThatThrownBy(() -> followService.findFollowedByMe(followerId, followeeId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
   }
 
   @Test

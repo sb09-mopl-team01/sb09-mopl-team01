@@ -11,6 +11,12 @@ class SseNotificationServiceTest {
   private final SseNotificationService sseNotificationService = new SseNotificationService();
 
   @Test
+  @DisplayName("알림 SSE 이벤트 이름은 명세와 동일하게 notifications를 사용한다")
+  void notificationEventNameMatchesSpecification() {
+    assertThat(SseNotificationService.NOTIFICATION_EVENT_NAME).isEqualTo("notifications");
+  }
+
+  @Test
   @DisplayName("사용자별 SSE 연결 수를 제한한다")
   void subscribeLimitsEmitterCountPerUser() {
     UUID receiverId = UUID.randomUUID();
