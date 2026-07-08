@@ -27,8 +27,21 @@ public class TheSportsDbContentMapper {
         event.idEvent(),
         titleOf(event),
         descriptionOf(event),
-        firstNotBlank(event.strThumb(), event.strPoster()),
+        thumbnailUrlOf(event),
         tags
+    );
+  }
+
+  private static String thumbnailUrlOf(TheSportsDbEventItem event) {
+    return firstNotBlank(
+        event.strThumb(),
+        event.strPoster(),
+        event.strBanner(),
+        event.strSquare(),
+        event.strFanart(),
+        event.strHomeTeamBadge(),
+        event.strAwayTeamBadge(),
+        event.strLeagueBadge()
     );
   }
 
@@ -72,12 +85,14 @@ public class TheSportsDbContentMapper {
     }
   }
 
-  private static String firstNotBlank(String first, String second) {
-    if (!isBlank(first)) {
-      return first.trim();
+  private static String firstNotBlank(String... values) {
+    if (values == null) {
+      return null;
     }
-    if (!isBlank(second)) {
-      return second.trim();
+    for (String value : values) {
+      if (!isBlank(value)) {
+        return value.trim();
+      }
     }
     return null;
   }
