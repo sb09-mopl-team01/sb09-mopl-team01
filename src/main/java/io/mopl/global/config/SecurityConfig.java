@@ -2,6 +2,7 @@ package io.mopl.global.config;
 
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
+import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
 import io.mopl.global.security.handler.LoginFailureHandler;
 import io.mopl.global.security.handler.LoginSuccessHandler;
@@ -27,7 +28,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
-import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
@@ -46,6 +47,7 @@ public class SecurityConfig {
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
   private final MoplUserDetailsService userDetailsService;
+  private final StatelessCsrfTokenRepository csrfTokenRepository;
 
   @Value("${mopl.cors.allowed-origins}")
   private List<String> allowedOrigins;
@@ -65,14 +67,11 @@ public class SecurityConfig {
       AuthenticationManager authenticationManager,
       CsrfCookieFilter csrfCookieFilter
   ) throws Exception {
-
-    CookieCsrfTokenRepository repository = csrfTokenRepository();
-
     http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .csrf(csrf -> configureCsrf(csrf, repository))
+        .csrf(csrf -> configureCsrf(csrf, csrfTokenRepository))
         .httpBasic(this::configureHttpBasic)
-        .addFilterBefore(csrfCookieFilter, CsrfFilter.class)
+        .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
         .formLogin(this::configureFormLogin)
         .logout(this::configureLogout)
         .sessionManagement(this::configureSessionManagement)
@@ -87,17 +86,6 @@ public class SecurityConfig {
     csrf.csrfTokenRepository(repository)
         .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
         .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/ws/**", "/api/auth/sign-out");
-  }
-
-  @Bean
-  public CookieCsrfTokenRepository csrfTokenRepository() {
-    CookieCsrfTokenRepository repository = CookieCsrfTokenRepository.withHttpOnlyFalse();
-    repository.setCookieName("XSRF-TOKEN");
-    repository.setHeaderName("X-XSRF-TOKEN");
-    repository.setCookieCustomizer(cookieBuilder ->
-        cookieBuilder.secure(false).path("/").sameSite("Lax")
-    );
-    return repository;
   }
 
   @Bean
@@ -156,7 +144,8 @@ public class SecurityConfig {
   }
 
   private void configureSessionManagement(SessionManagementConfigurer<HttpSecurity> session) {
-    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS);
+    session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
+            .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy());
   }
 
   private void configureAuthorizeRequests(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry auth) {

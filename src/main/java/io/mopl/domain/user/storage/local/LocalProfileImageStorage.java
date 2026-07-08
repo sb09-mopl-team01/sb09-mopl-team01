@@ -22,7 +22,7 @@ import java.util.UUID;
 @ConditionalOnProperty(name = "spring.storage.type", havingValue = "local", matchIfMissing = true)
 public class LocalProfileImageStorage implements ProfileImageStorage {
 
-  @Value("${spring.file.upload-dir}")
+  @Value("${spring.storage.file.upload-dir}")
   private String uploadDir;
 
   private static final List<String> ALLOWED_EXTENSIONS = List.of("jpg", "jpeg", "png", "gif");
