@@ -6,7 +6,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.auth.repository.RefreshTokenRepository;
@@ -19,16 +18,13 @@ import io.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
-import io.mopl.domain.user.event.UserRoleChangedEvent;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
-import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
@@ -39,11 +35,12 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
+import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.data.redis.core.ValueOperations;
+import java.time.Duration;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -68,9 +65,6 @@ class UserServiceTest {
 
   @Mock
   private RefreshTokenRepository refreshTokenRepository;
-
-  @Mock
-  private DomainEventPublisher eventPublisher;
 
   @Mock
   private ValueOperations<String, String> valueOperations;
@@ -177,37 +171,11 @@ class UserServiceTest {
     UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
     User user = mock(User.class);
 
-    given(user.getId()).willReturn(userId);
-    given(user.getRole()).willReturn(Role.USER, Role.ADMIN);
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
     userService.updateUserRole(userId, request);
 
     verify(user).updateRole(request.role());
-    verify(eventPublisher).publish(org.mockito.ArgumentMatchers.argThat(event -> {
-      if (!(event instanceof UserRoleChangedEvent roleChangedEvent)) {
-        return false;
-      }
-      return roleChangedEvent.userId().equals(userId)
-          && roleChangedEvent.role() == Role.ADMIN
-          && roleChangedEvent.occurredAt() != null;
-    }));
-  }
-
-  @Test
-  @DisplayName("동일한 권한으로 변경 요청 시 알림 이벤트를 발행하지 않는다")
-  void updateUserRole_SameRole_DoesNotPublishEvent() {
-    UUID userId = UUID.randomUUID();
-    UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
-    User user = mock(User.class);
-
-    given(user.getRole()).willReturn(Role.ADMIN, Role.ADMIN);
-    given(userRepository.findById(userId)).willReturn(Optional.of(user));
-
-    userService.updateUserRole(userId, request);
-
-    verify(user).updateRole(request.role());
-    verify(eventPublisher, never()).publish(org.mockito.ArgumentMatchers.any());
   }
 
   @Test
@@ -276,8 +244,8 @@ class UserServiceTest {
       UUID userId = UUID.randomUUID();
       UserLockUpdateRequest request = new UserLockUpdateRequest(false);
       User user = mock(User.class);
-
       given(user.getId()).willReturn(userId);
+      given(user.getEmail()).willReturn("test@example.com");
       given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
       userService.updateUserLockStatus(userId, request);

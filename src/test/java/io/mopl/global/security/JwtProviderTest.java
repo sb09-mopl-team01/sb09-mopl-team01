@@ -4,17 +4,19 @@ import com.nimbusds.jose.JOSEException;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.jwt.JwtProvider;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
-import org.springframework.security.core.userdetails.User;
-import org.springframework.security.core.userdetails.UserDetails;
 
 import java.util.Base64;
 import java.util.Collections;
 
 import static org.junit.jupiter.api.Assertions.*;
+import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
 
 class JwtProviderTest {
 
@@ -31,10 +33,19 @@ class JwtProviderTest {
   @Test
   @DisplayName("액세스 토큰 생성 및 검증 성공")
   void generateAndValidateAccessToken_Success() {
-    UserDetails userDetails = new User("test@example.com", "password",
-        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
+    MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
 
-    String token = jwtProvider.generateAccessToken(userDetails);
+    io.mopl.domain.user.entity.User mockEntityUser = mock(io.mopl.domain.user.entity.User.class);
+
+    given(mockUserDetails.getUsername()).willReturn("test@example.com");
+
+    doReturn(Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")))
+        .when(mockUserDetails).getAuthorities();
+
+    given(mockUserDetails.getUser()).willReturn(mockEntityUser);
+    given(mockEntityUser.getId()).willReturn(UUID.randomUUID());
+
+    String token = jwtProvider.generateAccessToken(mockUserDetails);
 
     assertNotNull(token);
     assertTrue(jwtProvider.validateToken(token));
@@ -65,15 +76,21 @@ class JwtProviderTest {
   @DisplayName("validateToken - 만료된 토큰인 경우 false 반환")
   void validateToken_ExpiredToken_ReturnsFalse() throws Exception {
     JwtProvider expiredJwtProvider = new JwtProvider(SECRET_KEY, 0L, 0L);
-    UserDetails userDetails = new User("test@example.com", "password",
-        Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
 
-    String expiredToken = expiredJwtProvider.generateAccessToken(userDetails);
+    MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
+    io.mopl.domain.user.entity.User mockEntityUser = mock(io.mopl.domain.user.entity.User.class);
+
+    given(mockUserDetails.getUsername()).willReturn("test@example.com");
+    doReturn(Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")))
+        .when(mockUserDetails).getAuthorities();
+    given(mockUserDetails.getUser()).willReturn(mockEntityUser);
+    given(mockEntityUser.getId()).willReturn(UUID.randomUUID());
+
+    String expiredToken = expiredJwtProvider.generateAccessToken(mockUserDetails);
 
     Thread.sleep(10);
 
     boolean isValid = jwtProvider.validateToken(expiredToken);
-
     assertFalse(isValid);
   }
 

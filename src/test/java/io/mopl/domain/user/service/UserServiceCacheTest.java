@@ -7,6 +7,7 @@ import static org.mockito.BDDMockito.given;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.user.service.UserService;
+import io.mopl.domain.user.storage.ProfileImageStorage;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -25,6 +26,9 @@ class UserServiceCacheTest {
 
   @MockitoBean
   private UserRepository userRepository;
+
+  @MockitoBean
+  private ProfileImageStorage profileImageStorage;
 
   @Test
   @DisplayName("캐시 테스트: 같은 유저를 2번 조회하면 DB 조회는 1번만 발생")
