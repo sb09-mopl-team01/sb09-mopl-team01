@@ -1,6 +1,5 @@
 package io.mopl.domain.watchingsession.websocket;
 
-import io.mopl.domain.watchingsession.service.WatchingSessionService;
 import io.mopl.global.security.MoplUserDetails;
 import java.security.Principal;
 import java.util.UUID;
@@ -25,9 +24,6 @@ public class WatchingSessionSubscriptionInterceptor implements ChannelIntercepto
   private static final Pattern WATCH_SUBSCRIPTION_PATTERN =
       Pattern.compile("^/sub/contents/([^/]+)/watch$");
 
-  private final WatchingSessionService watchingSessionService;
-  private final WatchingSessionSubscriptionRegistry subscriptionRegistry;
-
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
     StompHeaderAccessor accessor = MessageHeaderAccessor.getAccessor(message, StompHeaderAccessor.class);
@@ -36,46 +32,21 @@ public class WatchingSessionSubscriptionInterceptor implements ChannelIntercepto
     }
 
     if (StompCommand.SUBSCRIBE.equals(accessor.getCommand())) {
-      handleSubscribe(accessor);
-    } else if (StompCommand.UNSUBSCRIBE.equals(accessor.getCommand())) {
-      handleUnsubscribe(accessor);
-    } else if (StompCommand.DISCONNECT.equals(accessor.getCommand())) {
-      handleDisconnect(accessor);
+      validateSubscribe(accessor);
     }
 
     return message;
   }
 
-  private void handleSubscribe(StompHeaderAccessor accessor) {
+  private void validateSubscribe(StompHeaderAccessor accessor) {
     String destination = accessor.getDestination();
     Matcher matcher = WATCH_SUBSCRIPTION_PATTERN.matcher(destination == null ? "" : destination);
     if (!matcher.matches()) {
       return;
     }
 
-    UUID contentId = parseContentId(matcher.group(1));
-    UUID watcherId = resolveWatcherId(accessor.getUser());
-    watchingSessionService.startWatchingBySubscription(watcherId, contentId);
-    subscriptionRegistry.register(
-        accessor.getSessionId(),
-        accessor.getSubscriptionId(),
-        watcherId,
-        contentId
-    );
-  }
-
-  private void handleUnsubscribe(StompHeaderAccessor accessor) {
-    subscriptionRegistry.unregister(accessor.getSessionId(), accessor.getSubscriptionId())
-        .forEach(this::endWatching);
-  }
-
-  private void handleDisconnect(StompHeaderAccessor accessor) {
-    subscriptionRegistry.unregisterSession(accessor.getSessionId())
-        .forEach(this::endWatching);
-  }
-
-  private void endWatching(WatchingSessionSubscription subscription) {
-    watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
+    parseContentId(matcher.group(1));
+    resolveWatcherId(accessor.getUser());
   }
 
   private UUID parseContentId(String value) {
