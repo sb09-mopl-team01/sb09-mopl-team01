@@ -62,6 +62,14 @@ public class ConversationController {
     return conversationService.findConversation(requesterId, conversationId);
   }
 
+  @GetMapping("/with")
+  public ConversationDto findConversationWithUser(
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
+      @RequestParam UUID userId
+  ) {
+    return conversationService.findConversationWithUser(requesterId, userId);
+  }
+
   @GetMapping("/{conversationId}/direct-messages")
   public CursorResponse<DirectMessageDto> findDirectMessages(
       @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
