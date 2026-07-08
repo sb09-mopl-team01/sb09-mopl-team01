@@ -8,12 +8,15 @@ import io.mopl.domain.notification.service.NotificationService;
 import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Propagation;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
 import org.springframework.util.StringUtils;
 
 @Component
 @RequiredArgsConstructor
+@Transactional(propagation = Propagation.REQUIRES_NEW)
 public class NotificationDomainEventHandler {
 
   private static final String DEFAULT_DISPLAY_NAME = "사용자";
