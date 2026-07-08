@@ -13,6 +13,7 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
 import io.mopl.domain.content.repository.ContentRepository;
+import io.mopl.domain.content.storage.ContentThumbnailFile;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -136,13 +137,14 @@ class ContentServiceTest {
     ContentCreateRequest request = createRequest("movie", "description", Set.of("action"));
     MockMultipartFile thumbnail = thumbnail();
     String thumbnailUrl = "/content-thumbnails/poster.jpg";
-    Content content = manualContent("movie", "description", thumbnailUrl, request.tags());
+    ContentThumbnailFile thumbnailFile = new ContentThumbnailFile(thumbnailUrl, "poster.jpg");
+    Content content = manualContent("movie", "description", thumbnailUrl, "poster.jpg", request.tags());
     UUID contentId = UUID.randomUUID();
     ReflectionTestUtils.setField(content, "id", contentId);
     ContentStats stats = ContentStats.empty();
     ContentDto expectedDto = dto(contentId, "movie", "description", thumbnailUrl, Set.of("action"), 0.0, 0);
-    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
-    given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
+    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailFile);
+    given(contentMapper.toEntity(request, thumbnailFile)).willReturn(content);
     given(contentRepository.save(content)).willReturn(content);
     given(contentStatsService.getStats(content)).willReturn(stats);
     given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
@@ -158,16 +160,17 @@ class ContentServiceTest {
     ContentCreateRequest request = createRequest("movie", "description", Set.of("tag"));
     MockMultipartFile thumbnail = thumbnail();
     String thumbnailUrl = "/content-thumbnails/poster.jpg";
-    Content content = manualContent("movie", "description", thumbnailUrl, request.tags());
-    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailUrl);
-    given(contentMapper.toEntity(request, thumbnailUrl)).willReturn(content);
+    ContentThumbnailFile thumbnailFile = new ContentThumbnailFile(thumbnailUrl, "poster.jpg");
+    Content content = manualContent("movie", "description", thumbnailUrl, "poster.jpg", request.tags());
+    given(contentThumbnailService.uploadRequired(thumbnail)).willReturn(thumbnailFile);
+    given(contentMapper.toEntity(request, thumbnailFile)).willReturn(content);
     given(contentRepository.save(content)).willThrow(new RuntimeException("db failed"));
 
     assertThatThrownBy(() -> contentService.createContent(request, thumbnail))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("db failed");
 
-    verify(contentThumbnailService).delete(thumbnailUrl);
+    verify(contentThumbnailService).delete("poster.jpg");
   }
 
   @Test
@@ -178,14 +181,12 @@ class ContentServiceTest {
         "updated description",
         Set.of("updated-tag")
     );
-    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", Set.of("action"));
+    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", "current.jpg", Set.of("action"));
     ReflectionTestUtils.setField(content, "id", contentId);
     ContentStats stats = ContentStats.empty();
     ContentDto expectedDto = dto(contentId, "updated title", "updated description",
         "/content-thumbnails/current.jpg", Set.of("updated-tag"), 0.0, 0);
     given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
-    given(contentThumbnailService.uploadOptional(null, "/content-thumbnails/current.jpg"))
-        .willReturn("/content-thumbnails/current.jpg");
     given(contentStatsService.getStats(content)).willReturn(stats);
     given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
 
@@ -199,14 +200,14 @@ class ContentServiceTest {
   @Test
   void deleteContent() {
     UUID contentId = UUID.randomUUID();
-    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", Set.of("action"));
+    Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", "current.jpg", Set.of("action"));
     ReflectionTestUtils.setField(content, "id", contentId);
     given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
 
     contentService.deleteContent(contentId);
 
     verify(contentRepository).delete(content);
-    verify(contentThumbnailService).delete("/content-thumbnails/current.jpg");
+    verify(contentThumbnailService).delete("current.jpg");
   }
 
   @Test
@@ -223,6 +224,16 @@ class ContentServiceTest {
 
   private Content manualContent(String title, String description, String thumbnailUrl, Set<String> tags) {
     return Content.createManual(ContentType.MOVIE, title, description, thumbnailUrl, tags);
+  }
+
+  private Content manualContent(
+      String title,
+      String description,
+      String thumbnailUrl,
+      String thumbnailKey,
+      Set<String> tags
+  ) {
+    return Content.createManual(ContentType.MOVIE, title, description, thumbnailUrl, thumbnailKey, tags);
   }
 
   private ContentDto dto(

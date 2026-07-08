@@ -21,6 +21,7 @@ import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,13 +48,31 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
     }
 
+    return startNewWatchingSession(watcherId, contentId);
+  }
+
+  @Transactional
+  public WatchingSessionDto startWatchingBySubscription(UUID watcherId, UUID contentId) {
+    validateIds(watcherId, contentId);
+    return watchingSessionRepository.findByWatcherId(watcherId)
+        .map(existingSession -> {
+          if (existingSession.getContent().getId().equals(contentId)) {
+            return watchingSessionMapper.toDto(existingSession);
+          }
+          endWatchingSession(existingSession);
+          return startNewWatchingSession(watcherId, contentId);
+        })
+        .orElseGet(() -> startNewWatchingSession(watcherId, contentId));
+  }
+
+  private WatchingSessionDto startNewWatchingSession(UUID watcherId, UUID contentId) {
     User watcher = userRepository.findById(watcherId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
     Content content = contentRepository.findById(contentId)
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     WatchingSession session = WatchingSession.start(watcher, content);
-    WatchingSession savedSession = watchingSessionRepository.saveAndFlush(session);
+    WatchingSession savedSession = saveSession(session, watcherId);
     WatchingSessionDto savedSessionDto = watchingSessionMapper.toDto(savedSession);
     domainEventPublisher.publish(new WatchingSessionEnteredEvent(
         savedSessionDto,
@@ -74,6 +93,16 @@ public class WatchingSessionService {
     endWatchingInternal(watcherId, contentId);
   }
 
+  @Transactional
+  public void endWatchingIfPresent(UUID watcherId, UUID contentId) {
+    if (watcherId == null) {
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+    watchingSessionRepository.findByWatcherId(watcherId)
+        .filter(session -> contentId == null || session.getContent().getId().equals(contentId))
+        .ifPresent(this::endWatchingSession);
+  }
+
   private void endWatchingInternal(UUID watcherId, UUID contentId) {
     if (watcherId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
@@ -84,6 +113,10 @@ public class WatchingSessionService {
       throw new BaseException(ErrorCode.WATCHING_SESSION_NOT_FOUND);
     }
 
+    endWatchingSession(session);
+  }
+
+  private void endWatchingSession(WatchingSession session) {
     WatchingSessionDto deletedSessionDto = watchingSessionMapper.toDto(session);
     UUID deletedContentId = session.getContent().getId();
     watchingSessionRepository.delete(session);
@@ -148,6 +181,15 @@ public class WatchingSessionService {
   private void validateIds(UUID watcherId, UUID contentId) {
     if (watcherId == null || contentId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+  }
+
+  private WatchingSession saveSession(WatchingSession session, UUID watcherId) {
+    try {
+      return watchingSessionRepository.saveAndFlush(session);
+    } catch (DataIntegrityViolationException e) {
+      log.warn("Watching session unique constraint violated. watcherId={}", watcherId);
+      throw new BaseException(ErrorCode.WATCHING_SESSION_ALREADY_EXISTS);
     }
   }
 

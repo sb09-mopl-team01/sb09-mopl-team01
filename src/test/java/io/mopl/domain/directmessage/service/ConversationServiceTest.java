@@ -3,14 +3,17 @@ package io.mopl.domain.directmessage.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.mopl.domain.directmessage.dto.ConversationCreateRequest;
 import io.mopl.domain.directmessage.dto.ConversationDto;
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
+import io.mopl.domain.directmessage.dto.DirectMessageSendRequest;
 import io.mopl.domain.directmessage.entity.Conversation;
 import io.mopl.domain.directmessage.entity.DirectMessage;
+import io.mopl.domain.directmessage.event.DirectMessageSentEvent;
 import io.mopl.domain.directmessage.mapper.ConversationMapper;
 import io.mopl.domain.directmessage.mapper.DirectMessageMapper;
 import io.mopl.domain.directmessage.repository.ConversationRepository;
@@ -18,6 +21,7 @@ import io.mopl.domain.directmessage.repository.DirectMessageRepository;
 import io.mopl.domain.user.dto.response.UserSummary;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -29,6 +33,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
@@ -56,6 +61,9 @@ class ConversationServiceTest {
 
   @Mock
   private DirectMessageMapper directMessageMapper;
+
+  @Mock
+  private DomainEventPublisher eventPublisher;
 
   private UUID requesterId;
   private UUID withUserId;
@@ -125,6 +133,14 @@ class ConversationServiceTest {
         .isInstanceOf(BaseException.class)
         .extracting("errorCode")
         .isEqualTo(ErrorCode.SELF_CONVERSATION_NOT_ALLOWED);
+  }
+
+  @Test
+  void createConversationRejectsNullRequest() {
+    assertThatThrownBy(() -> conversationService.createConversation(requesterId, null))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
   }
 
   @Test
@@ -204,6 +220,37 @@ class ConversationServiceTest {
   }
 
   @Test
+  void findConversationWithUserReturnsConversationWhenExists() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    ConversationDto expected = createConversationDto(conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+    when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
+        .thenReturn(Optional.of(conversation));
+    when(conversationMapper.toDto(conversation, withUser)).thenReturn(expected);
+
+    ConversationDto result = conversationService.findConversationWithUser(requesterId, withUserId);
+
+    assertThat(result).isEqualTo(expected);
+  }
+
+  @Test
+  void findConversationWithUserThrowsNotFoundWhenConversationDoesNotExist() {
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+    when(conversationRepository.findByParticipantAIdAndParticipantBId(any(), any()))
+        .thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> conversationService.findConversationWithUser(requesterId, withUserId))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+  }
+
+  @Test
   void findDirectMessagesReturnsCursorResponseWhenRequesterIsParticipant() {
     Conversation conversation = Conversation.between(requesterId, withUserId);
     UUID conversationId = UUID.randomUUID();
@@ -244,6 +291,112 @@ class ConversationServiceTest {
     assertThat(result.totalCount()).isEqualTo(1);
     assertThat(result.sortBy()).isEqualTo("createdAt");
     assertThat(result.sortDirection()).isEqualTo(SortDirection.ASCENDING);
+  }
+
+  @Test
+  void sendDirectMessageSavesMessageWhenSenderIsParticipant() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    DirectMessage savedDirectMessage = DirectMessage.create(
+        conversation,
+        requesterId,
+        withUserId,
+        "hello"
+    );
+    UUID directMessageId = UUID.randomUUID();
+    Instant createdAt = Instant.now();
+    ReflectionTestUtils.setField(savedDirectMessage, "id", directMessageId);
+    ReflectionTestUtils.setField(savedDirectMessage, "createdAt", createdAt);
+    DirectMessageDto expected = createDirectMessageDto(directMessageId, conversationId, createdAt);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+    when(directMessageRepository.save(any(DirectMessage.class))).thenReturn(savedDirectMessage);
+    when(directMessageMapper.toDto(savedDirectMessage, requester, withUser)).thenReturn(expected);
+
+    DirectMessageDto result = conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        new DirectMessageSendRequest("  hello  ")
+    );
+
+    ArgumentCaptor<DirectMessage> directMessageCaptor = ArgumentCaptor.forClass(DirectMessage.class);
+    verify(directMessageRepository).save(directMessageCaptor.capture());
+    DirectMessage capturedDirectMessage = directMessageCaptor.getValue();
+    assertThat(capturedDirectMessage.getConversation()).isEqualTo(conversation);
+    assertThat(capturedDirectMessage.getSenderId()).isEqualTo(requesterId);
+    assertThat(capturedDirectMessage.getReceiverId()).isEqualTo(withUserId);
+    assertThat(capturedDirectMessage.getContent()).isEqualTo("hello");
+    assertThat(result).isEqualTo(expected);
+    verify(eventPublisher).publish(argThat(event -> event instanceof DirectMessageSentEvent sentEvent
+        && sentEvent.directMessageId().equals(directMessageId)
+        && sentEvent.conversationId().equals(conversationId)
+        && sentEvent.senderId().equals(requesterId)
+        && sentEvent.senderName().equals(requester.getName())
+        && sentEvent.receiverId().equals(withUserId)
+        && sentEvent.occurredAt() != null));
+  }
+
+  @Test
+  void sendDirectMessageRejectsBlankContent() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+
+    assertThatThrownBy(() -> conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        new DirectMessageSendRequest("   ")
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  void sendDirectMessageRejectsContentLongerThanMaxLength() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+    when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
+
+    assertThatThrownBy(() -> conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        new DirectMessageSendRequest("a".repeat(1001))
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  void sendDirectMessageRejectsWhenSenderIsNotParticipant() {
+    UUID otherUserId = UUID.randomUUID();
+    Conversation conversation = Conversation.between(withUserId, otherUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
+
+    assertThatThrownBy(() -> conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        new DirectMessageSendRequest("hello")
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.NOT_CHAT_PARTICIPANT);
   }
 
   @Test

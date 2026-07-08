@@ -37,9 +37,10 @@ public class NotificationController {
     if (userDetails == null) {
       throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
     }
+    UUID receiverId = resolveUserId(userDetails);
 
     CursorResponse<NotificationDto> response = notificationService.getNotifications(
-        userDetails.getUser().getId(),
+        receiverId,
         cursor,
         idAfter,
         limit,
@@ -57,8 +58,16 @@ public class NotificationController {
     if (userDetails == null) {
       throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
     }
+    UUID receiverId = resolveUserId(userDetails);
 
-    notificationService.readNotification(notificationId, userDetails.getUser().getId());
+    notificationService.readNotification(notificationId, receiverId);
     return ResponseEntity.noContent().build();
+  }
+
+  private UUID resolveUserId(MoplUserDetails userDetails) {
+    if (userDetails.getUser() == null || userDetails.getUser().getId() == null) {
+      throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
+    }
+    return userDetails.getUser().getId();
   }
 }

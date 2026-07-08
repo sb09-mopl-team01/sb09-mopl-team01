@@ -52,6 +52,9 @@ public class Content extends BaseUpdatableEntity {
   @Column(name = "thumbnail_url", length = 2048)
   private String thumbnailUrl;
 
+  @Column(name = "thumbnail_key", length = 512)
+  private String thumbnailKey;
+
   @Enumerated(EnumType.STRING)
   @Column(nullable = false, length = 30)
   private ContentSource source;
@@ -90,6 +93,7 @@ public class Content extends BaseUpdatableEntity {
       String title,
       String description,
       String thumbnailUrl,
+      String thumbnailKey,
       ContentSource source,
       String externalId,
       Instant lastSyncedAt,
@@ -100,6 +104,7 @@ public class Content extends BaseUpdatableEntity {
     this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
     this.description = requireText(description, "콘텐츠 설명은 필수입니다.");
     this.thumbnailUrl = normalizeNullableText(thumbnailUrl);
+    this.thumbnailKey = normalizeNullableText(thumbnailKey);
     this.source = Objects.requireNonNull(source, "콘텐츠 출처는 필수입니다.");
     this.externalId = normalizeNullableText(externalId);
     this.lastSyncedAt = lastSyncedAt;
@@ -113,7 +118,18 @@ public class Content extends BaseUpdatableEntity {
       String thumbnailUrl,
       Collection<String> tags
   ) {
-    return new Content(type, title, description, thumbnailUrl, ContentSource.MANUAL, null, null, tags);
+    return createManual(type, title, description, thumbnailUrl, null, tags);
+  }
+
+  public static Content createManual(
+      ContentType type,
+      String title,
+      String description,
+      String thumbnailUrl,
+      String thumbnailKey,
+      Collection<String> tags
+  ) {
+    return new Content(type, title, description, thumbnailUrl, thumbnailKey, ContentSource.MANUAL, null, null, tags);
   }
 
   public static Content createExternal(
@@ -129,7 +145,7 @@ public class Content extends BaseUpdatableEntity {
     if (source == ContentSource.MANUAL) {
       throw new IllegalArgumentException("외부 콘텐츠는 MANUAL 출처를 사용할 수 없습니다.");
     }
-    return new Content(type, title, description, thumbnailUrl, source, externalId, lastSyncedAt, tags);
+    return new Content(type, title, description, thumbnailUrl, null, source, externalId, lastSyncedAt, tags);
   }
 
   public void markSyncedAt(Instant syncedAt) {
@@ -145,6 +161,16 @@ public class Content extends BaseUpdatableEntity {
       Collection<String> tags,
       String thumbnailUrl
   ) {
+    updateManual(title, description, tags, thumbnailUrl, this.thumbnailKey);
+  }
+
+  public void updateManual(
+      String title,
+      String description,
+      Collection<String> tags,
+      String thumbnailUrl,
+      String thumbnailKey
+  ) {
     if (title != null) {
       this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
     }
@@ -156,6 +182,7 @@ public class Content extends BaseUpdatableEntity {
     }
     if (thumbnailUrl != null) {
       this.thumbnailUrl = normalizeNullableText(thumbnailUrl);
+      this.thumbnailKey = normalizeNullableText(thumbnailKey);
     }
   }
 

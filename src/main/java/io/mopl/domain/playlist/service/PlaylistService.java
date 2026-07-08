@@ -8,6 +8,7 @@ import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.entity.Playlist;
 import io.mopl.domain.playlist.entity.PlaylistContent;
 import io.mopl.domain.playlist.entity.PlaylistSubscription;
+import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
 import io.mopl.domain.playlist.mapper.PlaylistMapper;
 import io.mopl.domain.playlist.repository.PlaylistContentRepository;
 import io.mopl.domain.playlist.repository.PlaylistRepository;
@@ -21,11 +22,11 @@ import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -41,8 +42,7 @@ public class PlaylistService {
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
   private final PlaylistMapper playlistMapper;
-
-//  private final DomainEventPublisher eventPublisher;
+  private final DomainEventPublisher eventPublisher;
 
   @Transactional
   public UUID createPlaylist(UUID userId, PlaylistCreateRequest request) {
@@ -99,14 +99,14 @@ public class PlaylistService {
     playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
-
-//    로직 추가시 반영
-//    내 플리 구독 발생 / 이벤트 발행
-//    eventPublisher.publish(new PlaylistSubscribedEvent(
-//        playlist.getOwner().getId(),
-//        subscriber.getName(),
-//        playlist.getTitle()
-//    ));
+    eventPublisher.publish(new PlaylistSubscribedEvent(
+        playlist.getId(),
+        playlist.getTitle(),
+        playlist.getOwner().getId(),
+        subscriber.getId(),
+        subscriber.getName(),
+        Instant.now()
+    ));
   }
 
   @Transactional

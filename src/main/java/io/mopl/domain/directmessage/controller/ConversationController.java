@@ -9,10 +9,10 @@ import io.mopl.global.response.SortDirection;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestAttribute;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
@@ -27,7 +27,7 @@ public class ConversationController {
 
   @PostMapping
   public ConversationDto createConversation(
-      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
       @Valid @RequestBody ConversationCreateRequest request
   ) {
     return conversationService.createConversation(requesterId, request);
@@ -35,7 +35,7 @@ public class ConversationController {
 
   @GetMapping
   public CursorResponse<ConversationDto> findConversations(
-      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
       @RequestParam(required = false) String keywordLike,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) UUID idAfter,
@@ -56,15 +56,23 @@ public class ConversationController {
 
   @GetMapping("/{conversationId}")
   public ConversationDto findConversation(
-      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
       @PathVariable UUID conversationId
   ) {
     return conversationService.findConversation(requesterId, conversationId);
   }
 
+  @GetMapping("/with")
+  public ConversationDto findConversationWithUser(
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
+      @RequestParam UUID userId
+  ) {
+    return conversationService.findConversationWithUser(requesterId, userId);
+  }
+
   @GetMapping("/{conversationId}/direct-messages")
   public CursorResponse<DirectMessageDto> findDirectMessages(
-      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
       @PathVariable UUID conversationId,
       @RequestParam(required = false) String cursor,
       @RequestParam(required = false) UUID idAfter,
@@ -85,7 +93,7 @@ public class ConversationController {
 
   @PostMapping("/{conversationId}/direct-messages/{directMessageId}/read")
   public void readDirectMessage(
-      @RequestAttribute(name = "userId", required = true) UUID requesterId,
+      @AuthenticationPrincipal(expression = "user.id") UUID requesterId,
       @PathVariable UUID conversationId,
       @PathVariable UUID directMessageId
   ) {

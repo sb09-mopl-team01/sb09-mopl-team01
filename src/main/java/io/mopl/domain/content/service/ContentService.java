@@ -8,6 +8,7 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.mapper.ContentMapper;
 import io.mopl.domain.content.repository.ContentRepository;
+import io.mopl.domain.content.storage.ContentThumbnailFile;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -15,7 +16,6 @@ import io.mopl.global.response.SortDirection;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -37,24 +37,23 @@ public class ContentService {
   private final PlatformTransactionManager transactionManager;
 
   public ContentDto createContent(ContentCreateRequest request, MultipartFile thumbnail) {
-    String thumbnailUrl = null;
+    ContentThumbnailFile uploadedThumbnail = null;
     try {
-      thumbnailUrl = contentThumbnailService.uploadRequired(thumbnail);
-      String uploadedThumbnailUrl = thumbnailUrl;
+      uploadedThumbnail = contentThumbnailService.uploadRequired(thumbnail);
+      ContentThumbnailFile thumbnailFile = uploadedThumbnail;
 
-      ContentDto contentDto = executeInTransaction(() -> {
-        Content content = contentMapper.toEntity(request, uploadedThumbnailUrl);
+      return executeInTransaction(() -> {
+        Content content = contentMapper.toEntity(request, thumbnailFile);
         Content savedContent = contentRepository.save(content);
         log.info("Content create completed. contentId={}", savedContent.getId());
         return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
       });
-      return contentDto;
     } catch (IllegalArgumentException e) {
-      contentThumbnailService.delete(thumbnailUrl);
+      deleteThumbnail(uploadedThumbnail);
       log.warn("Content create rejected. title={}", request == null ? null : request.title());
       throw new BaseException(ErrorCode.INVALID_INPUT);
     } catch (RuntimeException e) {
-      contentThumbnailService.delete(thumbnailUrl);
+      deleteThumbnail(uploadedThumbnail);
       log.error("Content create failed. title={}", request == null ? null : request.title(), e);
       throw e;
     }
@@ -123,13 +122,14 @@ public class ContentService {
 
     Content content = getContentOrThrow(contentId);
     String currentThumbnailUrl = content.getThumbnailUrl();
-    String uploadedThumbnailUrl = null;
+    String currentThumbnailKey = content.getThumbnailKey();
+    ContentThumbnailFile uploadedThumbnail = null;
 
     try {
-      String thumbnailUrl = contentThumbnailService.uploadOptional(thumbnail, currentThumbnailUrl);
-      if (!Objects.equals(currentThumbnailUrl, thumbnailUrl)) {
-        uploadedThumbnailUrl = thumbnailUrl;
-      }
+      uploadedThumbnail = contentThumbnailService.uploadOptional(thumbnail);
+      String thumbnailUrl = uploadedThumbnail == null ? currentThumbnailUrl : uploadedThumbnail.url();
+      String thumbnailKey = uploadedThumbnail == null ? currentThumbnailKey : uploadedThumbnail.key();
+      boolean thumbnailChanged = uploadedThumbnail != null;
 
       ContentDto contentDto = executeInTransaction(() -> {
         Content targetContent = getContentOrThrow(contentId);
@@ -137,35 +137,36 @@ public class ContentService {
             request.title(),
             request.description(),
             request.tags(),
-            thumbnailUrl
+            thumbnailUrl,
+            thumbnailKey
         );
         log.info("Content update completed. contentId={}", contentId);
         return contentMapper.toDto(targetContent, contentStatsService.getStats(targetContent));
       });
 
-      if (uploadedThumbnailUrl != null) {
-        contentThumbnailService.delete(currentThumbnailUrl);
+      if (thumbnailChanged) {
+        contentThumbnailService.delete(currentThumbnailKey);
       }
       return contentDto;
     } catch (IllegalArgumentException e) {
-      contentThumbnailService.delete(uploadedThumbnailUrl);
+      deleteThumbnail(uploadedThumbnail);
       log.warn("Content update rejected. contentId={}", contentId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     } catch (RuntimeException e) {
-      contentThumbnailService.delete(uploadedThumbnailUrl);
+      deleteThumbnail(uploadedThumbnail);
       log.error("Content update failed. contentId={}", contentId, e);
       throw e;
     }
   }
 
   public void deleteContent(UUID contentId) {
-    String thumbnailUrl = executeInTransaction(() -> {
+    String thumbnailKey = executeInTransaction(() -> {
       Content content = getContentOrThrow(contentId);
-      String currentThumbnailUrl = content.getThumbnailUrl();
+      String currentThumbnailKey = content.getThumbnailKey();
       contentRepository.delete(content);
-      return currentThumbnailUrl;
+      return currentThumbnailKey;
     });
-    contentThumbnailService.delete(thumbnailUrl);
+    contentThumbnailService.delete(thumbnailKey);
     log.info("Content delete completed. contentId={}", contentId);
   }
 
@@ -175,6 +176,12 @@ public class ContentService {
           log.warn("Content find failed. contentId={}", contentId);
           return new BaseException(ErrorCode.INVALID_INPUT);
         });
+  }
+
+  private void deleteThumbnail(ContentThumbnailFile thumbnailFile) {
+    if (thumbnailFile != null) {
+      contentThumbnailService.delete(thumbnailFile.key());
+    }
   }
 
   private <T> T executeInTransaction(java.util.function.Supplier<T> action) {

@@ -58,6 +58,20 @@ public class ConversationRepositoryImpl implements ConversationRepositoryCustom 
     return count == null ? 0 : count;
   }
 
+  @Override
+  public boolean existsByIdAndParticipantId(UUID conversationId, UUID participantId) {
+    Integer result = queryFactory
+        .selectOne()
+        .from(conversation)
+        .where(
+            conversation.id.eq(conversationId),
+            participantCondition(participantId)
+        )
+        .fetchFirst();
+
+    return result != null;
+  }
+
   private BooleanExpression participantCondition(UUID requesterId) {
     return conversation.participantAId.eq(requesterId)
         .or(conversation.participantBId.eq(requesterId));

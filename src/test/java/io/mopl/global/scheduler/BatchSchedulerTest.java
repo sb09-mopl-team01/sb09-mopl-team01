@@ -85,6 +85,24 @@ class BatchSchedulerTest {
   }
 
   @Test
+  @DisplayName("배치 작업 실행 시 중복 실행 방지를 위한 고유 JobParameter를 전달한다")
+  void executeJob_PassesUniqueJobParameters() throws Exception {
+    Runnable scheduledAction = captureScheduledAction();
+    JobExecution successExecution = new JobExecution(1L);
+    successExecution.setStatus(BatchStatus.COMPLETED);
+    given(jobLauncher.run(any(Job.class), any(JobParameters.class))).willReturn(successExecution);
+
+    scheduledAction.run();
+
+    ArgumentCaptor<JobParameters> parametersCaptor = ArgumentCaptor.forClass(JobParameters.class);
+    verify(jobLauncher).run(any(Job.class), parametersCaptor.capture());
+    JobParameters jobParameters = parametersCaptor.getValue();
+
+    assertThat(jobParameters.getLong("runTime")).isNotNull();
+    assertThat(jobParameters.getString("requestId")).isNotBlank();
+  }
+
+  @Test
   @DisplayName("배치 작업 실패(FAILED 상태) 시 FAIL 카운터가 증가한다")
   void executeJob_FailedStatus_IncrementsFailCounter() throws Exception {
     Runnable scheduledAction = captureScheduledAction();
