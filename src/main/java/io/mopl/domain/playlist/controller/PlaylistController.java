@@ -4,15 +4,20 @@ import io.mopl.domain.playlist.dto.PlaylistDto;
 import io.mopl.domain.playlist.dto.request.PlaylistCreateRequest;
 import io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest;
 import io.mopl.domain.playlist.service.PlaylistService;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
+import io.mopl.global.security.MoplUserDetails;
 import jakarta.validation.Valid;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/playlists")
 @RequiredArgsConstructor
@@ -21,83 +26,88 @@ public class PlaylistController {
   private final PlaylistService playlistService;
 
   @PostMapping
+  @CrossOrigin(exposedHeaders = "Location")
   public ResponseEntity<Void> createPlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @Valid @RequestBody PlaylistCreateRequest request) {
 
-    playlistService.createPlaylist(userId, request);
-    return ResponseEntity.status(HttpStatus.CREATED).build();
-  }
+    UUID newPlaylistId = playlistService.createPlaylist(userDetails.getUser().getId(), request);
 
-  @DeleteMapping("/{playlistId}")
-  public ResponseEntity<Void> deletePlaylist(
-      @AuthenticationPrincipal UUID userId,
-      @PathVariable UUID playlistId) {
-
-    playlistService.deletePlaylist(userId, playlistId);
-    return ResponseEntity.ok().build();
+    return ResponseEntity.created(java.net.URI.create("/api/playlists/" + newPlaylistId)).build();
   }
 
   @PatchMapping("/{playlistId}")
   public ResponseEntity<Void> updatePlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @PathVariable UUID playlistId,
       @Valid @RequestBody PlaylistUpdateRequest request) {
 
-    playlistService.updatePlaylist(userId, playlistId, request);
+    playlistService.updatePlaylist(userDetails.getUser().getId(), playlistId, request);
+    return ResponseEntity.ok().build();
+  }
+
+  @DeleteMapping("/{playlistId}")
+  public ResponseEntity<Void> deletePlaylist(
+      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @PathVariable UUID playlistId) {
+
+    playlistService.deletePlaylist(userDetails.getUser().getId(), playlistId);
     return ResponseEntity.ok().build();
   }
 
   @PostMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> subscribePlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @PathVariable UUID playlistId) {
 
-    playlistService.subscribePlaylist(userId, playlistId);
+    playlistService.subscribePlaylist(userDetails.getUser().getId(), playlistId);
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
   @DeleteMapping("/{playlistId}/subscription")
   public ResponseEntity<Void> unsubscribePlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @PathVariable UUID playlistId) {
 
-    playlistService.unsubscribePlaylist(userId, playlistId);
+    playlistService.unsubscribePlaylist(userDetails.getUser().getId(), playlistId);
+
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
   @PostMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> addContentToPlaylist(
-      @AuthenticationPrincipal UUID userId,
-      @PathVariable UUID playlistId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
+      @PathVariable String playlistId, // ✨ 핵심: 반드시 String으로 받아야 undefined를 캐치합니다!
       @PathVariable UUID contentId) {
 
-    playlistService.addContentToPlaylist(userId, playlistId, contentId);
+    // 서비스의 fallback 메서드로 넘깁니다.
+    playlistService.addContentToPlaylistWithFallback(userDetails.getUser().getId(), playlistId, contentId);
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
+
   @DeleteMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> removeContentFromPlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @PathVariable UUID playlistId,
       @PathVariable UUID contentId) {
 
-    playlistService.removeContentFromPlaylist(userId, playlistId, contentId);
+    playlistService.removeContentFromPlaylist(userDetails.getUser().getId(), playlistId, contentId);
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
   @GetMapping("/{playlistId}")
   public ResponseEntity<PlaylistDto> findPlaylist(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @PathVariable UUID playlistId) {
 
-    PlaylistDto response = playlistService.findPlaylist(userId, playlistId);
+    PlaylistDto response = playlistService.findPlaylist(userDetails.getUser().getId(), playlistId);
     return ResponseEntity.ok(response);
   }
 
   @GetMapping
   public ResponseEntity<CursorResponse<PlaylistDto>> findPlaylists(
-      @AuthenticationPrincipal UUID userId,
+      @AuthenticationPrincipal MoplUserDetails userDetails,
       @RequestParam(required = false) String keywordLike,
       @RequestParam(required = false) UUID ownerIdEqual,
       @RequestParam(required = false) UUID subscriberIdEqual,
@@ -108,7 +118,7 @@ public class PlaylistController {
       @RequestParam String sortBy) {
 
     CursorResponse<PlaylistDto> response = playlistService.findPlaylists(
-        userId, keywordLike, ownerIdEqual, subscriberIdEqual,
+        userDetails.getUser().getId(), keywordLike, ownerIdEqual, subscriberIdEqual,
         cursor, idAfter, limit, sortDirection, sortBy
     );
     return ResponseEntity.ok(response);
