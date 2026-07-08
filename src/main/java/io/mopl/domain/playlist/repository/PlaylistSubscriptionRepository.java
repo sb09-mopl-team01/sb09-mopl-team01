@@ -9,7 +9,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
-public interface PlaylistSubscriptionRepository extends JpaRepository<PlaylistSubscription, UUID> {
+public interface PlaylistSubscriptionRepository extends
+    JpaRepository<PlaylistSubscription, UUID>,
+    PlaylistSubscriptionRepositoryCustom {
+
   void deleteAllByPlaylistId(UUID playlistId);
   boolean existsByPlaylistAndUser(Playlist playlist, User user);
   Optional<PlaylistSubscription> findByPlaylistAndUser(Playlist playlist, User user);
