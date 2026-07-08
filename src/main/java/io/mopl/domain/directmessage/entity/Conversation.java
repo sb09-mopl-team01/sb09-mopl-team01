@@ -16,25 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-    name = "conversations",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_conversation_participants",
-            columnNames = {"participant_a_id", "participant_b_id"}
-        )
-    },
-    indexes = {
-        @Index(
-            name = "idx_conversations_participant_a_created_at_id",
-            columnList = "participant_a_id, created_at, id"
-        ),
-        @Index(
-            name = "idx_conversations_participant_b_created_at_id",
-            columnList = "participant_b_id, created_at, id"
-        )
-    }
-)
+@Table(name = "conversations")
 public class Conversation extends BaseEntity {
 
   @Column(name = "participant_a_id", nullable = false)

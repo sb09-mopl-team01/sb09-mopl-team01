@@ -16,19 +16,7 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-@Table(
-    name = "direct_messages",
-    indexes = {
-        @Index(
-            name = "idx_direct_messages_conversation_created_at_id",
-            columnList = "conversation_id, created_at, id"
-        ),
-        @Index(
-            name = "idx_direct_messages_receiver_read",
-            columnList = "receiver_id, read"
-        )
-    }
-)
+@Table(name = "direct_messages")
 public class DirectMessage extends BaseEntity {
 
   public static final int CONTENT_MAX_LENGTH = 1000;
