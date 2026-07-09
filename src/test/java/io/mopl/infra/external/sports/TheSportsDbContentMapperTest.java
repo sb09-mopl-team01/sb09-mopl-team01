@@ -118,4 +118,60 @@ class TheSportsDbContentMapperTest {
 
     assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/arsenal-badge.png");
   }
+
+  @Test
+  void convertToCandidateUsesEventImageBeforeBadge() {
+    TheSportsDbEventItem event = new TheSportsDbEventItem(
+        "event-3",
+        "Arsenal vs Chelsea",
+        null,
+        "Soccer",
+        "English Premier League",
+        "Arsenal",
+        "Chelsea",
+        "2026-08-21",
+        "19:00:00",
+        null,
+        "https://example.com/poster.jpg",
+        null,
+        null,
+        null,
+        "https://example.com/arsenal-badge.png",
+        "https://example.com/chelsea-badge.png",
+        "https://example.com/premier-league-badge.png",
+        null
+    );
+
+    ExternalContentCandidate candidate = mapper.toCandidate(event);
+
+    assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/poster.jpg");
+  }
+
+  @Test
+  void convertToCandidateIgnoresBlankThumbnailCandidates() {
+    TheSportsDbEventItem event = new TheSportsDbEventItem(
+        "event-4",
+        "Arsenal vs Chelsea",
+        null,
+        "Soccer",
+        "English Premier League",
+        "Arsenal",
+        "Chelsea",
+        "2026-08-21",
+        "19:00:00",
+        "   ",
+        "\t",
+        "",
+        null,
+        null,
+        "https://example.com/arsenal-badge.png",
+        null,
+        null,
+        null
+    );
+
+    ExternalContentCandidate candidate = mapper.toCandidate(event);
+
+    assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/arsenal-badge.png");
+  }
 }
