@@ -55,6 +55,8 @@ public class TmdbExternalContentClient implements ExternalContentClient {
               .path(properties.moviePath())
               .queryParam("api_key", properties.apiKey())
               .queryParam("page", page)
+              .queryParam("language", language())
+              .queryParam("region", region())
               .build())
           .retrieve()
           .body(MOVIE_RESPONSE_TYPE);
@@ -63,6 +65,7 @@ public class TmdbExternalContentClient implements ExternalContentClient {
           ? List.of()
           : response.results().stream()
               .map(item -> tmdbContentMapper.toMovieCandidate(item, properties.imageBaseUrl()))
+              .filter(this::shouldKeepCandidate)
               .toList();
     } catch (Exception e) {
       throw new ExternalApiException("TMDB movie API request failed.", e);
@@ -76,6 +79,7 @@ public class TmdbExternalContentClient implements ExternalContentClient {
               .path(properties.tvPath())
               .queryParam("api_key", properties.apiKey())
               .queryParam("page", page)
+              .queryParam("language", language())
               .build())
           .retrieve()
           .body(TV_RESPONSE_TYPE);
@@ -84,13 +88,39 @@ public class TmdbExternalContentClient implements ExternalContentClient {
           ? List.of()
           : response.results().stream()
               .map(item -> tmdbContentMapper.toTvCandidate(item, properties.imageBaseUrl()))
+              .filter(this::shouldKeepCandidate)
               .toList();
     } catch (Exception e) {
       throw new ExternalApiException("TMDB tv API request failed.", e);
     }
   }
 
+  private boolean shouldKeepCandidate(ExternalContentCandidate candidate) {
+    if (candidate == null) {
+      return false;
+    }
+    if (!properties.koreanOnly()) {
+      return true;
+    }
+    return containsHangul(candidate.title()) || containsHangul(candidate.description());
+  }
+
+  private String language() {
+    return isBlank(properties.language()) ? "ko-KR" : properties.language().trim();
+  }
+
+  private String region() {
+    return isBlank(properties.region()) ? "KR" : properties.region().trim();
+  }
+
+  private static boolean containsHangul(String value) {
+    return !isBlank(value) && value.codePoints()
+        .anyMatch(codePoint -> Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HANGUL);
+  }
+
   private static boolean isBlank(String value) {
     return value == null || value.isBlank();
   }
 }
+
+
