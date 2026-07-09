@@ -57,7 +57,7 @@ class PlaylistControllerTest {
   void createPlaylist() {
     PlaylistCreateRequest request = new PlaylistCreateRequest("제목", "설명");
 
-    ResponseEntity<Void> response = playlistController.createPlaylist(mockUserDetails, request);
+    ResponseEntity<PlaylistDto> response = playlistController.createPlaylist(mockUserDetails, request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
     verify(playlistService).createPlaylist(eq(userId), any());
