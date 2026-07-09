@@ -10,6 +10,7 @@ import io.mopl.global.security.handler.MoplLogoutHandler;
 import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.handler.SpaCsrfTokenRequestHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -135,8 +136,7 @@ public class SecurityConfig {
     logout.logoutUrl("/api/auth/sign-out")
         .addLogoutHandler(logoutHandler)
         .logoutSuccessHandler(logoutSuccessHandler)
-        .invalidateHttpSession(false)
-        .deleteCookies("REFRESH_TOKEN");
+        .invalidateHttpSession(false);
   }
 
   private void configureHttpBasic(HttpBasicConfigurer<HttpSecurity> basic) {
@@ -150,6 +150,7 @@ public class SecurityConfig {
 
   private void configureAuthorizeRequests(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry auth) {
     auth
+        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()

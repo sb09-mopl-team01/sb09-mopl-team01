@@ -3,13 +3,16 @@ package io.mopl.global.websocket;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.Message;
 import org.springframework.messaging.MessageChannel;
 import org.springframework.messaging.simp.stomp.StompCommand;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.messaging.support.ChannelInterceptor;
 import org.springframework.messaging.support.MessageHeaderAccessor;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.authentication.AuthenticationCredentialsNotFoundException;
 import org.springframework.security.core.Authentication;
@@ -19,12 +22,14 @@ import org.springframework.util.StringUtils;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class WebSocketJwtChannelInterceptor implements ChannelInterceptor {
 
   private static final String BEARER_PREFIX = "Bearer ";
 
   private final JwtProvider jwtProvider;
   private final MoplUserDetailsService userDetailsService;
+  private final StringRedisTemplate redisTemplate;
 
   @Override
   public Message<?> preSend(Message<?> message, MessageChannel channel) {
@@ -40,7 +45,12 @@ public class WebSocketJwtChannelInterceptor implements ChannelInterceptor {
       }
 
       String email = jwtProvider.getUsername(token);
+      UUID userId = jwtProvider.getUserId(token);
       UserDetails userDetails = userDetailsService.loadUserByUsername(email);
+      if (isBlacklisted(userId) || !userDetails.isAccountNonLocked()) {
+        throw new AuthenticationCredentialsNotFoundException("WebSocket 인증 정보가 유효하지 않습니다.");
+      }
+
       Authentication authentication = new UsernamePasswordAuthenticationToken(
           userDetails,
           null,
@@ -50,6 +60,19 @@ public class WebSocketJwtChannelInterceptor implements ChannelInterceptor {
     }
 
     return message;
+  }
+
+  private boolean isBlacklisted(UUID userId) {
+    try {
+      return redisTemplate.hasKey("blacklist:access_token:" + userId);
+    } catch (Exception e) {
+      log.warn(
+          "WebSocketJwtChannelInterceptor Skipping token blacklist validation due to Redis connection error. userId={}",
+          userId,
+          e
+      );
+      return false;
+    }
   }
 
   private String resolveToken(StompHeaderAccessor accessor) {

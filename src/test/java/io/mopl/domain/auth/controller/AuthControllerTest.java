@@ -44,15 +44,19 @@ class AuthControllerTest {
     String currentRefreshToken = "old-token";
     UserDto mockUserDto = mock(UserDto.class);
     TokenRefreshResult mockResult = new TokenRefreshResult("new-access", "new-refresh", mockUserDto);
-    ResponseCookie mockCookie = ResponseCookie.from("REFRESH_TOKEN", "new-refresh").build();
+    ResponseCookie mockAccessCookie = ResponseCookie.from("ACCESS_TOKEN", "new-access").build();
+    ResponseCookie mockRefreshCookie = ResponseCookie.from("REFRESH_TOKEN", "new-refresh").build();
 
     when(authService.refreshTokens(currentRefreshToken)).thenReturn(mockResult);
-    when(cookieProvider.createRefreshTokenCookie("new-refresh")).thenReturn(mockCookie);
+    when(cookieProvider.createAccessTokenCookie("new-access")).thenReturn(mockAccessCookie);
+    when(cookieProvider.createRefreshTokenCookie("new-refresh")).thenReturn(mockRefreshCookie);
 
     ResponseEntity<?> response = authController.refresh(currentRefreshToken);
 
     assertEquals(HttpStatus.OK, response.getStatusCode());
     assertTrue(response.getHeaders().containsKey(HttpHeaders.SET_COOKIE));
+    assertTrue(response.getHeaders().get(HttpHeaders.SET_COOKIE).contains(mockAccessCookie.toString()));
+    assertTrue(response.getHeaders().get(HttpHeaders.SET_COOKIE).contains(mockRefreshCookie.toString()));
 
     TokenRefreshRequest body = (TokenRefreshRequest) response.getBody();
     assertNotNull(body);
