@@ -1,9 +1,11 @@
 package io.mopl.global.security.jwt;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mopl.global.security.CookieProvider;
 import io.mopl.global.security.MoplUserDetailsService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
@@ -33,15 +35,15 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
   private final ObjectMapper objectMapper;
 
+  private static final String SSE_PATH = "/api/sse";
+
   @Override
   protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
       throws ServletException, IOException {
 
-    String header = request.getHeader("Authorization");
+    String token = resolveToken(request);
 
-    if (header != null && header.startsWith("Bearer ")) {
-      String token = header.substring(7);
-
+    if (token != null) {
       if (jwtProvider.validateToken(token)) {
         String email = jwtProvider.getUsername(token);
         UUID userId = jwtProvider.getUserId(token);
@@ -66,6 +68,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     filterChain.doFilter(request, response);
+  }
+
+  private String resolveToken(HttpServletRequest request) {
+    String header = request.getHeader("Authorization");
+    if (header != null && header.startsWith("Bearer ")) {
+      return header.substring(7);
+    }
+
+    if (!SSE_PATH.equals(request.getRequestURI())) {
+      return null;
+    }
+
+    Cookie[] cookies = request.getCookies();
+    if (cookies == null) {
+      return null;
+    }
+
+    for (Cookie cookie : cookies) {
+      if (CookieProvider.ACCESS_TOKEN_COOKIE_NAME.equals(cookie.getName())) {
+        return cookie.getValue();
+      }
+    }
+    return null;
   }
 
   private void sendAccountLockResponse(HttpServletResponse response, int status, String message) throws IOException {
