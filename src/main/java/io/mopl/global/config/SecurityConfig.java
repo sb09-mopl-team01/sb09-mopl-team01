@@ -1,6 +1,5 @@
 package io.mopl.global.config;
 
-import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
@@ -18,7 +17,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -47,7 +45,6 @@ public class SecurityConfig {
   private final LoginFailureHandler loginFailureHandler;
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
-  private final MoplUserDetailsService userDetailsService;
   private final StatelessCsrfTokenRepository csrfTokenRepository;
 
   @Value("${mopl.cors.allowed-origins}")
@@ -105,17 +102,6 @@ public class SecurityConfig {
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/**", configuration);
     return source;
-  }
-
-  @Bean
-  public DaoAuthenticationProvider authenticationProvider() {
-    DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-    authProvider.setUserDetailsService(userDetailsService);
-    authProvider.setPasswordEncoder(passwordEncoder());
-
-    authProvider.setHideUserNotFoundExceptions(false);
-
-    return authProvider;
   }
 
   private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
