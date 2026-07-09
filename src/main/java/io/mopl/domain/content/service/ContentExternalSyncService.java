@@ -35,6 +35,7 @@ public class ContentExternalSyncService {
     int failedCount = 0;
 
     List<ExternalContentCandidate> candidates = fetchAllCandidates();
+    int fetchedCount = candidates.size();
     for (ExternalContentCandidate candidate : candidates) {
       try {
         if (syncCandidate(candidate, syncedAt)) {
@@ -54,13 +55,14 @@ public class ContentExternalSyncService {
     }
 
     log.info(
-        "Content external sync completed. createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
+        "Content external sync completed. fetchedCount={}, createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
+        fetchedCount,
         createdCount,
         skippedCount,
         failedCount,
         syncedAt
     );
-    return new ExternalContentSyncResult(createdCount, skippedCount, failedCount, syncedAt);
+    return new ExternalContentSyncResult(fetchedCount, createdCount, skippedCount, failedCount, syncedAt);
   }
 
   private List<ExternalContentCandidate> fetchAllCandidates() {
@@ -72,11 +74,14 @@ public class ContentExternalSyncService {
   }
 
   private List<ExternalContentCandidate> fetchCandidates(ExternalContentClient client) {
+    String clientName = client.getClass().getSimpleName();
     try {
       List<ExternalContentCandidate> candidates = client.fetchContents();
-      return candidates == null ? List.of() : candidates;
+      List<ExternalContentCandidate> resolvedCandidates = candidates == null ? List.of() : candidates;
+      log.info("Content external fetch completed. client={}, fetchedCount={}", clientName, resolvedCandidates.size());
+      return resolvedCandidates;
     } catch (ExternalApiException e) {
-      log.error("Content external fetch failed. client={}", client.getClass().getSimpleName(), e);
+      log.error("Content external fetch failed. client={}", clientName, e);
       throw e;
     }
   }
