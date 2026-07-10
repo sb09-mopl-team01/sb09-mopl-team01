@@ -47,7 +47,7 @@ public class PlaylistService {
   private final DomainEventPublisher eventPublisher;
 
   @Transactional
-  public UUID createPlaylist(UUID userId, PlaylistCreateRequest request) {
+  public PlaylistDto createPlaylist(UUID userId, PlaylistCreateRequest request) {
     log.info("Attempting to create playlist: userId={}, title={}", userId, request.title());
     User owner = userRepository.findById(userId)
         .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
@@ -59,6 +59,7 @@ public class PlaylistService {
     );
 
     Playlist savedPlaylist = playlistRepository.save(playlist);
+
     List<UUID> followerIds = followRepository.findFollowerIdsByFolloweeId(owner.getId());
     if (!followerIds.isEmpty()) {
       eventPublisher.publish(new PlaylistCreatedEvent(
@@ -73,7 +74,7 @@ public class PlaylistService {
 
     log.info("Playlist created successfully: {}, playlistId: {}, title: {}", userId, savedPlaylist.getId(), savedPlaylist.getTitle());
 
-    return savedPlaylist.getId();
+    return playlistMapper.toDto(savedPlaylist, false);
   }
 
   @Transactional
@@ -269,31 +270,7 @@ public class PlaylistService {
 
   private boolean isSubscribedBy(Playlist playlist, UUID userId) {
     if (userId == null) return false;
-    User requester = userRepository.findById(userId).orElse(null);
-    if (requester == null) return false;
-
 
     return playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlist.getId(), userId);
-  }
-
-  @org.springframework.transaction.annotation.Transactional
-  public void addContentToPlaylistWithFallback(java.util.UUID userId, String playlistId, java.util.UUID contentId) {
-    java.util.UUID targetId;
-
-    if ("undefined".equals(playlistId)) {
-      try {
-        Thread.sleep(200);
-      } catch (InterruptedException e) {
-        Thread.currentThread().interrupt();
-      }
-
-      targetId = playlistRepository.findFirstByOwnerIdOrderByCreatedAtDesc(userId)
-          .orElseThrow(() -> new io.mopl.global.exception.BaseException(io.mopl.global.exception.ErrorCode.PLAYLIST_NOT_FOUND))
-          .getId();
-    } else {
-      targetId = java.util.UUID.fromString(playlistId);
-    }
-
-    addContentToPlaylist(userId, targetId, contentId);
   }
 }

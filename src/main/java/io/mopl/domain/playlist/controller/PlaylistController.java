@@ -31,10 +31,9 @@ public class PlaylistController {
       @AuthenticationPrincipal MoplUserDetails userDetails,
       @Valid @RequestBody PlaylistCreateRequest request) {
 
-    UUID newPlaylistId = playlistService.createPlaylist(userDetails.getUser().getId(), request);
-    PlaylistDto createdPlaylist = playlistService.findPlaylist(userDetails.getUser().getId(), newPlaylistId);
+    PlaylistDto createdPlaylist = playlistService.createPlaylist(userDetails.getUser().getId(), request);
 
-    return ResponseEntity.created(java.net.URI.create("/api/playlists/" + newPlaylistId))
+    return ResponseEntity.created(java.net.URI.create("/api/playlists/" + createdPlaylist.id()))
         .body(createdPlaylist);
   }
 
@@ -79,10 +78,10 @@ public class PlaylistController {
   @PostMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> addContentToPlaylist(
       @AuthenticationPrincipal MoplUserDetails userDetails,
-      @PathVariable String playlistId,
+      @PathVariable UUID playlistId,
       @PathVariable UUID contentId) {
 
-    playlistService.addContentToPlaylistWithFallback(userDetails.getUser().getId(), playlistId, contentId);
+    playlistService.addContentToPlaylist(userDetails.getUser().getId(), playlistId, contentId);
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
