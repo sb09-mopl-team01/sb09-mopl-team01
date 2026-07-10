@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.mopl.infra.external.ExternalApiException;
+import io.mopl.infra.external.ExternalApiRetryExecutor;
 import io.mopl.infra.external.ExternalContentApiProperties;
 import io.mopl.infra.external.ExternalContentCandidate;
 import io.mopl.infra.external.ExternalContentFetchResult;
@@ -22,10 +23,12 @@ class TheSportsDbExternalContentClientTest {
   void fetchContents_countsUnmappableItemAndKeepsValidItem() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TheSportsDbExternalContentClient client = new TheSportsDbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TheSportsDbContentMapper()
+        properties,
+        new TheSportsDbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://www.thesportsdb.com/api/v1/json/test-sports-key/eventsnextleague.php?id=4328"))
@@ -60,10 +63,12 @@ class TheSportsDbExternalContentClientTest {
   void fetchContents_wrapsApiResponseError() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TheSportsDbExternalContentClient client = new TheSportsDbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TheSportsDbContentMapper()
+        properties,
+        new TheSportsDbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://www.thesportsdb.com/api/v1/json/test-sports-key/eventsnextleague.php?id=4328"))
@@ -80,6 +85,7 @@ class TheSportsDbExternalContentClientTest {
   private static ExternalContentApiProperties properties() {
     return new ExternalContentApiProperties(
         new ExternalContentApiProperties.Timeout(3, 5),
+        new ExternalContentApiProperties.Retry(1, 0, 1.0, 0),
         new ExternalContentApiProperties.Tmdb(
             null,
             "https://api.themoviedb.org/3",

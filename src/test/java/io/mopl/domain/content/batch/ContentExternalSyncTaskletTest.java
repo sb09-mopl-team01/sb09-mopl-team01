@@ -3,17 +3,20 @@ package io.mopl.domain.content.batch;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.content.dto.ExternalContentSyncResult;
 import io.mopl.domain.content.service.ContentExternalSyncService;
 import java.time.Instant;
+import java.util.Set;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.StepExecution;
+import org.springframework.batch.core.explore.JobExplorer;
 import org.springframework.batch.core.scope.context.ChunkContext;
 import org.springframework.batch.core.scope.context.StepContext;
 import org.springframework.batch.item.ExecutionContext;
@@ -25,6 +28,9 @@ class ContentExternalSyncTaskletTest {
   @Mock
   private ContentExternalSyncService contentExternalSyncService;
 
+  @Mock
+  private JobExplorer jobExplorer;
+
   @Test
   void execute_runsSyncServiceAndStoresResult() throws Exception {
     Instant syncedAt = Instant.parse("2026-07-06T00:00:00Z");
@@ -32,7 +38,7 @@ class ContentExternalSyncTaskletTest {
         .willReturn(new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, syncedAt));
     ExecutionContext executionContext = new ExecutionContext();
     ChunkContext chunkContext = chunkContext(executionContext);
-    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
+    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService, jobExplorer);
 
     RepeatStatus status = tasklet.execute(null, chunkContext);
 
@@ -55,7 +61,7 @@ class ContentExternalSyncTaskletTest {
         .willReturn(new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, null));
     ExecutionContext executionContext = new ExecutionContext();
     ChunkContext chunkContext = chunkContext(executionContext);
-    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
+    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService, jobExplorer);
 
     RepeatStatus status = tasklet.execute(null, chunkContext);
 
@@ -73,14 +79,35 @@ class ContentExternalSyncTaskletTest {
   void execute_propagatesSyncFailure() {
     RuntimeException failure = new RuntimeException("external sync failed");
     given(contentExternalSyncService.syncExternalContents()).willThrow(failure);
-    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
+    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService, jobExplorer);
 
     assertThatThrownBy(() -> tasklet.execute(null, chunkContext(new ExecutionContext())))
         .isSameAs(failure);
   }
 
+  @Test
+  void execute_rejectsWhenOlderExecutionIsStillRunning() {
+    JobExecution olderExecution = new JobExecution(1L);
+    given(jobExplorer.findRunningJobExecutions(ContentExternalSyncJobConfig.JOB_NAME))
+        .willReturn(Set.of(olderExecution));
+    ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(
+        contentExternalSyncService,
+        jobExplorer
+    );
+
+    assertThatThrownBy(() -> tasklet.execute(null, chunkContext(new ExecutionContext(), 2L)))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("콘텐츠 외부 동기화 Job이 이미 실행 중입니다.");
+
+    verify(contentExternalSyncService, never()).syncExternalContents();
+  }
+
   private ChunkContext chunkContext(ExecutionContext executionContext) {
-    JobExecution jobExecution = new JobExecution(1L);
+    return chunkContext(executionContext, 1L);
+  }
+
+  private ChunkContext chunkContext(ExecutionContext executionContext, Long jobExecutionId) {
+    JobExecution jobExecution = new JobExecution(jobExecutionId);
     jobExecution.setExecutionContext(executionContext);
     StepExecution stepExecution = new StepExecution(ContentExternalSyncJobConfig.STEP_NAME, jobExecution);
     return new ChunkContext(new StepContext(stepExecution));

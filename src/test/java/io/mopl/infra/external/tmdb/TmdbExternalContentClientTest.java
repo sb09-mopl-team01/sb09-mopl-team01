@@ -8,6 +8,7 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.mopl.infra.external.ExternalApiException;
+import io.mopl.infra.external.ExternalApiRetryExecutor;
 import io.mopl.infra.external.ExternalContentApiProperties;
 import io.mopl.infra.external.ExternalContentCandidate;
 import io.mopl.infra.external.ExternalContentFetchResult;
@@ -23,10 +24,12 @@ class TmdbExternalContentClientTest {
   void fetchContents_requestsKoreanLocaleAndKeepsKoreanItemsOnly() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TmdbExternalContentClient client = new TmdbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TmdbContentMapper()
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
@@ -85,10 +88,12 @@ class TmdbExternalContentClientTest {
   void fetchContents_wrapsApiResponseError() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TmdbExternalContentClient client = new TmdbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TmdbContentMapper()
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
@@ -103,9 +108,37 @@ class TmdbExternalContentClientTest {
   }
 
   @Test
+  void fetchContents_retriesServerErrorAndContinuesAfterRecovery() {
+    RestClient.Builder restClientBuilder = RestClient.builder();
+    MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties(2);
+    TmdbExternalContentClient client = new TmdbExternalContentClient(
+        restClientBuilder,
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
+    );
+    String movieUrl =
+        "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR";
+    mockServer.expect(once(), requestTo(movieUrl)).andRespond(withServerError());
+    mockServer.expect(once(), requestTo(movieUrl))
+        .andRespond(withSuccess("{\"results\": []}", MediaType.APPLICATION_JSON));
+    mockServer.expect(once(), requestTo(
+            "https://api.themoviedb.org/3/tv/popular?api_key=test-api-key&page=1&language=ko-KR"))
+        .andRespond(withSuccess("{\"results\": []}", MediaType.APPLICATION_JSON));
+
+    ExternalContentFetchResult result = client.fetchContents();
+
+    assertThat(result.fetchedCount()).isZero();
+    assertThat(result.failedCount()).isZero();
+    mockServer.verify();
+  }
+
+  @Test
   void fetchContents_countsMappingFailureAndContinuesWithRemainingItems() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TmdbContentMapper mapper = new TmdbContentMapper() {
       @Override
       public ExternalContentCandidate toMovieCandidate(TmdbMovieItem item, String imageBaseUrl) {
@@ -117,8 +150,9 @@ class TmdbExternalContentClientTest {
     };
     TmdbExternalContentClient client = new TmdbExternalContentClient(
         restClientBuilder,
-        properties(),
-        mapper
+        properties,
+        mapper,
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
@@ -157,8 +191,13 @@ class TmdbExternalContentClientTest {
   }
 
   private static ExternalContentApiProperties properties() {
+    return properties(1);
+  }
+
+  private static ExternalContentApiProperties properties(int maxAttempts) {
     return new ExternalContentApiProperties(
         new ExternalContentApiProperties.Timeout(3, 5),
+        new ExternalContentApiProperties.Retry(maxAttempts, 0, 1.0, 0),
         new ExternalContentApiProperties.Tmdb(
             "test-api-key",
             "https://api.themoviedb.org/3",
