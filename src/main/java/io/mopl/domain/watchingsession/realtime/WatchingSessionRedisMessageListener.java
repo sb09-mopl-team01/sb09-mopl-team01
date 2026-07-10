@@ -22,28 +22,42 @@ public class WatchingSessionRedisMessageListener implements MessageListener {
 
   @Override
   public void onMessage(Message message, byte[] pattern) {
+    if (message == null || message.getBody() == null || message.getBody().length == 0) {
+      log.warn("Ignoring empty watching session Redis message.");
+      return;
+    }
+
+    WatchingSessionChange change;
     try {
-      WatchingSessionChange change = objectMapper.readValue(
+      change = objectMapper.readValue(
           message.getBody(),
           WatchingSessionChange.class
       );
-      validate(change);
+    } catch (IOException e) {
+      log.warn("Ignoring malformed watching session Redis message.", e);
+      return;
+    }
+
+    if (!hasRequiredFields(change)) {
+      log.warn("Ignoring watching session Redis message with missing required fields.");
+      return;
+    }
+
+    try {
       messagingTemplate.convertAndSend(
           WatchingSessionTopic.of(change.watchingSession().content().id()),
           change
       );
-    } catch (IOException | RuntimeException e) {
-      log.warn("Ignoring invalid watching session Redis message.", e);
+    } catch (RuntimeException e) {
+      log.error("Failed to relay watching session Redis message to local WebSocket subscribers.", e);
     }
   }
 
-  private void validate(WatchingSessionChange change) {
-    if (change == null
-        || change.type() == null
-        || change.watchingSession() == null
-        || change.watchingSession().content() == null
-        || change.watchingSession().content().id() == null) {
-      throw new IllegalArgumentException("시청 세션 변경 메시지에 필수 값이 없습니다.");
-    }
+  private boolean hasRequiredFields(WatchingSessionChange change) {
+    return change != null
+        && change.type() != null
+        && change.watchingSession() != null
+        && change.watchingSession().content() != null
+        && change.watchingSession().content().id() != null;
   }
 }

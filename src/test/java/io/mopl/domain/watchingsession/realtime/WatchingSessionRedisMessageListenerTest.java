@@ -1,9 +1,11 @@
 package io.mopl.domain.watchingsession.realtime;
 
+import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.content.dto.ContentSummary;
@@ -18,6 +20,7 @@ import java.util.Set;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.DefaultMessage;
+import org.springframework.messaging.MessageDeliveryException;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class WatchingSessionRedisMessageListenerTest {
@@ -30,25 +33,7 @@ class WatchingSessionRedisMessageListenerTest {
   @Test
   void relaysRedisMessageToLocalWebSocketSubscribers() throws Exception {
     UUID contentId = UUID.randomUUID();
-    WatchingSessionChange change = new WatchingSessionChange(
-        WatchingSessionChangeType.JOIN,
-        new WatchingSessionDto(
-            UUID.randomUUID(),
-            Instant.now(),
-            new UserSummary(UUID.randomUUID(), "사용자", "https://example.com/profile.png"),
-            ContentSummary.builder()
-                .id(contentId)
-                .type(ContentType.MOVIE)
-                .title("콘텐츠")
-                .description("설명")
-                .thumbnailUrl("https://example.com/thumbnail.png")
-                .tags(Set.of("tag"))
-                .averageRating(4.5)
-                .reviewCount(10)
-                .build()
-        ),
-        1L
-    );
+    WatchingSessionChange change = change(contentId);
     byte[] payload = objectMapper.writeValueAsBytes(change);
 
     listener.onMessage(new DefaultMessage("watching-session:changes".getBytes(StandardCharsets.UTF_8), payload), null);
@@ -70,10 +55,44 @@ class WatchingSessionRedisMessageListenerTest {
     verifyNoInteractions(messagingTemplate);
   }
 
+  @Test
+  void isolatesLocalWebSocketRelayFailure() throws Exception {
+    UUID contentId = UUID.randomUUID();
+    WatchingSessionChange change = change(contentId);
+    doThrow(new MessageDeliveryException("broker unavailable"))
+        .when(messagingTemplate)
+        .convertAndSend(eq("/sub/contents/" + contentId + "/watch"), eq(change));
+
+    assertThatCode(() -> listener.onMessage(message(objectMapper.writeValueAsString(change)), null))
+        .doesNotThrowAnyException();
+  }
+
   private DefaultMessage message(String payload) {
     return new DefaultMessage(
         "watching-session:changes".getBytes(StandardCharsets.UTF_8),
         payload.getBytes(StandardCharsets.UTF_8)
+    );
+  }
+
+  private WatchingSessionChange change(UUID contentId) {
+    return new WatchingSessionChange(
+        WatchingSessionChangeType.JOIN,
+        new WatchingSessionDto(
+            UUID.randomUUID(),
+            Instant.now(),
+            new UserSummary(UUID.randomUUID(), "사용자", "https://example.com/profile.png"),
+            ContentSummary.builder()
+                .id(contentId)
+                .type(ContentType.MOVIE)
+                .title("콘텐츠")
+                .description("설명")
+                .thumbnailUrl("https://example.com/thumbnail.png")
+                .tags(Set.of("tag"))
+                .averageRating(4.5)
+                .reviewCount(10)
+                .build()
+        ),
+        1L
     );
   }
 }
