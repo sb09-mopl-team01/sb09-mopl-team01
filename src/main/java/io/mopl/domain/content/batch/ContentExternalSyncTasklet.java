@@ -18,6 +18,8 @@ import org.springframework.stereotype.Component;
 public class ContentExternalSyncTasklet implements Tasklet {
 
   static final String FETCHED_COUNT_KEY = "contentExternalSync.fetchedCount";
+  static final String ACCEPTED_COUNT_KEY = "contentExternalSync.acceptedCount";
+  static final String FILTERED_COUNT_KEY = "contentExternalSync.filteredCount";
   static final String CREATED_COUNT_KEY = "contentExternalSync.createdCount";
   static final String SKIPPED_COUNT_KEY = "contentExternalSync.skippedCount";
   static final String FAILED_COUNT_KEY = "contentExternalSync.failedCount";
@@ -32,8 +34,10 @@ public class ContentExternalSyncTasklet implements Tasklet {
       ExternalContentSyncResult result = contentExternalSyncService.syncExternalContents();
       putResultToExecutionContext(chunkContext, result);
       log.info(
-          "Content externalSync completed. fetchedCount={}, createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
+          "Content externalSync completed. fetchedCount={}, acceptedCount={}, filteredCount={}, createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
           result.fetchedCount(),
+          result.acceptedCount(),
+          result.filteredCount(),
           result.createdCount(),
           result.skippedCount(),
           result.failedCount(),
@@ -58,6 +62,8 @@ public class ContentExternalSyncTasklet implements Tasklet {
         .getExecutionContext();
 
     jobExecutionContext.putInt(FETCHED_COUNT_KEY, result.fetchedCount());
+    jobExecutionContext.putInt(ACCEPTED_COUNT_KEY, result.acceptedCount());
+    jobExecutionContext.putInt(FILTERED_COUNT_KEY, result.filteredCount());
     jobExecutionContext.putInt(CREATED_COUNT_KEY, result.createdCount());
     jobExecutionContext.putInt(SKIPPED_COUNT_KEY, result.skippedCount());
     jobExecutionContext.putInt(FAILED_COUNT_KEY, result.failedCount());

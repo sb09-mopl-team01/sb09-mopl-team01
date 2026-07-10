@@ -29,7 +29,7 @@ class ContentExternalSyncTaskletTest {
   void execute_runsSyncServiceAndStoresResult() throws Exception {
     Instant syncedAt = Instant.parse("2026-07-06T00:00:00Z");
     given(contentExternalSyncService.syncExternalContents())
-        .willReturn(new ExternalContentSyncResult(6, 2, 3, 1, syncedAt));
+        .willReturn(new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, syncedAt));
     ExecutionContext executionContext = new ExecutionContext();
     ChunkContext chunkContext = chunkContext(executionContext);
     ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
@@ -37,10 +37,12 @@ class ContentExternalSyncTaskletTest {
     RepeatStatus status = tasklet.execute(null, chunkContext);
 
     assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FETCHED_COUNT_KEY)).isEqualTo(6);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FETCHED_COUNT_KEY)).isEqualTo(8);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.ACCEPTED_COUNT_KEY)).isEqualTo(6);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FILTERED_COUNT_KEY)).isEqualTo(1);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.CREATED_COUNT_KEY)).isEqualTo(2);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.SKIPPED_COUNT_KEY)).isEqualTo(3);
-    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(1);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(2);
     String storedSyncedAt = executionContext.getString(ContentExternalSyncTasklet.SYNCED_AT_KEY);
     assertThat(storedSyncedAt).isEqualTo("2026-07-06T00:00:00Z");
     assertThat(Instant.parse(storedSyncedAt)).isEqualTo(syncedAt);
@@ -50,7 +52,7 @@ class ContentExternalSyncTaskletTest {
   @Test
   void execute_doesNotStoreSyncedAtWhenSyncedAtIsNull() throws Exception {
     given(contentExternalSyncService.syncExternalContents())
-        .willReturn(new ExternalContentSyncResult(6, 2, 3, 1, null));
+        .willReturn(new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, null));
     ExecutionContext executionContext = new ExecutionContext();
     ChunkContext chunkContext = chunkContext(executionContext);
     ContentExternalSyncTasklet tasklet = new ContentExternalSyncTasklet(contentExternalSyncService);
@@ -58,10 +60,12 @@ class ContentExternalSyncTaskletTest {
     RepeatStatus status = tasklet.execute(null, chunkContext);
 
     assertThat(status).isEqualTo(RepeatStatus.FINISHED);
-    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FETCHED_COUNT_KEY)).isEqualTo(6);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FETCHED_COUNT_KEY)).isEqualTo(8);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.ACCEPTED_COUNT_KEY)).isEqualTo(6);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FILTERED_COUNT_KEY)).isEqualTo(1);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.CREATED_COUNT_KEY)).isEqualTo(2);
     assertThat(executionContext.getInt(ContentExternalSyncTasklet.SKIPPED_COUNT_KEY)).isEqualTo(3);
-    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(1);
+    assertThat(executionContext.getInt(ContentExternalSyncTasklet.FAILED_COUNT_KEY)).isEqualTo(2);
     assertThat(executionContext.containsKey(ContentExternalSyncTasklet.SYNCED_AT_KEY)).isFalse();
   }
 

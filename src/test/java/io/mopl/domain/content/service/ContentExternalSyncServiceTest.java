@@ -15,6 +15,7 @@ import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.infra.external.ExternalApiException;
 import io.mopl.infra.external.ExternalContentCandidate;
 import io.mopl.infra.external.ExternalContentClient;
+import io.mopl.infra.external.ExternalContentFetchResult;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
@@ -37,10 +38,10 @@ class ContentExternalSyncServiceTest {
 
   @Test
   void syncExternalContents_createsNewContentAndSkipsDuplicatedContent() {
-    ExternalContentClient client = () -> List.of(
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(List.of(
         candidate("tmdb-1", "New Movie"),
         candidate("tmdb-2", "Existing Movie")
-    );
+    ));
     Content existingContent = Content.createExternal(
         ContentType.MOVIE,
         "Existing Movie",
@@ -62,6 +63,8 @@ class ContentExternalSyncServiceTest {
     ExternalContentSyncResult result = service.syncExternalContents();
 
     assertThat(result.fetchedCount()).isEqualTo(2);
+    assertThat(result.acceptedCount()).isEqualTo(2);
+    assertThat(result.filteredCount()).isZero();
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(1);
     assertThat(result.failedCount()).isZero();
@@ -78,7 +81,7 @@ class ContentExternalSyncServiceTest {
 
   @Test
   void syncExternalContents_skipsInvalidItemAndContinues() {
-    ExternalContentClient client = () -> List.of(
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(List.of(
         candidate("tmdb-1", "New Movie"),
         new ExternalContentCandidate(
             ContentType.MOVIE,
@@ -89,7 +92,7 @@ class ContentExternalSyncServiceTest {
             null,
             List.of("movie", "tmdb")
         )
-    );
+    ));
     ContentExternalSyncService service = serviceWith(client);
 
     given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
@@ -99,10 +102,78 @@ class ContentExternalSyncServiceTest {
     ExternalContentSyncResult result = service.syncExternalContents();
 
     assertThat(result.fetchedCount()).isEqualTo(2);
+    assertThat(result.acceptedCount()).isEqualTo(2);
+    assertThat(result.filteredCount()).isZero();
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isZero();
     assertThat(result.failedCount()).isEqualTo(1);
     verify(contentRepository).save(any(Content.class));
+  }
+
+  @Test
+  void syncExternalContents_countsClientMappingFailuresAndPolicyFiltersSeparately() {
+    ExternalContentClient client = () -> new ExternalContentFetchResult(
+        3,
+        List.of(candidate("tmdb-1", "New Movie")),
+        1,
+        1
+    );
+    ContentExternalSyncService service = serviceWith(client);
+
+    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
+        .willReturn(Optional.empty());
+    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+    ExternalContentSyncResult result = service.syncExternalContents();
+
+    assertThat(result.fetchedCount()).isEqualTo(3);
+    assertThat(result.acceptedCount()).isEqualTo(1);
+    assertThat(result.filteredCount()).isEqualTo(1);
+    assertThat(result.createdCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isZero();
+    assertThat(result.failedCount()).isEqualTo(1);
+  }
+
+  @Test
+  void syncExternalContents_skipsCandidateWithMissingTypeAndContinues() {
+    ExternalContentCandidate missingType = new ExternalContentCandidate(
+        null,
+        ContentSource.TMDB,
+        "tmdb-invalid",
+        "Invalid Movie",
+        "Invalid description",
+        null,
+        List.of("movie")
+    );
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(List.of(
+        missingType,
+        candidate("tmdb-1", "New Movie")
+    ));
+    ContentExternalSyncService service = serviceWith(client);
+
+    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
+        .willReturn(Optional.empty());
+    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+
+    ExternalContentSyncResult result = service.syncExternalContents();
+
+    assertThat(result.createdCount()).isEqualTo(1);
+    assertThat(result.failedCount()).isEqualTo(1);
+  }
+
+  @Test
+  void syncExternalContents_propagatesDatabaseFailure() {
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(
+        List.of(candidate("tmdb-1", "New Movie"))
+    );
+    ContentExternalSyncService service = serviceWith(client);
+    IllegalStateException failure = new IllegalStateException("database failed");
+    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
+        .willThrow(failure);
+
+    assertThatThrownBy(service::syncExternalContents).isSameAs(failure);
+
+    verify(contentRepository, never()).save(any());
   }
 
   @Test
@@ -122,7 +193,9 @@ class ContentExternalSyncServiceTest {
 
   @Test
   void syncExternalContents_doesNotSaveWhenAnyClientFetchFails() {
-    ExternalContentClient successClient = () -> List.of(candidate("tmdb-1", "New Movie"));
+    ExternalContentClient successClient = () -> ExternalContentFetchResult.accepted(
+        List.of(candidate("tmdb-1", "New Movie"))
+    );
     ExternalContentClient failedClient = () -> {
       throw new ExternalApiException("second external api failed");
     };

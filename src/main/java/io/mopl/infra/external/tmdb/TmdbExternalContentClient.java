@@ -4,13 +4,17 @@ import io.mopl.infra.external.ExternalApiException;
 import io.mopl.infra.external.ExternalContentApiProperties;
 import io.mopl.infra.external.ExternalContentCandidate;
 import io.mopl.infra.external.ExternalContentClient;
+import io.mopl.infra.external.ExternalContentFetchResult;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Function;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestClient;
 
 @Component
+@Slf4j
 public class TmdbExternalContentClient implements ExternalContentClient {
 
   private static final ParameterizedTypeReference<TmdbContentResponse<TmdbMovieItem>> MOVIE_RESPONSE_TYPE =
@@ -35,20 +39,21 @@ public class TmdbExternalContentClient implements ExternalContentClient {
   }
 
   @Override
-  public List<ExternalContentCandidate> fetchContents() {
+  public ExternalContentFetchResult fetchContents() {
     if (isBlank(properties.apiKey())) {
       throw new ExternalApiException("TMDB API key is required.");
     }
 
-    List<ExternalContentCandidate> candidates = new ArrayList<>();
+    ExternalContentFetchResult result = ExternalContentFetchResult.empty();
     for (int page = 1; page <= Math.max(1, properties.pages()); page++) {
-      candidates.addAll(fetchMovies(page));
-      candidates.addAll(fetchTvSeries(page));
+      result = result.merge(fetchMovies(page));
+      result = result.merge(fetchTvSeries(page));
     }
-    return candidates;
+    return result;
   }
 
-  private List<ExternalContentCandidate> fetchMovies(int page) {
+  private ExternalContentFetchResult fetchMovies(int page) {
+    List<TmdbMovieItem> items;
     try {
       TmdbContentResponse<TmdbMovieItem> response = restClient.get()
           .uri(uriBuilder -> uriBuilder
@@ -60,19 +65,19 @@ public class TmdbExternalContentClient implements ExternalContentClient {
               .build())
           .retrieve()
           .body(MOVIE_RESPONSE_TYPE);
-
-      return response == null || response.results() == null
-          ? List.of()
-          : response.results().stream()
-              .map(item -> tmdbContentMapper.toMovieCandidate(item, properties.imageBaseUrl()))
-              .filter(this::shouldKeepCandidate)
-              .toList();
+      items = response == null || response.results() == null ? List.of() : response.results();
     } catch (Exception e) {
       throw new ExternalApiException("TMDB movie API request failed.", e);
     }
+    return mapCandidates(
+        items,
+        item -> tmdbContentMapper.toMovieCandidate(item, properties.imageBaseUrl()),
+        "movie"
+    );
   }
 
-  private List<ExternalContentCandidate> fetchTvSeries(int page) {
+  private ExternalContentFetchResult fetchTvSeries(int page) {
+    List<TmdbTvItem> items;
     try {
       TmdbContentResponse<TmdbTvItem> response = restClient.get()
           .uri(uriBuilder -> uriBuilder
@@ -83,16 +88,46 @@ public class TmdbExternalContentClient implements ExternalContentClient {
               .build())
           .retrieve()
           .body(TV_RESPONSE_TYPE);
-
-      return response == null || response.results() == null
-          ? List.of()
-          : response.results().stream()
-              .map(item -> tmdbContentMapper.toTvCandidate(item, properties.imageBaseUrl()))
-              .filter(this::shouldKeepCandidate)
-              .toList();
+      items = response == null || response.results() == null ? List.of() : response.results();
     } catch (Exception e) {
       throw new ExternalApiException("TMDB tv API request failed.", e);
     }
+    return mapCandidates(
+        items,
+        item -> tmdbContentMapper.toTvCandidate(item, properties.imageBaseUrl()),
+        "tvSeries"
+    );
+  }
+
+  private <T> ExternalContentFetchResult mapCandidates(
+      List<T> items,
+      Function<T, ExternalContentCandidate> mapper,
+      String contentType
+  ) {
+    List<ExternalContentCandidate> candidates = new ArrayList<>();
+    int filteredCount = 0;
+    int failedCount = 0;
+    for (T item : items) {
+      try {
+        ExternalContentCandidate candidate = mapper.apply(item);
+        if (candidate == null) {
+          failedCount++;
+        } else if (shouldKeepCandidate(candidate)) {
+          candidates.add(candidate);
+        } else {
+          filteredCount++;
+        }
+      } catch (RuntimeException e) {
+        failedCount++;
+        log.warn(
+            "Content external item mapping failed. client=TMDB, contentType={}, errorType={}, message={}",
+            contentType,
+            e.getClass().getSimpleName(),
+            e.getMessage()
+        );
+      }
+    }
+    return new ExternalContentFetchResult(items.size(), candidates, filteredCount, failedCount);
   }
 
   private boolean shouldKeepCandidate(ExternalContentCandidate candidate) {
