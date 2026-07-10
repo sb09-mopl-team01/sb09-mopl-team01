@@ -62,6 +62,8 @@ mopl:
       enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
       channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
       presence-ttl: ${WATCHING_SESSION_REDIS_PRESENCE_TTL:PT24H}
+      lease-ttl: ${WATCHING_SESSION_REDIS_LEASE_TTL:PT90S}
+      lease-maintenance-delay-millis: ${WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS:30000}
   admin:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}

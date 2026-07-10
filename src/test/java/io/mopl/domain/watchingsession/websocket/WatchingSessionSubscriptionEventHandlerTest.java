@@ -3,9 +3,14 @@ package io.mopl.domain.watchingsession.websocket;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.mopl.domain.user.entity.User;
+import io.mopl.domain.watchingsession.realtime.WatchingSessionLeaseStore;
+import io.mopl.domain.watchingsession.realtime.WatchingSessionNodeId;
 import io.mopl.domain.watchingsession.service.WatchingSessionService;
 import io.mopl.global.security.MoplUserDetails;
 import java.util.UUID;
@@ -29,11 +34,15 @@ class WatchingSessionSubscriptionEventHandlerTest {
       new WatchingSessionSubscriptionRegistry();
   private final WatchingSessionSubscriptionResolver subscriptionResolver =
       new WatchingSessionSubscriptionResolver();
+  private final WatchingSessionLeaseStore leaseStore = mock(WatchingSessionLeaseStore.class);
+  private final WatchingSessionNodeId nodeId = new WatchingSessionNodeId("node-a", "");
   private final WatchingSessionSubscriptionEventHandler eventHandler =
       new WatchingSessionSubscriptionEventHandler(
           watchingSessionService,
           subscriptionRegistry,
-          subscriptionResolver
+          subscriptionResolver,
+          leaseStore,
+          nodeId
       );
 
   private UUID watcherId;
@@ -68,6 +77,9 @@ class WatchingSessionSubscriptionEventHandlerTest {
         authentication
     );
 
+    when(leaseStore.acquire(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
+
     eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message));
 
     verify(watchingSessionService).startWatchingBySubscription(watcherId, contentId);
@@ -75,6 +87,10 @@ class WatchingSessionSubscriptionEventHandlerTest {
 
   @Test
   void handleUnsubscribeEndsWatchingWhenLastWatchSubscriptionIsRemoved() {
+    when(leaseStore.acquire(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
+    when(leaseStore.release(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
     eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
         StompCommand.SUBSCRIBE,
         "/sub/contents/%s/watch".formatted(contentId),
@@ -105,6 +121,10 @@ class WatchingSessionSubscriptionEventHandlerTest {
 
   @Test
   void handleDisconnectEndsWatching() {
+    when(leaseStore.acquire(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
+    when(leaseStore.release(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
     eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
         StompCommand.SUBSCRIBE,
         "/sub/contents/%s/watch".formatted(contentId),
@@ -166,6 +186,90 @@ class WatchingSessionSubscriptionEventHandlerTest {
     eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message));
 
     verify(watchingSessionService, never()).startWatchingBySubscription(any(), any());
+  }
+
+  @Test
+  void handleSubscribeDoesNotStartWatchingWhenAnotherTaskAlreadyHasLease() {
+    when(leaseStore.acquire(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(false);
+
+    eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
+        StompCommand.SUBSCRIBE,
+        "/sub/contents/%s/watch".formatted(contentId),
+        "session-1",
+        "sub-1",
+        authentication
+    )));
+
+    verify(watchingSessionService, never()).startWatchingBySubscription(watcherId, contentId);
+  }
+
+  @Test
+  void handleUnsubscribeDoesNotEndWatchingWhenAnotherTaskStillHasLease() {
+    when(leaseStore.acquire(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(true);
+    when(leaseStore.release(new WatchingSessionSubscription(watcherId, contentId), "node-a"))
+        .thenReturn(false);
+    eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
+        StompCommand.SUBSCRIBE,
+        "/sub/contents/%s/watch".formatted(contentId),
+        "session-1",
+        "sub-1",
+        authentication
+    )));
+
+    eventHandler.handleUnsubscribe(new SessionUnsubscribeEvent(
+        this,
+        message(StompCommand.UNSUBSCRIBE, null, "session-1", "sub-1", authentication)
+    ));
+
+    verify(watchingSessionService, never()).endWatchingIfPresent(watcherId, contentId);
+  }
+
+  @Test
+  void handleSubscribeRollsBackLeaseWhenWatchingSessionStartFails() {
+    WatchingSessionSubscription subscription = new WatchingSessionSubscription(watcherId, contentId);
+    when(leaseStore.acquire(subscription, "node-a")).thenReturn(true);
+    doThrow(new IllegalStateException("database unavailable"))
+        .when(watchingSessionService)
+        .startWatchingBySubscription(watcherId, contentId);
+
+    org.assertj.core.api.Assertions.assertThatThrownBy(() ->
+        eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
+            StompCommand.SUBSCRIBE,
+            "/sub/contents/%s/watch".formatted(contentId),
+            "session-1",
+            "sub-1",
+            authentication
+        )))
+    ).isInstanceOf(IllegalStateException.class);
+
+    verify(leaseStore).release(subscription, "node-a");
+    verify(watchingSessionService).startWatchingBySubscription(watcherId, contentId);
+  }
+
+  @Test
+  void handleUnsubscribeRestoresLeaseWhenWatchingSessionEndFails() {
+    WatchingSessionSubscription subscription = new WatchingSessionSubscription(watcherId, contentId);
+    when(leaseStore.acquire(subscription, "node-a")).thenReturn(true);
+    when(leaseStore.release(subscription, "node-a")).thenReturn(true);
+    doThrow(new IllegalStateException("database unavailable"))
+        .when(watchingSessionService)
+        .endWatchingIfPresent(watcherId, contentId);
+    eventHandler.handleSubscribe(new SessionSubscribeEvent(this, message(
+        StompCommand.SUBSCRIBE,
+        "/sub/contents/%s/watch".formatted(contentId),
+        "session-1",
+        "sub-1",
+        authentication
+    )));
+
+    eventHandler.handleUnsubscribe(new SessionUnsubscribeEvent(
+        this,
+        message(StompCommand.UNSUBSCRIBE, null, "session-1", "sub-1", authentication)
+    ));
+
+    verify(leaseStore, times(2)).acquire(subscription, "node-a");
   }
 
   private Message<byte[]> message(
