@@ -61,6 +61,7 @@ mopl:
     redis:
       enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
       channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
+      presence-ttl: ${WATCHING_SESSION_REDIS_PRESENCE_TTL:PT24H}
   admin:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}

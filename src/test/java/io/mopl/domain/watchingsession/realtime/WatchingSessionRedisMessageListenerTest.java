@@ -2,6 +2,7 @@ package io.mopl.domain.watchingsession.realtime;
 
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -53,5 +54,26 @@ class WatchingSessionRedisMessageListenerTest {
     listener.onMessage(new DefaultMessage("watching-session:changes".getBytes(StandardCharsets.UTF_8), payload), null);
 
     verify(messagingTemplate).convertAndSend(eq("/sub/contents/" + contentId + "/watch"), eq(change));
+  }
+
+  @Test
+  void ignoresMessageWithMissingRequiredFields() {
+    listener.onMessage(message("{}"), null);
+
+    verifyNoInteractions(messagingTemplate);
+  }
+
+  @Test
+  void ignoresMalformedMessage() {
+    listener.onMessage(message("not-json"), null);
+
+    verifyNoInteractions(messagingTemplate);
+  }
+
+  private DefaultMessage message(String payload) {
+    return new DefaultMessage(
+        "watching-session:changes".getBytes(StandardCharsets.UTF_8),
+        payload.getBytes(StandardCharsets.UTF_8)
+    );
   }
 }

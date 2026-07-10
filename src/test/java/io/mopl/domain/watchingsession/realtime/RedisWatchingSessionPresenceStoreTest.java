@@ -17,7 +17,7 @@ class RedisWatchingSessionPresenceStoreTest {
   @SuppressWarnings("unchecked")
   private final SetOperations<String, String> setOperations = mock(SetOperations.class);
   private final RedisWatchingSessionPresenceStore presenceStore =
-      new RedisWatchingSessionPresenceStore(redisTemplate);
+      new RedisWatchingSessionPresenceStore(redisTemplate, Duration.ofHours(6));
 
   @Test
   void enterStoresWatcherInContentPresenceSetAndRefreshesTtl() {
@@ -29,7 +29,7 @@ class RedisWatchingSessionPresenceStoreTest {
     presenceStore.enter(watcherId, contentId);
 
     verify(setOperations).add(key, watcherId.toString());
-    verify(redisTemplate).expire(eq(key), eq(Duration.ofHours(24)));
+    verify(redisTemplate).expire(eq(key), eq(Duration.ofHours(6)));
   }
 
   @Test

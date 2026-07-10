@@ -59,7 +59,7 @@ flowchart LR
 ## 운영 확장 메모
 
 - WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
-- `WATCHING_SESSION_REDIS_ENABLED=true`이면 입장·퇴장 변경 이벤트를 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. 로컬·테스트 기본값은 `false`이며 기존 단일 인스턴스 전송 방식을 유지합니다.
+- `WATCHING_SESSION_REDIS_ENABLED=true`이면 입장·퇴장 변경 이벤트를 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. `WATCHING_SESSION_REDIS_PRESENCE_TTL`로 presence 만료 시간을 조정할 수 있으며, 로컬·테스트 기본값은 `false`로 기존 단일 인스턴스 전송 방식을 유지합니다.
 - 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
 
 ## 프로젝트 구조

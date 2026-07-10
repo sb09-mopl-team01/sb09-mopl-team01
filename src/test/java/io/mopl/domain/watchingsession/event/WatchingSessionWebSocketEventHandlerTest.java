@@ -6,6 +6,8 @@ import static org.mockito.Mockito.verify;
 import io.mopl.domain.content.dto.ContentSummary;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.user.dto.response.UserSummary;
+import io.mopl.domain.watchingsession.dto.WatchingSessionChange;
+import io.mopl.domain.watchingsession.dto.WatchingSessionChangeType;
 import io.mopl.domain.watchingsession.dto.WatchingSessionDto;
 import io.mopl.domain.watchingsession.realtime.WatchingSessionPresenceStore;
 import io.mopl.domain.watchingsession.realtime.WatchingSessionRealtimePublisher;
@@ -34,8 +36,8 @@ class WatchingSessionWebSocketEventHandlerTest {
     eventHandler.handleEntered(new WatchingSessionEnteredEvent(watchingSession, 3L, occurredAt));
 
     verify(presenceStore).enter(watcherId, contentId);
-    verify(realtimePublisher).publish(new io.mopl.domain.watchingsession.dto.WatchingSessionChange(
-        io.mopl.domain.watchingsession.dto.WatchingSessionChangeType.JOIN,
+    verify(realtimePublisher).publish(new WatchingSessionChange(
+        WatchingSessionChangeType.JOIN,
         watchingSession,
         3L
     ));
@@ -53,8 +55,8 @@ class WatchingSessionWebSocketEventHandlerTest {
     eventHandler.handleLeft(new WatchingSessionLeftEvent(watchingSession, 2L, occurredAt));
 
     verify(presenceStore).leave(watcherId, contentId);
-    verify(realtimePublisher).publish(new io.mopl.domain.watchingsession.dto.WatchingSessionChange(
-        io.mopl.domain.watchingsession.dto.WatchingSessionChangeType.LEAVE,
+    verify(realtimePublisher).publish(new WatchingSessionChange(
+        WatchingSessionChangeType.LEAVE,
         watchingSession,
         2L
     ));

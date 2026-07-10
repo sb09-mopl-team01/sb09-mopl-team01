@@ -3,7 +3,6 @@ package io.mopl.domain.watchingsession.realtime;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.watchingsession.dto.WatchingSessionChange;
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -18,8 +17,6 @@ import org.springframework.stereotype.Component;
 @ConditionalOnProperty(name = "mopl.watching-session.redis.enabled", havingValue = "true")
 public class WatchingSessionRedisMessageListener implements MessageListener {
 
-  private static final String WATCHING_SESSION_TOPIC = "/sub/contents/%s/watch";
-
   private final ObjectMapper objectMapper;
   private final SimpMessagingTemplate messagingTemplate;
 
@@ -30,16 +27,23 @@ public class WatchingSessionRedisMessageListener implements MessageListener {
           message.getBody(),
           WatchingSessionChange.class
       );
+      validate(change);
       messagingTemplate.convertAndSend(
-          WATCHING_SESSION_TOPIC.formatted(change.watchingSession().content().id()),
+          WatchingSessionTopic.of(change.watchingSession().content().id()),
           change
       );
-    } catch (IOException e) {
-      log.error(
-          "Ignoring invalid watching session Redis message. payload={}",
-          new String(message.getBody(), StandardCharsets.UTF_8),
-          e
-      );
+    } catch (IOException | RuntimeException e) {
+      log.warn("Ignoring invalid watching session Redis message.", e);
+    }
+  }
+
+  private void validate(WatchingSessionChange change) {
+    if (change == null
+        || change.type() == null
+        || change.watchingSession() == null
+        || change.watchingSession().content() == null
+        || change.watchingSession().content().id() == null) {
+      throw new IllegalArgumentException("시청 세션 변경 메시지에 필수 값이 없습니다.");
     }
   }
 }
