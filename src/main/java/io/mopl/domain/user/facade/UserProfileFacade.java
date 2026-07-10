@@ -3,6 +3,8 @@ package io.mopl.domain.user.facade;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
 import io.mopl.domain.user.service.UserService;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import io.mopl.infra.s3.S3Service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -33,8 +35,8 @@ public class UserProfileFacade {
       try {
         newImageUrl = s3Service.uploadFile(image, uploadDir);
       } catch (IOException e) {
-        log.error("S3 Profile Image Upload Failed. userId={}", userId, e);
-        throw new RuntimeException("프로필 이미지 업로드 중 오류가 발생했습니다.", e);
+        log.error("User Profile Image Upload Failed. userId={}", userId, e);
+        throw new BaseException(ErrorCode.PROFILE_IMAGE_UPLOAD_FAIL);
       }
     }
 
@@ -44,7 +46,7 @@ public class UserProfileFacade {
       try {
         s3Service.deleteFile(oldImageUrl);
       } catch (Exception e) {
-        log.warn("S3 Previous Profile Image Delete Failed. url={}", oldImageUrl, e);
+        log.warn("User Previous Profile Image Delete Failed. url={}", oldImageUrl, e);
       }
     }
 
