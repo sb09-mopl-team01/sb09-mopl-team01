@@ -12,6 +12,8 @@ import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
@@ -39,6 +41,26 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(new ErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), "서버 내부에서 예상치 못한 오류가 발생했습니다."));
+  }
+
+  @ExceptionHandler(AsyncRequestNotUsableException.class)
+  protected void handleAsyncRequestNotUsableException(
+      AsyncRequestNotUsableException e, HttpServletRequest request) {
+
+    log.debug("Async request disconnected. uri={}, method={}, message={}",
+        request.getRequestURI(), request.getMethod(), e.getMessage());
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  protected ResponseEntity<ErrorResponse> handleNoResourceFoundException(
+      NoResourceFoundException e, HttpServletRequest request) {
+
+    log.debug("Static resource not found. uri={}, method={}",
+        request.getRequestURI(), request.getMethod());
+
+    return ResponseEntity
+        .status(ErrorCode.RESOURCE_NOT_FOUND.getStatus())
+        .body(ErrorResponse.of(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
   @ExceptionHandler(BaseException.class)

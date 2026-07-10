@@ -38,6 +38,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 @TestPropertySource(properties = {
+    "spring.storage.type=local",
+    "spring.cloud.aws.region.static=ap-northeast-2",
+    "mopl.content.thumbnail.storage-type=local",
     "mopl.content.thumbnail.storage-path=build/test-content-thumbnails",
     "mopl.content.thumbnail.url-prefix=/content-thumbnails",
     "spring.data.redis.host=localhost",
@@ -90,7 +93,7 @@ class ContentAdminControllerIntegrationTest {
         }
         """;
     MockMultipartFile createRequestPart = jsonPart("request", createRequest);
-    MockMultipartFile createThumbnail = imagePart("thumbnail", "create.jpg");
+    MockMultipartFile createThumbnail = imagePart("thumbnail", "create.jpg", MediaType.IMAGE_JPEG_VALUE);
 
     MvcResult createResult = mockMvc.perform(multipart("/api/contents")
             .file(createRequestPart)
@@ -111,6 +114,7 @@ class ContentAdminControllerIntegrationTest {
       assertThat(createdContent.getType()).isEqualTo(ContentType.MOVIE);
       assertThat(createdContent.getTags()).containsExactlyInAnyOrder("등록태그", "영화");
       assertThat(createdContent.getThumbnailUrl()).startsWith("/content-thumbnails/");
+      assertThat(createdContent.getThumbnailKey()).isNotBlank().endsWith(".jpg");
     });
 
     ContentUpdateRequest updateRequest = new ContentUpdateRequest(
@@ -119,7 +123,7 @@ class ContentAdminControllerIntegrationTest {
         Set.of("수정태그")
     );
     MockMultipartFile updateRequestPart = jsonPart("request", updateRequest);
-    MockMultipartFile updateThumbnail = imagePart("thumbnail", "update.png");
+    MockMultipartFile updateThumbnail = imagePart("thumbnail", "update.png", MediaType.IMAGE_PNG_VALUE);
 
     mockMvc.perform(multipart("/api/contents/{contentId}", contentId)
             .file(updateRequestPart)
@@ -139,6 +143,7 @@ class ContentAdminControllerIntegrationTest {
       assertThat(updatedContent.getDescription()).isEqualTo("수정 설명");
       assertThat(updatedContent.getTags()).containsExactly("수정태그");
       assertThat(updatedContent.getThumbnailUrl()).endsWith(".png");
+      assertThat(updatedContent.getThumbnailKey()).isNotBlank().endsWith(".png");
     });
 
     mockMvc.perform(delete("/api/contents/{contentId}", contentId)
@@ -161,11 +166,11 @@ class ContentAdminControllerIntegrationTest {
     );
   }
 
-  private MockMultipartFile imagePart(String name, String filename) {
+  private MockMultipartFile imagePart(String name, String filename, String contentType) {
     return new MockMultipartFile(
         name,
         filename,
-        MediaType.IMAGE_JPEG_VALUE,
+        contentType,
         "thumbnail".getBytes(StandardCharsets.UTF_8)
     );
   }
