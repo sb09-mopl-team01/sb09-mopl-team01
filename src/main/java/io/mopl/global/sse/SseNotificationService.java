@@ -10,6 +10,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
@@ -46,8 +47,8 @@ public class SseNotificationService {
           .id(emitterId.toString())
           .name(CONNECT_EVENT_NAME)
           .data("connected"));
-    } catch (IOException | IllegalStateException e) {
-      completeWithError(receiverId, emitterId, emitter, e);
+    } catch (Exception e) {
+      closeQuietly(receiverId, emitterId, emitter, e);
     }
 
     return emitter;
@@ -65,8 +66,8 @@ public class SseNotificationService {
             .id(notificationId.toString())
             .name(NOTIFICATION_EVENT_NAME)
             .data(notification));
-      } catch (IOException | IllegalStateException e) {
-        completeWithError(receiverId, emitterId, connection.emitter(), e);
+      } catch (Exception e) {
+        closeQuietly(receiverId, emitterId, connection.emitter(), e);
       }
     });
   }
@@ -79,8 +80,8 @@ public class SseNotificationService {
             connection.emitter().send(SseEmitter.event()
                 .name(HEARTBEAT_EVENT_NAME)
                 .data("ping"));
-          } catch (IOException | IllegalStateException e) {
-            completeWithError(receiverId, emitterId, connection.emitter(), e);
+          } catch (Exception e) {
+            closeQuietly(receiverId, emitterId, connection.emitter(), e);
           }
         })
     );
@@ -92,7 +93,7 @@ public class SseNotificationService {
       return;
     }
 
-    userEmitters.values().forEach(connection -> connection.emitter().complete());
+    userEmitters.values().forEach(connection -> safeComplete(connection.emitter()));
   }
 
   int countByReceiverId(UUID receiverId) {
@@ -109,18 +110,47 @@ public class SseNotificationService {
         .min(Comparator.comparing(entry -> entry.getValue().connectedAt()));
     oldestConnection.ifPresent(entry -> {
       remove(receiverId, entry.getKey());
-      entry.getValue().emitter().complete();
+      safeComplete(entry.getValue().emitter());
     });
   }
 
-  private void completeWithError(
+  private void closeQuietly(
       UUID receiverId,
       UUID emitterId,
       SseEmitter emitter,
       Exception exception
   ) {
     remove(receiverId, emitterId);
-    emitter.completeWithError(exception);
+    if (isExpectedDisconnect(exception)) {
+      log.debug(
+          "SSE connection closed. receiverId={}, emitterId={}, reason={}",
+          receiverId,
+          emitterId,
+          exception.getClass().getSimpleName()
+      );
+    } else {
+      log.warn(
+          "SSE send failed unexpectedly. receiverId={}, emitterId={}",
+          receiverId,
+          emitterId,
+          exception
+      );
+    }
+    safeComplete(emitter);
+  }
+
+  private boolean isExpectedDisconnect(Exception exception) {
+    return exception instanceof IOException
+        || exception instanceof IllegalStateException
+        || exception instanceof AsyncRequestNotUsableException;
+  }
+
+  private void safeComplete(SseEmitter emitter) {
+    try {
+      emitter.complete();
+    } catch (Exception e) {
+      log.trace("SSE emitter already completed.", e);
+    }
   }
 
   private void remove(UUID receiverId, UUID emitterId) {

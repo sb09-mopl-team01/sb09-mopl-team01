@@ -50,7 +50,9 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
 
     refreshTokenRepository.save(email, refreshToken);
 
+    ResponseCookie accessTokenCookie = cookieProvider.createAccessTokenCookie(accessToken);
     ResponseCookie refreshTokenCookie = cookieProvider.createRefreshTokenCookie(refreshToken);
+    response.addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
     response.addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
 
     UserDto userDto = userMapper.toDto(userDetails.getUser());
