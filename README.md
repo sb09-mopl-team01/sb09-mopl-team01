@@ -58,9 +58,9 @@ flowchart LR
 
 ## 운영 확장 메모
 
-- WatchingSession WebSocket 구독 상태는 현재 단일 서버 기준의 인메모리 registry로 관리합니다.
-- ECS 다중 인스턴스 확장 시에는 서버 간 presence 공유를 위해 Redis 또는 broker 기반 저장소로 전환합니다.
-- 실시간 시청자 수는 현재 DB count 기준으로 계산하며, 고동시성 구간에서는 Redis counter 또는 콘텐츠별 presence cache로 분리합니다.
+- WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
+- `WATCHING_SESSION_REDIS_ENABLED=true`이면 입장·퇴장 변경 이벤트를 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. 로컬·테스트 기본값은 `false`이며 기존 단일 인스턴스 전송 방식을 유지합니다.
+- 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
 
 ## 프로젝트 구조
 

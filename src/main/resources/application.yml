@@ -57,6 +57,10 @@ jwt:
   max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
 
 mopl:
+  watching-session:
+    redis:
+      enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
+      channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
   admin:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}
