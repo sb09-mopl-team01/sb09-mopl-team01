@@ -1,0 +1,39 @@
+{
+  "family": "mopl-backend-task",
+  "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
+  "networkMode": "awsvpc",
+  "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/mopl-ecs-task-role",
+  "requiresCompatibilities": ["FARGATE"],
+  "cpu": "512",
+  "memory": "1024",
+  "containerDefinitions": [
+    {
+      "name": "mopl-backend-container",
+      "image": "IMAGE_URI",
+      "memory": "1024",
+      "portMappings": [{ "containerPort": 8080, "hostPort": 8080 }],
+      "environment": [
+        { "name": "SPRING_PROFILES_ACTIVE", "value": "dev" },
+        { "name": "SPRING_DATASOURCE_URL", "value": "jdbc:postgresql://mopl-db.cf8yegic26l8.ap-northeast-2.rds.amazonaws.com:5432/postgres" },
+        { "name": "RDS_PORT", "value": "5432" },
+        { "name": "RDS_DB_NAME", "value": "postgres" },
+        { "name": "RDS_USERNAME", "value": "postgres" },
+        { "name": "AWS_S3_BUCKET", "value": "mopl-s3-storage-945504686053-ap-northeast-2-an" }
+      ],
+      "secrets": [
+        {
+          "name": "RDS_HOST",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:${AWS_ACCOUNT_ID}:secret:mopl-prod-secrets:RDS_HOST::"
+        },
+        {
+          "name": "RDS_PASSWORD",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:${AWS_ACCOUNT_ID}:secret:mopl-prod-secrets:RDS_PASSWORD::"
+        },
+        {
+          "name": "JWT_SECRET",
+          "valueFrom": "arn:aws:secretsmanager:ap-northeast-2:${AWS_ACCOUNT_ID}:secret:mopl-prod-secrets:JWT_SECRET::"
+        }
+      ]
+    }
+  ]
+}

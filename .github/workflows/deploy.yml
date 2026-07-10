@@ -1,8 +1,8 @@
-name: Mopl-deve
+name: Mopl-dev
 
 on:
   push:
-    branches: [ "dev", "chore/CICD-test" ]
+    branches: [ "dev", "chore/secret-key" ]
 
 jobs:
   build-and-deploy:
@@ -17,14 +17,6 @@ jobs:
         with:
           java-version: '17'
           distribution: 'temurin'
-
-      - name: Create .env file for build
-        run: |
-          echo "RDS_HOST=${{ secrets.RDS_HOST }}" >> .env
-          echo "RDS_PORT=5432" >> .env
-          echo "RDS_DB_NAME=${{ secrets.RDS_DB_NAME }}" >> .env
-          echo "RDS_USERNAME=${{ secrets.RDS_USERNAME }}" >> .env
-          echo "RDS_PASSWORD=${{ secrets.RDS_PASSWORD }}" >> .env
 
       - name: Grant permission
         run: chmod +x gradlew
@@ -52,41 +44,37 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
 
-      - name: Deploy to EC2 via SSH
-        uses: appleboy/ssh-action@master
+      - name: Render AWS Account ID in Task Definition
+        run: envsubst < task-definition.json > task-def-rendered.json
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Inject CloudWatch Log Configuration
+        run: |
+            jq '.containerDefinitions[0] += {
+              "logConfiguration": {
+                "logDriver": "awslogs",
+                "options": {
+                  "awslogs-group": "/ecs/mopl-backend-task",
+                  "awslogs-region": "${{ secrets.AWS_REGION }}",
+                  "awslogs-stream-prefix": "ecs",
+                  "awslogs-create-group": "true"
+                }
+              }
+            }' task-def-rendered.json > task-def-with-logs.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
         with:
-          host: ${{ secrets.EC2_HOST }}
-          username: ${{ secrets.EC2_USERNAME }}
-          key: ${{ secrets.EC2_SSH_KEY }}
-          script: |
-            set -e
-            
-            echo "===== DEBUG ====="
-            echo "REGISTRY=${{ steps.login-ecr.outputs.registry }}"
-            echo "IMAGE=${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest"
-            
-            echo "===== ECR LOGIN ====="
-            aws ecr get-login-password --region "${{ secrets.AWS_REGION }}" \
-              | docker login --username AWS --password-stdin "${{ steps.login-ecr.outputs.registry }}"
-            
-            echo "===== DEPLOY START ====="
-            docker rm -f mopl-backend-apps || true
-            
-            docker pull "${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest"
-            
-            docker run -d -p 8080:8080 --name mopl-backend-apps \
-              -e SPRING_PROFILES_ACTIVE=dev \
-              -e RDS_HOST="${{ secrets.RDS_HOST }}" \
-              -e RDS_PORT="5432" \
-              -e RDS_DB_NAME="${{ secrets.RDS_DB_NAME }}" \
-              -e RDS_USERNAME="${{ secrets.RDS_USERNAME }}" \
-              -e RDS_PASSWORD="${{ secrets.RDS_PASSWORD }}" \
-              -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-              -e REDIS_PASSWORD="${{ secrets.REDIS_PASSWORD }}" \
-              -e AWS_ACCESS_KEY="${{ secrets.AWS_ACCESS_KEY_ID }}" \
-              -e AWS_SECRET_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
-              -e CLOUD_AWS_REGION_STATIC="${{ secrets.AWS_REGION }}" \
-              -e CLOUD_AWS_S3_BUCKET="${{ secrets.AWS_S3_BUCKET }}" \
-              "${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest"
-            docker image prune -f
-            echo "===== DEPLOY SUCCESS ====="
+          task-definition: task-def-with-logs.json
+          container-name: mopl-backend-container
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:latest
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: mopl-backend-service
+          cluster: mopl-cluster
+          wait-for-service-stability: true

@@ -2,6 +2,19 @@ FROM eclipse-temurin:17-jdk-alpine
 
 WORKDIR /app
 
-COPY build/libs/*-SNAPSHOT.jar app.jar
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-ENTRYPOINT java -jar app.jar
+COPY build/libs/*-SNAPSHOT.jar app.jar
+RUN chown -R appuser:appgroup /app
+
+USER appuser
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", \
+    "-XX:+UseContainerSupport", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-Djava.security.egd=file:/dev/./urandom", \
+    "-Dspring.profiles.active=dev", \
+    "-jar", \
+    "app.jar"]
