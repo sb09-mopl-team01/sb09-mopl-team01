@@ -30,6 +30,12 @@ class TheSportsDbContentMapperTest {
               "strTime": "12:00:00",
               "strThumb": "https://example.com/thumb.jpg",
               "strPoster": "https://example.com/poster.jpg",
+              "strBanner": "https://example.com/banner.jpg",
+              "strSquare": "https://example.com/square.jpg",
+              "strFanart": "https://example.com/fanart.jpg",
+              "strHomeTeamBadge": "https://example.com/home-badge.png",
+              "strAwayTeamBadge": "https://example.com/away-badge.png",
+              "strLeagueBadge": "https://example.com/league-badge.png",
               "strDescriptionEN": "Premier League match"
             }
           ]
@@ -69,6 +75,12 @@ class TheSportsDbContentMapperTest {
         "19:00:00",
         null,
         "https://example.com/poster.jpg",
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
         null
     );
 
@@ -77,5 +89,89 @@ class TheSportsDbContentMapperTest {
     assertThat(candidate.title()).isEqualTo("Lakers vs Warriors");
     assertThat(candidate.description()).isEqualTo("NBA / 2026-07-02 / 19:00:00");
     assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/poster.jpg");
+  }
+
+  @Test
+  void convertToCandidateUsesTeamBadgeWhenEventImagesAreMissing() {
+    TheSportsDbEventItem event = new TheSportsDbEventItem(
+        "event-2",
+        "Arsenal vs Coventry City",
+        null,
+        "Soccer",
+        "English Premier League",
+        "Arsenal",
+        "Coventry City",
+        "2026-08-21",
+        "19:00:00",
+        "",
+        "",
+        "",
+        "",
+        null,
+        "https://example.com/arsenal-badge.png",
+        "https://example.com/coventry-badge.png",
+        "https://example.com/premier-league-badge.png",
+        null
+    );
+
+    ExternalContentCandidate candidate = mapper.toCandidate(event);
+
+    assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/arsenal-badge.png");
+  }
+
+  @Test
+  void convertToCandidateUsesEventImageBeforeBadge() {
+    TheSportsDbEventItem event = new TheSportsDbEventItem(
+        "event-3",
+        "Arsenal vs Chelsea",
+        null,
+        "Soccer",
+        "English Premier League",
+        "Arsenal",
+        "Chelsea",
+        "2026-08-21",
+        "19:00:00",
+        null,
+        "https://example.com/poster.jpg",
+        null,
+        null,
+        null,
+        "https://example.com/arsenal-badge.png",
+        "https://example.com/chelsea-badge.png",
+        "https://example.com/premier-league-badge.png",
+        null
+    );
+
+    ExternalContentCandidate candidate = mapper.toCandidate(event);
+
+    assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/poster.jpg");
+  }
+
+  @Test
+  void convertToCandidateIgnoresBlankThumbnailCandidates() {
+    TheSportsDbEventItem event = new TheSportsDbEventItem(
+        "event-4",
+        "Arsenal vs Chelsea",
+        null,
+        "Soccer",
+        "English Premier League",
+        "Arsenal",
+        "Chelsea",
+        "2026-08-21",
+        "19:00:00",
+        "   ",
+        "\t",
+        "",
+        null,
+        null,
+        "https://example.com/arsenal-badge.png",
+        null,
+        null,
+        null
+    );
+
+    ExternalContentCandidate candidate = mapper.toCandidate(event);
+
+    assertThat(candidate.thumbnailUrl()).isEqualTo("https://example.com/arsenal-badge.png");
   }
 }
