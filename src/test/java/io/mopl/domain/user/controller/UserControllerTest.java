@@ -24,6 +24,7 @@ import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
+import io.mopl.domain.user.facade.UserProfileFacade;
 import io.mopl.domain.user.service.UserService;
 import io.mopl.global.exception.GlobalExceptionHandler;
 import io.mopl.global.response.CursorResponse;
@@ -121,6 +122,9 @@ class UserControllerTest {
   @MockitoBean
   private StringRedisTemplate stringRedisTemplate;
 
+  @MockitoBean
+  private UserProfileFacade userProfileFacade;
+
   @Test
   @DisplayName("POST /api/users - 회원가입 성공 시 201 반환")
   void createUser_Success() throws Exception {
@@ -178,7 +182,6 @@ class UserControllerTest {
   @Test
   @DisplayName("GET /api/users - 필수 파라미터(limit) 누락 시 401 반환")
   void findUsers_Fail_MissingParameter() throws Exception {
-    // 🌟 서버의 GlobalExceptionHandler 동작 방식에 맞춰 401(Unauthorized)로 수정 완료
     mockMvc.perform(get("/api/users")
             .param("sortBy", "createdAt")
             .param("sortDirection", "DESCENDING"))
@@ -223,13 +226,13 @@ class UserControllerTest {
         "request", "", MediaType.APPLICATION_JSON_VALUE,
         objectMapper.writeValueAsString(request).getBytes(StandardCharsets.UTF_8)
     );
-
     MockMultipartFile imagePart = new MockMultipartFile(
         "image", "profile.png", MediaType.IMAGE_PNG_VALUE, "dummy_image_data".getBytes()
     );
 
     UserDto responseDto = UserDto.builder().id(userId).name("변경된이름").build();
-    given(userService.updateProfile(eq(userId), any(UserUpdateRequest.class), any())).willReturn(responseDto);
+
+    given(userProfileFacade.updateProfile(eq(userId), any(UserUpdateRequest.class), any())).willReturn(responseDto);
 
     mockMvc.perform(multipart("/api/users/{userId}", userId)
             .file(requestPart)
@@ -241,7 +244,7 @@ class UserControllerTest {
   }
 
   @Test
-  @DisplayName("PATCH /api/users/{userId} - 존재하지 않는 유저 프로필 수정 시 404 Not Found 반환")
+  @DisplayName("PATCH /api/users/{userId} - 존재하지 않는 유저 프로필 수정 시 404 반환")
   void updateUser_Fail_NotFound() throws Exception {
     UUID userId = UUID.randomUUID();
     UserUpdateRequest request = new UserUpdateRequest("변경된이름");
@@ -251,7 +254,7 @@ class UserControllerTest {
         objectMapper.writeValueAsString(request).getBytes(StandardCharsets.UTF_8)
     );
 
-    given(userService.updateProfile(eq(userId), any(UserUpdateRequest.class), any()))
+    given(userProfileFacade.updateProfile(eq(userId), any(UserUpdateRequest.class), any()))
         .willThrow(new UserNotFoundException());
 
     mockMvc.perform(multipart("/api/users/{userId}", userId)
