@@ -13,12 +13,14 @@ import io.mopl.global.exception.ErrorCode;
 import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
 @Transactional(readOnly = true)
+@Slf4j
 public class FollowService {
 
   private final FollowRepository followRepository;
@@ -27,11 +29,18 @@ public class FollowService {
 
   @Transactional
   public FollowDto follow(UUID followerId, FollowCreateRequest request) {
+    if (request == null || request.followeeId() == null) {
+      log.warn("Invalid follow request. followerId={}, request={}", followerId, request);
+      throw new BaseException(ErrorCode.INVALID_INPUT);
+    }
+
     User follower = getUser(followerId);
     User followee = getUser(request.followeeId());
     validateFollowTarget(follower, followee);
 
     if (followRepository.existsByFollowerAndFollowee(follower, followee)) {
+      log.warn("Duplicate follow request. followerId={}, followeeId={}",
+          follower.getId(), followee.getId());
       throw new BaseException(ErrorCode.ALREADY_FOLLOWING);
     }
 
@@ -43,6 +52,8 @@ public class FollowService {
         followee.getId(),
         Instant.now()
     ));
+    log.debug("Follow created. followId={}, followerId={}, followeeId={}",
+        follow.getId(), follower.getId(), followee.getId());
     return toDto(follow);
   }
 
@@ -50,18 +61,27 @@ public class FollowService {
   public void unfollow(UUID followerId, UUID followId) {
     User follower = getUser(followerId);
     Follow follow = followRepository.findById(followId)
-        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
+        .orElseThrow(() -> {
+          log.warn("Unfollow target not found. followerId={}, followId={}", followerId, followId);
+          return new BaseException(ErrorCode.FOLLOW_NOT_FOUND);
+        });
 
     if (!follow.isFollowedBy(follower)) {
+      log.warn("Unfollow forbidden. requesterId={}, followId={}, ownerId={}",
+          follower.getId(), follow.getId(), follow.getFollower().getId());
       throw new BaseException(ErrorCode.FORBIDDEN);
     }
 
     followRepository.delete(follow);
+    log.debug("Follow deleted. followId={}, followerId={}, followeeId={}",
+        follow.getId(), follower.getId(), follow.getFollowee().getId());
   }
 
   public long countFollowers(UUID followeeId) {
     User followee = getUser(followeeId);
-    return followRepository.countByFollowee(followee);
+    long count = followRepository.countByFollowee(followee);
+    log.debug("Follower count found. followeeId={}, count={}", followee.getId(), count);
+    return count;
   }
 
   public FollowDto findFollowedByMe(UUID followerId, UUID followeeId) {
@@ -70,16 +90,24 @@ public class FollowService {
 
     return followRepository.findByFollowerAndFollowee(follower, followee)
         .map(this::toDto)
-        .orElseThrow(() -> new BaseException(ErrorCode.FOLLOW_NOT_FOUND));
+        .orElseThrow(() -> {
+          log.warn("Follow relation not found. followerId={}, followeeId={}",
+              follower.getId(), followee.getId());
+          return new BaseException(ErrorCode.FOLLOW_NOT_FOUND);
+        });
   }
 
   private User getUser(UUID userId) {
     return userRepository.findById(userId)
-        .orElseThrow(() -> new BaseException(ErrorCode.USER_NOT_FOUND));
+        .orElseThrow(() -> {
+          log.warn("Follow user not found. userId={}", userId);
+          return new BaseException(ErrorCode.USER_NOT_FOUND);
+        });
   }
 
   private void validateFollowTarget(User follower, User followee) {
     if (follower.getId().equals(followee.getId())) {
+      log.warn("Self follow request denied. userId={}", follower.getId());
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }
