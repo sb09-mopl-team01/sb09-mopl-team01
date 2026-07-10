@@ -56,6 +56,7 @@ public class AuthController {
     try {
       TokenRefreshResult result = authService.refreshTokens(currentRefreshToken);
 
+      ResponseCookie newAccessTokenCookie = cookieProvider.createAccessTokenCookie(result.newAccessToken());
       ResponseCookie newRefreshTokenCookie = cookieProvider.createRefreshTokenCookie(result.newRefreshToken());
 
       TokenRefreshRequest tokenRefreshRequest = new TokenRefreshRequest(
@@ -64,6 +65,7 @@ public class AuthController {
       );
 
       return ResponseEntity.ok()
+          .header(HttpHeaders.SET_COOKIE, newAccessTokenCookie.toString())
           .header(HttpHeaders.SET_COOKIE, newRefreshTokenCookie.toString())
           .body(tokenRefreshRequest);
 

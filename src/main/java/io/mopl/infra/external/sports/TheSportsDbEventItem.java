@@ -25,6 +25,18 @@ public record TheSportsDbEventItem(
     String strThumb,
     @JsonProperty("strPoster")
     String strPoster,
+    @JsonProperty("strBanner")
+    String strBanner,
+    @JsonProperty("strSquare")
+    String strSquare,
+    @JsonProperty("strFanart")
+    String strFanart,
+    @JsonProperty("strHomeTeamBadge")
+    String strHomeTeamBadge,
+    @JsonProperty("strAwayTeamBadge")
+    String strAwayTeamBadge,
+    @JsonProperty("strLeagueBadge")
+    String strLeagueBadge,
     @JsonProperty("strDescriptionEN")
     String strDescriptionEn
 ) {

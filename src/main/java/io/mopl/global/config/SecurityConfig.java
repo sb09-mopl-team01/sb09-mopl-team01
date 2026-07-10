@@ -1,6 +1,5 @@
 package io.mopl.global.config;
 
-import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
@@ -10,6 +9,7 @@ import io.mopl.global.security.handler.MoplLogoutHandler;
 import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.handler.SpaCsrfTokenRequestHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
+import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +17,6 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -46,7 +45,6 @@ public class SecurityConfig {
   private final LoginFailureHandler loginFailureHandler;
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
-  private final MoplUserDetailsService userDetailsService;
   private final StatelessCsrfTokenRepository csrfTokenRepository;
 
   @Value("${mopl.cors.allowed-origins}")
@@ -106,17 +104,6 @@ public class SecurityConfig {
     return source;
   }
 
-  @Bean
-  public DaoAuthenticationProvider authenticationProvider() {
-    DaoAuthenticationProvider authProvider = new DaoAuthenticationProvider();
-    authProvider.setUserDetailsService(userDetailsService);
-    authProvider.setPasswordEncoder(passwordEncoder());
-
-    authProvider.setHideUserNotFoundExceptions(false);
-
-    return authProvider;
-  }
-
   private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
     MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);
     moplLoginFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
@@ -135,8 +122,7 @@ public class SecurityConfig {
     logout.logoutUrl("/api/auth/sign-out")
         .addLogoutHandler(logoutHandler)
         .logoutSuccessHandler(logoutSuccessHandler)
-        .invalidateHttpSession(false)
-        .deleteCookies("REFRESH_TOKEN");
+        .invalidateHttpSession(false);
   }
 
   private void configureHttpBasic(HttpBasicConfigurer<HttpSecurity> basic) {
@@ -150,6 +136,7 @@ public class SecurityConfig {
 
   private void configureAuthorizeRequests(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry auth) {
     auth
+        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
         .requestMatchers(HttpMethod.POST, "/api/users").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/auth/sign-in").permitAll()
         .requestMatchers(HttpMethod.POST, "/api/auth/refresh").permitAll()

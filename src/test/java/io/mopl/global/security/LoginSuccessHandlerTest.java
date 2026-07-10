@@ -52,7 +52,8 @@ class LoginSuccessHandlerTest {
     String email = "test@example.com";
     String accessToken = "access-token";
     String refreshToken = "refresh-token";
-    ResponseCookie cookie = ResponseCookie.from("REFRESH_TOKEN", refreshToken).build();
+    ResponseCookie accessTokenCookie = ResponseCookie.from("ACCESS_TOKEN", accessToken).build();
+    ResponseCookie refreshTokenCookie = ResponseCookie.from("REFRESH_TOKEN", refreshToken).build();
     UserDto userDto = mock(UserDto.class);
 
     when(authentication.getPrincipal()).thenReturn(userDetails);
@@ -61,14 +62,16 @@ class LoginSuccessHandlerTest {
 
     when(jwtProvider.generateAccessToken(userDetails)).thenReturn(accessToken);
     when(jwtProvider.generateRefreshToken(email)).thenReturn(refreshToken);
-    when(cookieProvider.createRefreshTokenCookie(refreshToken)).thenReturn(cookie);
+    when(cookieProvider.createAccessTokenCookie(accessToken)).thenReturn(accessTokenCookie);
+    when(cookieProvider.createRefreshTokenCookie(refreshToken)).thenReturn(refreshTokenCookie);
     when(userMapper.toDto(user)).thenReturn(userDto);
     when(response.getWriter()).thenReturn(printWriter);
 
     loginSuccessHandler.onAuthenticationSuccess(request, response, authentication);
 
     verify(refreshTokenRepository).save(email, refreshToken);
-    verify(response).addHeader(HttpHeaders.SET_COOKIE, cookie.toString());
+    verify(response).addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
+    verify(response).addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
     verify(response).setStatus(200);
     verify(response).setContentType(MediaType.APPLICATION_JSON_VALUE);
     verify(objectMapper).writeValue(eq(printWriter), any());
