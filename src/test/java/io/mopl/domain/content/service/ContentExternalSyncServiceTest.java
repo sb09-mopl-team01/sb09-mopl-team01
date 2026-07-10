@@ -61,6 +61,7 @@ class ContentExternalSyncServiceTest {
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
+    assertThat(result.fetchedCount()).isEqualTo(2);
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(1);
     assertThat(result.failedCount()).isZero();
@@ -97,6 +98,7 @@ class ContentExternalSyncServiceTest {
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
+    assertThat(result.fetchedCount()).isEqualTo(2);
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isZero();
     assertThat(result.failedCount()).isEqualTo(1);

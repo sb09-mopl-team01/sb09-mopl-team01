@@ -17,6 +17,7 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class ContentExternalSyncTasklet implements Tasklet {
 
+  static final String FETCHED_COUNT_KEY = "contentExternalSync.fetchedCount";
   static final String CREATED_COUNT_KEY = "contentExternalSync.createdCount";
   static final String SKIPPED_COUNT_KEY = "contentExternalSync.skippedCount";
   static final String FAILED_COUNT_KEY = "contentExternalSync.failedCount";
@@ -31,7 +32,8 @@ public class ContentExternalSyncTasklet implements Tasklet {
       ExternalContentSyncResult result = contentExternalSyncService.syncExternalContents();
       putResultToExecutionContext(chunkContext, result);
       log.info(
-          "Content externalSync completed. createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
+          "Content externalSync completed. fetchedCount={}, createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
+          result.fetchedCount(),
           result.createdCount(),
           result.skippedCount(),
           result.failedCount(),
@@ -55,6 +57,7 @@ public class ContentExternalSyncTasklet implements Tasklet {
         .getJobExecution()
         .getExecutionContext();
 
+    jobExecutionContext.putInt(FETCHED_COUNT_KEY, result.fetchedCount());
     jobExecutionContext.putInt(CREATED_COUNT_KEY, result.createdCount());
     jobExecutionContext.putInt(SKIPPED_COUNT_KEY, result.skippedCount());
     jobExecutionContext.putInt(FAILED_COUNT_KEY, result.failedCount());
