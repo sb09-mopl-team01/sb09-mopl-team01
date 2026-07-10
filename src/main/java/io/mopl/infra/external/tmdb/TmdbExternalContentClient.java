@@ -106,11 +106,13 @@ public class TmdbExternalContentClient implements ExternalContentClient {
   }
 
   private String language() {
-    return isBlank(properties.language()) ? "ko-KR" : properties.language().trim();
+    String language = properties.language();
+    return isBlank(language) ? "ko-KR" : language.trim();
   }
 
   private String region() {
-    return isBlank(properties.region()) ? "KR" : properties.region().trim();
+    String region = properties.region();
+    return isBlank(region) ? "KR" : region.trim();
   }
 
   private static boolean containsHangul(String value) {
@@ -122,5 +124,3 @@ public class TmdbExternalContentClient implements ExternalContentClient {
     return value == null || value.isBlank();
   }
 }
-
-
