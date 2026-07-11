@@ -10,10 +10,14 @@ import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.infra.external.ExternalContentCandidate;
 import io.mopl.infra.external.ExternalContentClient;
 import io.mopl.infra.external.ExternalContentFetchResult;
+import jakarta.persistence.EntityManagerFactory;
 import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.stream.IntStream;
+import org.hibernate.SessionFactory;
+import org.hibernate.stat.Statistics;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -24,7 +28,7 @@ import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
-@DataJpaTest
+@DataJpaTest(properties = "spring.jpa.properties.hibernate.generate_statistics=true")
 @Import(io.mopl.global.config.AppConfig.class)
 @ActiveProfiles("test")
 @Transactional(propagation = Propagation.NOT_SUPPORTED)
@@ -38,6 +42,9 @@ class ContentExternalSyncServiceIntegrationTest {
 
   @Autowired
   private PlatformTransactionManager transactionManager;
+
+  @Autowired
+  private EntityManagerFactory entityManagerFactory;
 
   @AfterEach
   void cleanUp() {
@@ -62,9 +69,27 @@ class ContentExternalSyncServiceIntegrationTest {
     assertThat(contentRepository.count()).isEqualTo(1);
 
     Content storedContent = contentRepository
-        .findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1")
+        .findBySourceAndTypeAndExternalId(ContentSource.TMDB, ContentType.MOVIE, "tmdb-1")
         .orElseThrow();
     assertThat(storedContent.getLastSyncedAt()).isEqualTo(SECOND_SYNCED_AT);
+  }
+
+  @Test
+  void syncExternalContents_usesOneBulkLookupPerChunk() {
+    List<ExternalContentCandidate> candidates = IntStream.rangeClosed(1, 205)
+        .mapToObj(index -> candidate("tmdb-" + index))
+        .toList();
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(candidates);
+    Statistics statistics = entityManagerFactory.unwrap(SessionFactory.class).getStatistics();
+    statistics.clear();
+
+    ExternalContentSyncResult result = serviceWith(client, FIRST_SYNCED_AT)
+        .syncExternalContents();
+
+    assertThat(result.createdCount()).isEqualTo(205);
+    assertThat(result.skippedCount()).isZero();
+    assertThat(statistics.getQueryExecutionCount()).isEqualTo(3);
+    assertThat(statistics.getTransactionCount()).isEqualTo(3);
   }
 
   private ContentExternalSyncService serviceWith(ExternalContentClient client, Instant syncedAt) {

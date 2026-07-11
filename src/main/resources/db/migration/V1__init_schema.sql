@@ -32,7 +32,7 @@ CREATE TABLE contents (
                           last_synced_at TIMESTAMPTZ,
                           average_rating DOUBLE PRECISION NOT NULL DEFAULT 0.0,
                           review_count INTEGER NOT NULL DEFAULT 0,
-                          CONSTRAINT uk_contents_source_external_id UNIQUE (source, external_id)
+                          CONSTRAINT uk_contents_source_type_external_id UNIQUE (source, type, external_id)
 );
 
 CREATE INDEX idx_contents_type ON contents (type);

@@ -3,8 +3,11 @@ package io.mopl.domain.content.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyCollection;
+import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.content.dto.ExternalContentSyncResult;
@@ -20,7 +23,7 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
+import java.util.stream.IntStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
@@ -53,12 +56,10 @@ class ContentExternalSyncServiceTest {
         List.of("movie", "tmdb")
     );
     ContentExternalSyncService service = serviceWith(client);
-
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
-        .willReturn(Optional.empty());
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-2"))
-        .willReturn(Optional.of(existingContent));
-    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of(existingContent));
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
@@ -71,9 +72,10 @@ class ContentExternalSyncServiceTest {
     assertThat(result.syncedAt()).isEqualTo(FIXED_NOW);
     assertThat(existingContent.getLastSyncedAt()).isEqualTo(FIXED_NOW);
 
-    ArgumentCaptor<Content> contentCaptor = ArgumentCaptor.forClass(Content.class);
-    verify(contentRepository).save(contentCaptor.capture());
-    Content savedContent = contentCaptor.getValue();
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<Content>> contentCaptor = ArgumentCaptor.forClass(List.class);
+    verify(contentRepository).saveAll(contentCaptor.capture());
+    Content savedContent = contentCaptor.getValue().get(0);
     assertThat(savedContent.getSource()).isEqualTo(ContentSource.TMDB);
     assertThat(savedContent.getExternalId()).isEqualTo("tmdb-1");
     assertThat(savedContent.getLastSyncedAt()).isEqualTo(FIXED_NOW);
@@ -94,10 +96,10 @@ class ContentExternalSyncServiceTest {
         )
     ));
     ContentExternalSyncService service = serviceWith(client);
-
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
-        .willReturn(Optional.empty());
-    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of());
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
@@ -107,7 +109,7 @@ class ContentExternalSyncServiceTest {
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isZero();
     assertThat(result.failedCount()).isEqualTo(1);
-    verify(contentRepository).save(any(Content.class));
+    verify(contentRepository).saveAll(anyList());
   }
 
   @Test
@@ -119,10 +121,10 @@ class ContentExternalSyncServiceTest {
         1
     );
     ContentExternalSyncService service = serviceWith(client);
-
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
-        .willReturn(Optional.empty());
-    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of());
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
@@ -150,15 +152,100 @@ class ContentExternalSyncServiceTest {
         candidate("tmdb-1", "New Movie")
     ));
     ContentExternalSyncService service = serviceWith(client);
-
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
-        .willReturn(Optional.empty());
-    given(contentRepository.save(any(Content.class))).willAnswer(invocation -> invocation.getArgument(0));
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of());
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
 
     ExternalContentSyncResult result = service.syncExternalContents();
 
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.failedCount()).isEqualTo(1);
+  }
+
+  @Test
+  void syncExternalContents_deduplicatesCandidateKeysBeforeDatabaseSync() {
+    ExternalContentCandidate first = candidate("tmdb-1", "First Movie");
+    ExternalContentCandidate duplicated = candidate("tmdb-1", "Duplicated Movie");
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(
+        List.of(first, duplicated)
+    );
+    ContentExternalSyncService service = serviceWith(client);
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of());
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+    ExternalContentSyncResult result = service.syncExternalContents();
+
+    assertThat(result.createdCount()).isEqualTo(1);
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(result.failedCount()).isZero();
+    verify(contentRepository).findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection());
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<Content>> contentCaptor = ArgumentCaptor.forClass(List.class);
+    verify(contentRepository).saveAll(contentCaptor.capture());
+    assertThat(contentCaptor.getValue())
+        .singleElement()
+        .extracting(Content::getTitle)
+        .isEqualTo("First Movie");
+  }
+
+  @Test
+  void syncExternalContents_keepsTmdbMovieAndTvWithSameExternalId() {
+    ExternalContentCandidate movie = candidate("100", "Movie");
+    ExternalContentCandidate tvSeries = new ExternalContentCandidate(
+        ContentType.TV_SERIES,
+        ContentSource.TMDB,
+        "100",
+        "TV Series",
+        "Description",
+        "https://image.example.com/tv-100.jpg",
+        List.of("tvSeries", "tmdb")
+    );
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(
+        List.of(movie, tvSeries)
+    );
+    ContentExternalSyncService service = serviceWith(client);
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of());
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+    ExternalContentSyncResult result = service.syncExternalContents();
+
+    assertThat(result.createdCount()).isEqualTo(2);
+    assertThat(result.skippedCount()).isZero();
+    @SuppressWarnings("unchecked")
+    ArgumentCaptor<List<Content>> contentCaptor = ArgumentCaptor.forClass(List.class);
+    verify(contentRepository).saveAll(contentCaptor.capture());
+    assertThat(contentCaptor.getValue())
+        .extracting(Content::getType)
+        .containsExactly(ContentType.MOVIE, ContentType.TV_SERIES);
+  }
+
+  @Test
+  void syncExternalContents_stopsAtFailedChunkAfterCompletingPreviousChunk() {
+    List<ExternalContentCandidate> candidates = IntStream
+        .rangeClosed(1, ContentExternalSyncService.SYNC_CHUNK_SIZE + 1)
+        .mapToObj(index -> candidate("tmdb-" + index, "Movie " + index))
+        .toList();
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(candidates);
+    ContentExternalSyncService service = serviceWith(client);
+    IllegalStateException failure = new IllegalStateException("second chunk failed");
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of())
+        .willThrow(failure);
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+    assertThatThrownBy(service::syncExternalContents).isSameAs(failure);
+
+    verify(contentRepository, times(2))
+        .findAllBySourceInAndTypeInAndExternalIdIn(
+            anyCollection(), anyCollection(), anyCollection());
+    verify(contentRepository).saveAll(anyList());
   }
 
   @Test
@@ -168,12 +255,13 @@ class ContentExternalSyncServiceTest {
     );
     ContentExternalSyncService service = serviceWith(client);
     IllegalStateException failure = new IllegalStateException("database failed");
-    given(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "tmdb-1"))
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
         .willThrow(failure);
 
     assertThatThrownBy(service::syncExternalContents).isSameAs(failure);
 
-    verify(contentRepository, never()).save(any());
+    verify(contentRepository, never()).saveAll(any());
   }
 
   @Test
@@ -187,8 +275,8 @@ class ContentExternalSyncServiceTest {
         .isInstanceOf(ExternalApiException.class)
         .hasMessage("external api failed");
 
-    verify(contentRepository, never()).findBySourceAndExternalId(any(), any());
-    verify(contentRepository, never()).save(any());
+    verify(contentRepository, never()).findAllBySourceInAndTypeInAndExternalIdIn(any(), any(), any());
+    verify(contentRepository, never()).saveAll(any());
   }
 
   @Test
@@ -205,8 +293,8 @@ class ContentExternalSyncServiceTest {
         .isInstanceOf(ExternalApiException.class)
         .hasMessage("second external api failed");
 
-    verify(contentRepository, never()).findBySourceAndExternalId(any(), any());
-    verify(contentRepository, never()).save(any());
+    verify(contentRepository, never()).findAllBySourceInAndTypeInAndExternalIdIn(any(), any(), any());
+    verify(contentRepository, never()).saveAll(any());
   }
 
   private ContentExternalSyncService serviceWith(ExternalContentClient client) {
