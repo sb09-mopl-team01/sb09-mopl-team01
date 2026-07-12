@@ -1,5 +1,6 @@
 package io.mopl.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;

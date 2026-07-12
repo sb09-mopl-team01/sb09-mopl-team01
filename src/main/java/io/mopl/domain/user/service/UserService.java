@@ -1,7 +1,8 @@
 package io.mopl.domain.user.service;
 
-import io.mopl.domain.auth.repository.RefreshTokenRepository;
-import io.mopl.domain.auth.service.TempPasswordService;
+import io.mopl.domain.user.event.UserLockedEvent;
+import io.mopl.domain.user.event.UserPasswordChangeEvent;
+import io.mopl.domain.user.event.UserUnlockedEvent;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.storage.ProfileImageStorage;
@@ -22,22 +23,17 @@ import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.cache.annotation.CachePut;
 import org.springframework.cache.annotation.Cacheable;
-import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.web.multipart.MultipartFile;
 
 @Slf4j
@@ -50,13 +46,7 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final ProfileImageStorage profileImageStorage;
-  private final TempPasswordService tempPasswordService;
-  private final StringRedisTemplate redisTemplate;
-  private final RefreshTokenRepository refreshTokenRepository;
   private final DomainEventPublisher eventPublisher;
-
-  @Value("${jwt.access-token-validity-seconds}")
-  long accessTokenValiditySeconds;
 
   @Transactional
   public UserDto createUser(UserCreateRequest request) {
@@ -72,6 +62,7 @@ public class UserService {
         .build();
 
     User savedUser = userRepository.save(user);
+
     log.info("User Create Completed. id={}", savedUser.getId());
     return userMapper.toDto(savedUser);
   }
@@ -134,17 +125,7 @@ public class UserService {
     String newPasswordHash = passwordEncoder.encode(request.password());
     user.changePassword(newPasswordHash);
 
-    // 임시
-    TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-      @Override
-      public void afterCommit() {
-        try {
-          tempPasswordService.deleteTempPassword(user.getEmail());
-        } catch (Exception e) {
-          log.warn("Redis TempPassword deletion failed after DB commit. email={}", user.getEmail(), e);
-        }
-      }
-    });
+    eventPublisher.publish(new UserPasswordChangeEvent(user.getEmail()));
 
     log.info("User Update Password Completed. id={}", userId);
   }
@@ -158,42 +139,14 @@ public class UserService {
           return new UserNotFoundException();
         });
 
-    String email = user.getEmail();
-    UUID id = user.getId();
-
     if (request.locked()) {
       user.lockAccount();
-      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-        @Override
-        public void afterCommit() {
-          try {
-            redisTemplate.opsForValue().set(
-                "blacklist:access_token:" + id,
-                "true",
-                Duration.ofSeconds(accessTokenValiditySeconds)
-            );
-
-            refreshTokenRepository.deleteByEmail(email);
-
-          } catch (Exception e) {
-            log.error("Redis Lock status update failed for user={}", email, e);
-          }
-        }
-      });
-
+      eventPublisher.publish(new UserLockedEvent(user.getId(), user.getEmail()));
     } else {
       user.unlockAccount();
-      TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
-        @Override
-        public void afterCommit() {
-          try {
-            redisTemplate.delete("blacklist:access_token:" + id);
-          } catch (Exception e) {
-            log.error("Redis Unlock status update failed for user={}", email, e);
-          }
-        }
-      });
+      eventPublisher.publish(new UserUnlockedEvent(user.getId()));
     }
+
     log.info("User Update LockStatus Completed. id={}", userId);
   }
 

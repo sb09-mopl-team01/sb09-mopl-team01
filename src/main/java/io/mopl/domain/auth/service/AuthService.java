@@ -2,11 +2,13 @@ package io.mopl.domain.auth.service;
 
 import io.mopl.domain.auth.dto.TokenRefreshResult;
 import io.mopl.domain.auth.repository.RefreshTokenRepository;
+import io.mopl.domain.mail.event.TempPasswordIssuedEvent;
 import io.mopl.domain.mail.service.MailService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.MoplUserDetails;
@@ -29,8 +31,8 @@ public class AuthService {
   private final UserMapper userMapper;
   private final UserRepository userRepository;
   private final TempPasswordService tempPasswordService;
-  private final MailService mailService;
   private final PasswordEncoder passwordEncoder;
+  private final DomainEventPublisher eventPublisher;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
     log.debug("Auth Token-Refresh Started.");
@@ -70,20 +72,14 @@ public class AuthService {
   }
 
   public void resetPassword(String email) {
-    log.debug("Auth Reset Password Started. email={}", email);
-
-    userRepository.findByEmail(email)
-        .orElseThrow(() -> {
-          log.warn("Auth Reset Password Failed. User not found. email={}", email);
-          return new UserNotFoundException();
-        });
+    userRepository.findByEmail(email).orElseThrow(UserNotFoundException::new);
 
     String tempPassword = tempPasswordService.generateRandomPassword();
     String encodedTempPassword = passwordEncoder.encode(tempPassword);
 
     tempPasswordService.saveTempPassword(email, encodedTempPassword);
 
-    mailService.sendTempPasswordEmail(email, tempPassword);
+    eventPublisher.publish(new TempPasswordIssuedEvent(email, tempPassword));
 
     log.debug("Auth Reset Password Completed. email={}", email);
   }
