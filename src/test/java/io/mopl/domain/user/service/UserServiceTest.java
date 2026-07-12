@@ -3,13 +3,10 @@ package io.mopl.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
-import io.mopl.domain.auth.repository.RefreshTokenRepository;
-import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -18,10 +15,15 @@ import io.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.event.UserLockedEvent;
+import io.mopl.domain.user.event.UserPasswordChangeEvent;
+import io.mopl.domain.user.event.UserRoleChangedEvent;
+import io.mopl.domain.user.event.UserUnlockedEvent;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.storage.ProfileImageStorage;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -37,11 +39,6 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
-import org.springframework.transaction.support.TransactionSynchronization;
-import org.springframework.transaction.support.TransactionSynchronizationManager;
-import org.springframework.data.redis.core.StringRedisTemplate;
-import org.springframework.data.redis.core.ValueOperations;
-import java.time.Duration;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -57,18 +54,6 @@ class UserServiceTest {
 
   @Mock
   private PasswordEncoder passwordEncoder;
-
-  @Mock
-  private TempPasswordService tempPasswordService;
-
-  @Mock
-  private StringRedisTemplate redisTemplate;
-
-  @Mock
-  private RefreshTokenRepository refreshTokenRepository;
-
-  @Mock
-  private ValueOperations<String, String> valueOperations;
 
   @Mock
   private DomainEventPublisher eventPublisher;
@@ -148,128 +133,91 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("순수 프로필 정보 업데이트 성공 (S3 제외)")
-  void updateProfileInfo_Success() {
+  @DisplayName("프로필 수정 성공")
+  void updateProfile_Success() {
     UUID userId = UUID.randomUUID();
     UserUpdateRequest request = new UserUpdateRequest("새로운이름");
-    String newImageUrl = "https://s3.amazonaws.com/new-image.jpg";
     User user = mock(User.class);
 
     UserDto updatedUserDto = UserDto.builder()
         .id(userId)
         .name(request.name())
-        .profileImageUrl(newImageUrl)
         .build();
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(userMapper.toDto(user)).willReturn(updatedUserDto);
 
-    UserDto result = userService.updateProfileInfo(userId, request, newImageUrl);
+    UserDto result = userService.updateProfile(userId, request, null);
 
     assertThat(result.name()).isEqualTo("새로운이름");
-    assertThat(result.profileImageUrl()).isEqualTo(newImageUrl);
-
-    verify(user).updateProfile(request.name(), newImageUrl);
+    verify(user).updateProfile(request.name(), null);
   }
+
   @Test
-  @DisplayName("권한 변경 성공")
+  @DisplayName("권한 변경 성공 및 이벤트 발행 검증")
   void updateUserRole_Success() {
     UUID userId = UUID.randomUUID();
     UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
     User user = mock(User.class);
 
-    given(user.getId()).willReturn(userId);
-    given(user.getRole()).willReturn(Role.USER);
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(user.getRole()).willReturn(Role.USER);
+    given(user.getId()).willReturn(userId);
 
     userService.updateUserRole(userId, request);
+
     verify(user).updateRole(request.role());
-
-    verify(eventPublisher).publish(any());
+    verify(eventPublisher).publish(any(UserRoleChangedEvent.class));
   }
 
   @Test
-  @DisplayName("비밀번호 변경 성공")
+  @DisplayName("비밀번호 변경 성공 및 이벤트 발행 검증")
   void changePassword_Success() {
-    TransactionSynchronizationManager.initSynchronization();
+    UUID userId = UUID.randomUUID();
+    ChangePasswordRequest request = new ChangePasswordRequest("newPassword123!");
+    User user = mock(User.class);
 
-    try {
-      UUID userId = UUID.randomUUID();
-      ChangePasswordRequest request = new ChangePasswordRequest("newPassword123!");
-      User user = mock(User.class);
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
+    given(user.getEmail()).willReturn("test@example.com");
 
-      given(user.getEmail()).willReturn("test@example.com");
-      given(userRepository.findById(userId)).willReturn(Optional.of(user));
-      given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
+    userService.changePassword(userId, request);
 
-      userService.changePassword(userId, request);
-
-      verify(user).changePassword("new_encoded_password");
-
-      TransactionSynchronizationManager.getSynchronizations()
-          .forEach(sync -> sync.afterCommit());
-
-      verify(tempPasswordService).deleteTempPassword("test@example.com");
-
-    } finally {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
+    verify(user).changePassword("new_encoded_password");
+    verify(eventPublisher).publish(any(UserPasswordChangeEvent.class));
   }
 
   @Test
-  @DisplayName("계정 잠금 설정 성공")
+  @DisplayName("계정 잠금 설정 성공 및 이벤트 발행 검증")
   void updateUserLockStatus_Lock_Success() {
-    TransactionSynchronizationManager.initSynchronization();
-    try {
-      UUID userId = UUID.randomUUID();
-      UserLockUpdateRequest request = new UserLockUpdateRequest(true);
-      User user = mock(User.class);
+    UUID userId = UUID.randomUUID();
+    UserLockUpdateRequest request = new UserLockUpdateRequest(true);
+    User user = mock(User.class);
 
-      given(user.getId()).willReturn(userId);
-      given(user.getEmail()).willReturn("test@example.com");
-      given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(user.getId()).willReturn(userId);
+    given(user.getEmail()).willReturn("test@example.com");
 
-      given(redisTemplate.opsForValue()).willReturn(valueOperations);
+    userService.updateUserLockStatus(userId, request);
 
-      userService.updateUserLockStatus(userId, request);
-
-      verify(user).lockAccount();
-
-      TransactionSynchronizationManager.getSynchronizations()
-          .forEach(TransactionSynchronization::afterCommit);
-
-      verify(valueOperations).set(eq("blacklist:access_token:" + userId), eq("true"), any(Duration.class));
-      verify(refreshTokenRepository).deleteByEmail("test@example.com");
-
-    } finally {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
+    verify(user).lockAccount();
+    verify(eventPublisher).publish(any(UserLockedEvent.class));
   }
 
   @Test
-  @DisplayName("계정 잠금 해제 성공")
+  @DisplayName("계정 잠금 해제 성공 및 이벤트 발행 검증")
   void updateUserLockStatus_Unlock_Success() {
-    TransactionSynchronizationManager.initSynchronization();
-    try {
-      UUID userId = UUID.randomUUID();
-      UserLockUpdateRequest request = new UserLockUpdateRequest(false);
-      User user = mock(User.class);
-      given(user.getId()).willReturn(userId);
-      given(user.getEmail()).willReturn("test@example.com");
-      given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    UUID userId = UUID.randomUUID();
+    UserLockUpdateRequest request = new UserLockUpdateRequest(false);
+    User user = mock(User.class);
 
-      userService.updateUserLockStatus(userId, request);
+    given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(user.getId()).willReturn(userId);
 
-      verify(user).unlockAccount();
+    userService.updateUserLockStatus(userId, request);
 
-      TransactionSynchronizationManager.getSynchronizations()
-          .forEach(TransactionSynchronization::afterCommit);
-
-      verify(redisTemplate).delete("blacklist:access_token:" + userId);
-
-    } finally {
-      TransactionSynchronizationManager.clearSynchronization();
-    }
+    verify(user).unlockAccount();
+    verify(eventPublisher).publish(any(UserUnlockedEvent.class));
   }
 
   @Test
