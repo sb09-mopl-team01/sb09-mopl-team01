@@ -67,13 +67,19 @@ flowchart LR
 ## Kafka 및 스키마 마이그레이션 기반
 
 - Flyway는 기본적으로 활성화되어 있으며(`FLYWAY_ENABLED=true`), `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다.
-- Kafka는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 현재는 연결 설정만 제공하며, 이벤트 발행·소비는 후속 작업에서 추가합니다.
+- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
+- Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
+- 전달 보장은 at-least-once입니다. Relay가 Kafka ACK 뒤 상태 변경 전에 중단되면 중복 발행될 수 있으므로, consumer는 `eventId`로 멱등 처리해야 합니다.
 
 | 환경 변수 | 기본값 | 용도 |
 | --- | --- | --- |
-| `KAFKA_ENABLED` | `false` | Kafka listener와 health check 활성화 여부 |
+| `KAFKA_ENABLED` | `false` | Kafka producer, listener, health check 및 Outbox Relay 활성화 여부 |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
 | `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
+| `OUTBOX_RELAY_ENABLED` | `true` | Outbox Relay 및 발행 완료 데이터 정리 스케줄 활성화 여부 |
+| `OUTBOX_RELAY_BATCH_SIZE` | `100` | 한 번의 Relay 실행에서 선점할 최대 이벤트 수 |
+| `OUTBOX_MAX_ATTEMPTS` | `5` | Kafka 발행 최대 시도 횟수. 초과 시 `FAILED` 상태로 보관 |
+| `OUTBOX_CLAIM_TIMEOUT` | `PT1M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간 |
 | `FLYWAY_ENABLED` | `true` | Flyway 마이그레이션 활성화 여부 |
 
 ## 프로젝트 구조
