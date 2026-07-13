@@ -15,7 +15,7 @@ public record ExternalContentApiProperties(
     }
     if (tmdb == null) {
       tmdb = new Tmdb(null, "https://api.themoviedb.org/3", "https://image.tmdb.org/t/p/w500",
-          "/movie/popular", "/tv/popular", 1);
+          "/movie/popular", "/tv/popular", "ko-KR", "KR", true, 1);
     }
     if (theSportsDb == null) {
       theSportsDb = new TheSportsDb(null, "https://www.thesportsdb.com/api/v1/json", null,
@@ -35,6 +35,9 @@ public record ExternalContentApiProperties(
       String imageBaseUrl,
       String moviePath,
       String tvPath,
+      String language,
+      String region,
+      boolean koreanOnly,
       int pages
   ) {
   }
@@ -47,3 +50,4 @@ public record ExternalContentApiProperties(
   ) {
   }
 }
+

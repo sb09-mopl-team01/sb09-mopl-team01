@@ -78,6 +78,9 @@ mopl:
       image-base-url: https://image.tmdb.org/t/p/w500
       movie-path: /movie/popular
       tv-path: /tv/popular
+      language: ${TMDB_LANGUAGE:ko-KR}
+      region: ${TMDB_REGION:KR}
+      korean-only: ${TMDB_KOREAN_ONLY:true}
       pages: ${TMDB_SYNC_PAGES:1}
     the-sports-db:
       api-key: ${THE_SPORTS_DB_API_KEY:}
@@ -98,3 +101,4 @@ mopl:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
     allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
     allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,Accept,X-XSRF-TOKEN,X-Requested-With}
+
