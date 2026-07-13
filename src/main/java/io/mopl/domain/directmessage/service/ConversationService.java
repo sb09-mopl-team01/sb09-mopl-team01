@@ -28,6 +28,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -36,6 +37,7 @@ import org.springframework.util.StringUtils;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class ConversationService {
 
   private static final String CREATED_AT_SORT = "createdAt";
@@ -50,6 +52,7 @@ public class ConversationService {
   @Transactional
   public ConversationDto createConversation(UUID requesterId, ConversationCreateRequest request) {
     if (request == null || request.withUserId() == null) {
+      log.warn("Invalid conversation create request. requesterId={}, request={}", requesterId, request);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
@@ -62,6 +65,8 @@ public class ConversationService {
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
         .orElseGet(() -> saveConversation(key));
     validateConversationParticipant(conversation, requester.getId());
+    log.debug("Conversation created or found. conversationId={}, requesterId={}, withUserId={}",
+        conversation.getId(), requester.getId(), withUser.getId());
 
     return conversationMapper.toDto(
         conversation,
@@ -80,7 +85,11 @@ public class ConversationService {
     Conversation key = Conversation.between(requester.getId(), withUser.getId());
     Conversation conversation = conversationRepository
         .findByParticipantAIdAndParticipantBId(key.getParticipantAId(), key.getParticipantBId())
-        .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
+        .orElseThrow(() -> {
+          log.warn("Conversation with user not found. requesterId={}, userId={}",
+              requester.getId(), withUser.getId());
+          return new BaseException(ErrorCode.CONVERSATION_NOT_FOUND);
+        });
 
     return conversationMapper.toDto(
         conversation,
@@ -105,6 +114,8 @@ public class ConversationService {
     validateFindConversationsCommand(limit, sortDirection, sortBy);
 
     Instant parsedCursor = parseCursor(cursor);
+    log.debug("Conversation list requested. requesterId={}, keywordLike={}, cursor={}, idAfter={}, limit={}, sortDirection={}",
+        requester.getId(), keywordLike, parsedCursor, idAfter, limit, sortDirection);
     List<Conversation> conversations = conversationRepository.findMyConversationsWithCursor(
         requester.getId(),
         keywordLike,
@@ -130,6 +141,8 @@ public class ConversationService {
         .toList();
 
     Conversation lastConversation = pageData.isEmpty() ? null : pageData.get(pageData.size() - 1);
+    log.debug("Conversation list found. requesterId={}, size={}, hasNext={}",
+        requester.getId(), pageData.size(), hasNext);
 
     return new CursorResponse<>(
         data,
@@ -147,6 +160,8 @@ public class ConversationService {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
     validateConversationParticipant(conversation, requester.getId());
+    log.debug("Conversation found. requesterId={}, conversationId={}",
+        requester.getId(), conversation.getId());
     User withUser = getOtherUser(
         findOtherParticipants(requester.getId(), List.of(conversation)),
         conversation.getOtherParticipantId(requester.getId())
@@ -172,10 +187,12 @@ public class ConversationService {
   ) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
-    conversation.getOtherParticipantId(requester.getId());
+    validateConversationParticipant(conversation, requester.getId());
     validateFindConversationsCommand(limit, sortDirection, sortBy);
 
     Instant parsedCursor = parseCursor(cursor);
+    log.debug("Direct message list requested. requesterId={}, conversationId={}, cursor={}, idAfter={}, limit={}, sortDirection={}",
+        requester.getId(), conversation.getId(), parsedCursor, idAfter, limit, sortDirection);
     List<DirectMessage> directMessages = directMessageRepository.findByConversationIdWithCursor(
         conversation.getId(),
         parsedCursor,
@@ -198,6 +215,8 @@ public class ConversationService {
         .toList();
 
     DirectMessage lastDirectMessage = pageData.isEmpty() ? null : pageData.get(pageData.size() - 1);
+    log.debug("Direct message list found. requesterId={}, conversationId={}, size={}, hasNext={}",
+        requester.getId(), conversation.getId(), pageData.size(), hasNext);
 
     return new CursorResponse<>(
         data,
@@ -217,6 +236,8 @@ public class ConversationService {
       DirectMessageSendRequest request
   ) {
     if (request == null) {
+      log.warn("Invalid direct message send request. senderId={}, conversationId={}, request={}",
+          senderId, conversationId, request);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
     User sender = getUser(senderId);
@@ -233,6 +254,8 @@ public class ConversationService {
     );
     DirectMessage savedDirectMessage = directMessageRepository.save(directMessage);
     publishDirectMessageSent(savedDirectMessage, sender, receiver);
+    log.debug("Direct message sent. directMessageId={}, conversationId={}, senderId={}, receiverId={}",
+        savedDirectMessage.getId(), conversation.getId(), sender.getId(), receiver.getId());
 
     return directMessageMapper.toDto(savedDirectMessage, sender, receiver);
   }
@@ -241,19 +264,27 @@ public class ConversationService {
   public void readDirectMessage(UUID requesterId, UUID conversationId, UUID directMessageId) {
     User requester = getUser(requesterId);
     Conversation conversation = getConversation(conversationId);
-    conversation.getOtherParticipantId(requester.getId());
+    validateConversationParticipant(conversation, requester.getId());
 
     DirectMessage directMessage = directMessageRepository.findById(directMessageId)
-        .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
+        .orElseThrow(() -> {
+          log.warn("Direct message read target not found. requesterId={}, conversationId={}, directMessageId={}",
+              requester.getId(), conversation.getId(), directMessageId);
+          return new BaseException(ErrorCode.INVALID_INPUT);
+        });
 
     validateDirectMessageReadTarget(conversation, directMessage, requester.getId());
     directMessage.markAsRead();
+    log.debug("Direct message read. directMessageId={}, conversationId={}, requesterId={}",
+        directMessage.getId(), conversation.getId(), requester.getId());
   }
 
   private Conversation saveConversation(Conversation conversation) {
     try {
       return conversationRepository.save(conversation);
     } catch (DataIntegrityViolationException e) {
+      log.warn("Conversation create duplicated by concurrent request. participantAId={}, participantBId={}",
+          conversation.getParticipantAId(), conversation.getParticipantBId());
 
       // 다른 트랜잭션이 이미 생성한 경우 재조회
       return conversationRepository
@@ -267,6 +298,7 @@ public class ConversationService {
 
   private void validateParticipants(UUID requesterId, UUID withUserId) {
     if (requesterId.equals(withUserId)) {
+      log.warn("Self conversation request denied. requesterId={}", requesterId);
       throw new BaseException(ErrorCode.SELF_CONVERSATION_NOT_ALLOWED);
     }
   }
@@ -283,6 +315,8 @@ public class ConversationService {
     if (limit <= 0
         || sortDirection == null
         || !CREATED_AT_SORT.equals(sortBy)) {
+      log.warn("Invalid direct message page request. limit={}, sortBy={}, sortDirection={}",
+          limit, sortBy, sortDirection);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }
@@ -294,17 +328,21 @@ public class ConversationService {
   ) {
     if (!directMessage.getConversation().getId().equals(conversation.getId())
         || !directMessage.getReceiverId().equals(requesterId)) {
+      log.warn("Invalid direct message read request. conversationId={}, directMessageId={}, requesterId={}, receiverId={}",
+          conversation.getId(), directMessage.getId(), requesterId, directMessage.getReceiverId());
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }
 
   private String validateMessageContent(String content) {
     if (!StringUtils.hasText(content)) {
+      log.warn("Invalid direct message content. reason=blank");
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
     String trimmedContent = content.trim();
     if (trimmedContent.length() > DirectMessage.CONTENT_MAX_LENGTH) {
+      log.warn("Invalid direct message content. reason=too_long, length={}", trimmedContent.length());
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
@@ -334,26 +372,35 @@ public class ConversationService {
     try {
       return Instant.parse(cursor);
     } catch (DateTimeException e) {
+      log.warn("Invalid direct message cursor format. cursor={}", cursor);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
   }
 
   private User getUser(UUID userId) {
     if (userId == null) {
+      log.warn("Invalid direct message user lookup. userId={}", userId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
     return userRepository.findById(userId)
-        .orElseThrow(UserNotFoundException::new);
+        .orElseThrow(() -> {
+          log.warn("Direct message user not found. userId={}", userId);
+          return new UserNotFoundException();
+        });
   }
 
   private Conversation getConversation(UUID conversationId) {
     if (conversationId == null) {
+      log.warn("Invalid conversation lookup. conversationId={}", conversationId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
     return conversationRepository.findById(conversationId)
-        .orElseThrow(() -> new BaseException(ErrorCode.CONVERSATION_NOT_FOUND));
+        .orElseThrow(() -> {
+          log.warn("Conversation not found. conversationId={}", conversationId);
+          return new BaseException(ErrorCode.CONVERSATION_NOT_FOUND);
+        });
   }
 
   private Map<UUID, User> findOtherParticipants(UUID requesterId, List<Conversation> conversations) {
@@ -369,6 +416,7 @@ public class ConversationService {
   private User getOtherUser(Map<UUID, User> usersById, UUID userId) {
     User user = usersById.get(userId);
     if (user == null) {
+      log.warn("Direct message participant user not found. userId={}", userId);
       throw new UserNotFoundException();
     }
     return user;
