@@ -26,8 +26,8 @@ public class ExternalContentClientConfig {
       ExternalContentApiProperties.Timeout timeout
   ) {
     SimpleClientHttpRequestFactory requestFactory = new SimpleClientHttpRequestFactory();
-    requestFactory.setConnectTimeout(Duration.ofSeconds(Math.max(1, timeout.connectSeconds())));
-    requestFactory.setReadTimeout(Duration.ofSeconds(Math.max(1, timeout.readSeconds())));
+    requestFactory.setConnectTimeout(Duration.ofSeconds(timeout.connectSeconds()));
+    requestFactory.setReadTimeout(Duration.ofSeconds(timeout.readSeconds()));
     return requestFactory;
   }
 }

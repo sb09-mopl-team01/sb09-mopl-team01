@@ -8,8 +8,10 @@ import static org.springframework.test.web.client.response.MockRestResponseCreat
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 import io.mopl.infra.external.ExternalApiException;
+import io.mopl.infra.external.ExternalApiRetryExecutor;
 import io.mopl.infra.external.ExternalContentApiProperties;
 import io.mopl.infra.external.ExternalContentCandidate;
+import io.mopl.infra.external.ExternalContentFetchResult;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
@@ -22,10 +24,12 @@ class TmdbExternalContentClientTest {
   void fetchContents_requestsKoreanLocaleAndKeepsKoreanItemsOnly() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TmdbExternalContentClient client = new TmdbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TmdbContentMapper()
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
@@ -68,9 +72,13 @@ class TmdbExternalContentClientTest {
             }
             """, MediaType.APPLICATION_JSON));
 
-    List<ExternalContentCandidate> result = client.fetchContents();
+    ExternalContentFetchResult result = client.fetchContents();
 
-    assertThat(result)
+    assertThat(result.fetchedCount()).isEqualTo(3);
+    assertThat(result.acceptedCount()).isEqualTo(2);
+    assertThat(result.filteredCount()).isEqualTo(1);
+    assertThat(result.failedCount()).isZero();
+    assertThat(result.candidates())
         .extracting(ExternalContentCandidate::externalId)
         .containsExactly("1", "3");
     mockServer.verify();
@@ -80,10 +88,12 @@ class TmdbExternalContentClientTest {
   void fetchContents_wrapsApiResponseError() {
     RestClient.Builder restClientBuilder = RestClient.builder();
     MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
     TmdbExternalContentClient client = new TmdbExternalContentClient(
         restClientBuilder,
-        properties(),
-        new TmdbContentMapper()
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
     );
     mockServer.expect(once(), requestTo(
             "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
@@ -97,9 +107,97 @@ class TmdbExternalContentClientTest {
     mockServer.verify();
   }
 
+  @Test
+  void fetchContents_retriesServerErrorAndContinuesAfterRecovery() {
+    RestClient.Builder restClientBuilder = RestClient.builder();
+    MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties(2);
+    TmdbExternalContentClient client = new TmdbExternalContentClient(
+        restClientBuilder,
+        properties,
+        new TmdbContentMapper(),
+        new ExternalApiRetryExecutor(properties)
+    );
+    String movieUrl =
+        "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR";
+    mockServer.expect(once(), requestTo(movieUrl)).andRespond(withServerError());
+    mockServer.expect(once(), requestTo(movieUrl))
+        .andRespond(withSuccess("{\"results\": []}", MediaType.APPLICATION_JSON));
+    mockServer.expect(once(), requestTo(
+            "https://api.themoviedb.org/3/tv/popular?api_key=test-api-key&page=1&language=ko-KR"))
+        .andRespond(withSuccess("{\"results\": []}", MediaType.APPLICATION_JSON));
+
+    ExternalContentFetchResult result = client.fetchContents();
+
+    assertThat(result.fetchedCount()).isZero();
+    assertThat(result.failedCount()).isZero();
+    mockServer.verify();
+  }
+
+  @Test
+  void fetchContents_countsMappingFailureAndContinuesWithRemainingItems() {
+    RestClient.Builder restClientBuilder = RestClient.builder();
+    MockRestServiceServer mockServer = MockRestServiceServer.bindTo(restClientBuilder).build();
+    ExternalContentApiProperties properties = properties();
+    TmdbContentMapper mapper = new TmdbContentMapper() {
+      @Override
+      public ExternalContentCandidate toMovieCandidate(TmdbMovieItem item, String imageBaseUrl) {
+        if (item != null && Long.valueOf(2L).equals(item.id())) {
+          throw new IllegalArgumentException("invalid movie item");
+        }
+        return super.toMovieCandidate(item, imageBaseUrl);
+      }
+    };
+    TmdbExternalContentClient client = new TmdbExternalContentClient(
+        restClientBuilder,
+        properties,
+        mapper,
+        new ExternalApiRetryExecutor(properties)
+    );
+    mockServer.expect(once(), requestTo(
+            "https://api.themoviedb.org/3/movie/popular?api_key=test-api-key&page=1&language=ko-KR&region=KR"))
+        .andRespond(withSuccess("""
+            {
+              "results": [
+                {
+                  "id": 1,
+                  "title": "정상 영화",
+                  "overview": "정상 설명입니다.",
+                  "genre_ids": [18]
+                },
+                {
+                  "id": 2,
+                  "title": "잘못된 영화",
+                  "overview": "잘못된 설명입니다.",
+                  "genre_ids": [18]
+                }
+              ]
+            }
+            """, MediaType.APPLICATION_JSON));
+    mockServer.expect(once(), requestTo(
+            "https://api.themoviedb.org/3/tv/popular?api_key=test-api-key&page=1&language=ko-KR"))
+        .andRespond(withSuccess("{\"results\": []}", MediaType.APPLICATION_JSON));
+
+    ExternalContentFetchResult result = client.fetchContents();
+
+    assertThat(result.fetchedCount()).isEqualTo(2);
+    assertThat(result.acceptedCount()).isEqualTo(1);
+    assertThat(result.filteredCount()).isZero();
+    assertThat(result.failedCount()).isEqualTo(1);
+    assertThat(result.candidates())
+        .extracting(ExternalContentCandidate::externalId)
+        .containsExactly("1");
+    mockServer.verify();
+  }
+
   private static ExternalContentApiProperties properties() {
+    return properties(1);
+  }
+
+  private static ExternalContentApiProperties properties(int maxAttempts) {
     return new ExternalContentApiProperties(
         new ExternalContentApiProperties.Timeout(3, 5),
+        new ExternalContentApiProperties.Retry(maxAttempts, 0, 1.0, 0),
         new ExternalContentApiProperties.Tmdb(
             "test-api-key",
             "https://api.themoviedb.org/3",
