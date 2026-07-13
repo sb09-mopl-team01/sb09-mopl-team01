@@ -5,8 +5,6 @@ import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.mapper.UserMapper;
-import io.mopl.global.security.CookieProvider;
-import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.handler.LoginSuccessHandler;
 import io.mopl.global.security.jwt.JwtProvider;
 import jakarta.servlet.http.HttpServletRequest;
@@ -23,8 +21,10 @@ import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 
 import java.io.PrintWriter;
+import java.util.UUID;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -49,6 +49,7 @@ class LoginSuccessHandlerTest {
   @Test
   @DisplayName("로그인 성공 시 토큰 발급 및 응답 설정이 정상적으로 수행된다")
   void onAuthenticationSuccess_Success() throws Exception {
+    UUID userId = UUID.randomUUID();
     String email = "test@example.com";
     String accessToken = "access-token";
     String refreshToken = "refresh-token";
@@ -59,6 +60,7 @@ class LoginSuccessHandlerTest {
     when(authentication.getPrincipal()).thenReturn(userDetails);
     when(userDetails.getUsername()).thenReturn(email);
     when(userDetails.getUser()).thenReturn(user);
+    when(user.getId()).thenReturn(userId);
 
     when(jwtProvider.generateAccessToken(userDetails)).thenReturn(accessToken);
     when(jwtProvider.generateRefreshToken(email)).thenReturn(refreshToken);
@@ -69,7 +71,7 @@ class LoginSuccessHandlerTest {
 
     loginSuccessHandler.onAuthenticationSuccess(request, response, authentication);
 
-    verify(refreshTokenRepository).save(email, refreshToken);
+    verify(refreshTokenRepository).save(userId, refreshToken);
     verify(response).addHeader(HttpHeaders.SET_COOKIE, accessTokenCookie.toString());
     verify(response).addHeader(HttpHeaders.SET_COOKIE, refreshTokenCookie.toString());
     verify(response).setStatus(200);
