@@ -17,6 +17,8 @@ spring:
         order_inserts: true
         order_updates: true
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: never
 
@@ -35,6 +37,19 @@ spring:
           auth: true
           starttls:
             enable: true
+
+logging:
+  file:
+    name: ${LOG_FILE_NAME:logs/mopl.log}
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_ARCHIVE_FILE_PATTERN:logs/archive/mopl.%d{yyyy-MM-dd}.%i.log.gz}
+      max-file-size: ${LOG_MAX_FILE_SIZE:50MB}
+      max-history: ${LOG_MAX_HISTORY:14}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:2GB}
+      clean-history-on-start: ${LOG_CLEAN_HISTORY_ON_START:false}
 
 management:
   endpoints:
@@ -57,6 +72,13 @@ jwt:
   max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
 
 mopl:
+  logging:
+    backup:
+      enabled: ${LOG_BACKUP_ENABLED:false}
+      cron: ${LOG_BACKUP_CRON:0 0 4 * * *}
+      archive-directory: ${LOG_ARCHIVE_DIRECTORY:logs/archive}
+      s3-key-prefix: ${LOG_BACKUP_S3_KEY_PREFIX:logs/mopl}
+      instance-id: ${LOG_BACKUP_INSTANCE_ID:${HOSTNAME:local}}
   watching-session:
     redis:
       enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}

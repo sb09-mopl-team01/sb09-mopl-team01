@@ -5,6 +5,7 @@ import io.micrometer.core.instrument.Timer;
 import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.batch.core.BatchStatus;
@@ -42,9 +43,11 @@ public class BatchScheduler implements SchedulingConfigurer {
 
   private void executeAsSpringBatchJob(BatchTask task) {
     String jobName = task.getJobName();
+    String requestId = UUID.randomUUID().toString();
+    long startedAtNanos = System.nanoTime();
 
     Timer timer = Timer.builder("mopl.batch.execution.time")
-        .description("배치 작업 소요 시간")
+        .description("Batch job execution duration")
         .tag("jobName", jobName)
         .register(meterRegistry);
 
@@ -53,23 +56,52 @@ public class BatchScheduler implements SchedulingConfigurer {
 
       JobParameters params = new JobParametersBuilder()
           .addLong("runTime", System.currentTimeMillis())
-          .addString("requestId", UUID.randomUUID().toString())
+          .addString("requestId", requestId)
           .toJobParameters();
 
+      log.info("Batch execution started. jobName={}, requestId={}", jobName, requestId);
       JobExecution execution = timer.recordCallable(() -> jobLauncher.run(job, params));
+      long durationMs = elapsedMillis(startedAtNanos);
+      Long jobExecutionId = execution == null ? null : execution.getId();
+      BatchStatus batchStatus = execution == null ? BatchStatus.UNKNOWN : execution.getStatus();
 
-      if (execution != null && execution.getStatus() == BatchStatus.COMPLETED) {
+      if (batchStatus == BatchStatus.COMPLETED) {
         meterRegistry.counter("mopl.batch.execution.status", "jobName", jobName, "status", "SUCCESS").increment();
-        log.info("[Spring Batch] 실행 성공 JobName: {}", jobName);
+        log.info(
+            "Batch execution completed. jobName={}, jobExecutionId={}, requestId={}, status={}, durationMs={}",
+            jobName,
+            jobExecutionId,
+            requestId,
+            batchStatus,
+            durationMs
+        );
       } else {
-        // Step 중 하나라도 실패해서 Job이 FAILED 상태로 끝난 경우
         meterRegistry.counter("mopl.batch.execution.status", "jobName", jobName, "status", "FAIL").increment();
-        log.warn("[Spring Batch] 실행 실패 또는 중단 JobName: {}", jobName);
+        log.warn(
+            "Batch execution failed. jobName={}, jobExecutionId={}, requestId={}, status={}, durationMs={}",
+            jobName,
+            jobExecutionId,
+            requestId,
+            batchStatus,
+            durationMs
+        );
       }
 
     } catch (Exception e) {
       meterRegistry.counter("mopl.batch.execution.status", "jobName", jobName, "status", "FAIL").increment();
-      log.error("[Spring Batch] 실행 중 예외 발생 JobName: {}", jobName, e);
+      log.error(
+          "Batch execution failed. jobName={}, requestId={}, durationMs={}, errorType={}, message={}",
+          jobName,
+          requestId,
+          elapsedMillis(startedAtNanos),
+          e.getClass().getSimpleName(),
+          e.getMessage(),
+          e
+      );
     }
+  }
+
+  private long elapsedMillis(long startedAtNanos) {
+    return TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - startedAtNanos);
   }
 }
