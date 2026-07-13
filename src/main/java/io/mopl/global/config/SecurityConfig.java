@@ -148,6 +148,8 @@ public class SecurityConfig {
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
         .requestMatchers("/actuator/health").permitAll()
+        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
+        .hasRole("ADMIN")
         .anyRequest().authenticated();
   }
 }
