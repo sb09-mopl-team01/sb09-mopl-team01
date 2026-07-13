@@ -57,9 +57,17 @@ class PlaylistControllerTest {
   void createPlaylist() {
     PlaylistCreateRequest request = new PlaylistCreateRequest("제목", "설명");
 
-    ResponseEntity<Void> response = playlistController.createPlaylist(mockUserDetails, request);
+    UUID expectedId = UUID.randomUUID();
+    PlaylistDto mockDto = mock(PlaylistDto.class);
+    given(mockDto.id()).willReturn(expectedId);
+
+    given(playlistService.createPlaylist(eq(userId), any())).willReturn(mockDto);
+
+    ResponseEntity<PlaylistDto> response = playlistController.createPlaylist(mockUserDetails, request);
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.CREATED);
+    assertThat(response.getHeaders().getLocation().getPath()).isEqualTo("/api/playlists/" + expectedId); // 헤더 검증 추가
+    assertThat(response.getBody()).isEqualTo(mockDto);
     verify(playlistService).createPlaylist(eq(userId), any());
   }
 
