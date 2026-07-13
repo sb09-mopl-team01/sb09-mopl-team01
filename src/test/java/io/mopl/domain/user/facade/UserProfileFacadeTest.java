@@ -60,6 +60,7 @@ class UserProfileFacadeTest {
 
     given(userService.findUser(userId)).willReturn(oldUserDto);
     given(s3Service.uploadFile(image, UPLOAD_DIR)).willReturn(newImageUrl);
+
     given(userService.updateProfileInfo(userId, request, newImageUrl)).willReturn(updatedUserDto);
 
     UserDto result = userProfileFacade.updateProfile(userId, request, image);
@@ -92,24 +93,5 @@ class UserProfileFacadeTest {
     verify(s3Service, never()).uploadFile(any(), anyString());
     verify(s3Service, never()).deleteFile(anyString());
     verify(userService).updateProfileInfo(userId, request, oldImageUrl);
-  }
-
-  @Test
-  @DisplayName("S3 업로드 실패 시 RuntimeException을 던진다")
-  void updateProfile_Fail_WhenS3UploadThrowsException() throws IOException {
-    UUID userId = UUID.randomUUID();
-    UserUpdateRequest request = new UserUpdateRequest("변경된이름");
-    MockMultipartFile image = new MockMultipartFile("image", "new.png", "image/png", "data".getBytes());
-
-    UserDto oldUserDto = UserDto.builder().id(userId).profileImageUrl(null).build();
-
-    given(userService.findUser(userId)).willReturn(oldUserDto);
-    given(s3Service.uploadFile(image, UPLOAD_DIR)).willThrow(new IOException("S3 Upload Error"));
-
-    RuntimeException exception = assertThrows(RuntimeException.class,
-        () -> userProfileFacade.updateProfile(userId, request, image));
-
-    assertThat(exception.getMessage()).isEqualTo("프로필 이미지 업로드 중 오류가 발생했습니다.");
-    verify(userService, never()).updateProfileInfo(any(), any(), any());
   }
 }

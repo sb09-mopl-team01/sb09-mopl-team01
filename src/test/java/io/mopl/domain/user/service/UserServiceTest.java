@@ -146,7 +146,7 @@ class UserServiceTest {
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(userMapper.toDto(user)).willReturn(updatedUserDto);
 
-    UserDto result = userService.updateProfile(userId, request, null);
+    UserDto result = userService.updateProfileInfo(userId, request, null);
 
     assertThat(result.name()).isEqualTo("새로운이름");
     verify(user).updateProfile(request.name(), null);
