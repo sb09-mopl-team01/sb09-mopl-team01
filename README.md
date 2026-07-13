@@ -64,6 +64,18 @@ flowchart LR
 - `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 만료 정책을 조정할 수 있습니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
 - 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
 
+## Kafka 및 스키마 마이그레이션 기반
+
+- Flyway는 기본적으로 활성화되어 있으며(`FLYWAY_ENABLED=true`), `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다.
+- Kafka는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 현재는 연결 설정만 제공하며, 이벤트 발행·소비는 후속 작업에서 추가합니다.
+
+| 환경 변수 | 기본값 | 용도 |
+| --- | --- | --- |
+| `KAFKA_ENABLED` | `false` | Kafka listener와 health check 활성화 여부 |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
+| `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
+| `FLYWAY_ENABLED` | `true` | Flyway 마이그레이션 활성화 여부 |
+
 ## 프로젝트 구조
 
 ```text
@@ -96,7 +108,7 @@ chmod +x gradlew
 ```
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
-인메모리 H2 데이터베이스를 사용합니다.
+인메모리 H2 데이터베이스를 사용합니다. 테스트 프로필은 Flyway와 Kafka 자동 구성을 비활성화하므로 외부 PostgreSQL, Kafka, Schema Registry 연결이 필요하지 않습니다.
 
 
 ## 문서
