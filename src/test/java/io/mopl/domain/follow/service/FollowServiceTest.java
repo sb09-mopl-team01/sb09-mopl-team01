@@ -11,6 +11,7 @@ import static org.mockito.Mockito.verify;
 import io.mopl.domain.follow.dto.FollowCreateRequest;
 import io.mopl.domain.follow.dto.FollowDto;
 import io.mopl.domain.follow.entity.Follow;
+import io.mopl.domain.follow.event.FollowCancelledEvent;
 import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
@@ -132,6 +133,15 @@ class FollowServiceTest {
     followService.unfollow(followerId, followId);
 
     verify(followRepository).delete(follow);
+    verify(eventPublisher).publish(argThat(event -> {
+      if (!(event instanceof FollowCancelledEvent followCancelledEvent)) {
+        return false;
+      }
+      return followCancelledEvent.followId().equals(followId)
+          && followCancelledEvent.followerId().equals(followerId)
+          && followCancelledEvent.followeeId().equals(followeeId)
+          && followCancelledEvent.occurredAt() != null;
+    }));
   }
 
   @Test
@@ -148,6 +158,7 @@ class FollowServiceTest {
     assertThatThrownBy(() -> followService.unfollow(otherUserId, followId))
         .isInstanceOf(BaseException.class)
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+    verify(eventPublisher, never()).publish(any());
   }
 
   @Test
@@ -160,6 +171,7 @@ class FollowServiceTest {
     assertThatThrownBy(() -> followService.unfollow(followerId, followId))
         .isInstanceOf(BaseException.class)
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
+    verify(eventPublisher, never()).publish(any());
   }
 
   @Test
