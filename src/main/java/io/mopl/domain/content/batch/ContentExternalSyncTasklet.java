@@ -29,6 +29,7 @@ public class ContentExternalSyncTasklet implements Tasklet {
 
   private final ContentExternalSyncService contentExternalSyncService;
   private final JobExplorer jobExplorer;
+  private final ContentExternalSyncMetrics contentExternalSyncMetrics;
 
   @Override
   public RepeatStatus execute(StepContribution contribution, ChunkContext chunkContext) {
@@ -37,6 +38,7 @@ public class ContentExternalSyncTasklet implements Tasklet {
     try {
       ExternalContentSyncResult result = contentExternalSyncService.syncExternalContents();
       putResultToExecutionContext(chunkContext, result);
+      contentExternalSyncMetrics.record(result);
       log.info(
           "Content externalSync completed. fetchedCount={}, acceptedCount={}, filteredCount={}, createdCount={}, skippedCount={}, failedCount={}, syncedAt={}",
           result.fetchedCount(),
