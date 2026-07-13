@@ -1,5 +1,7 @@
 package io.mopl.domain.watchingsession.websocket;
 
+import io.mopl.domain.watchingsession.realtime.WatchingSessionLeaseStore;
+import io.mopl.domain.watchingsession.realtime.WatchingSessionNodeId;
 import io.mopl.domain.watchingsession.service.WatchingSessionService;
 import java.util.Optional;
 import java.util.UUID;
@@ -21,6 +23,8 @@ public class WatchingSessionSubscriptionEventHandler {
   private final WatchingSessionService watchingSessionService;
   private final WatchingSessionSubscriptionRegistry subscriptionRegistry;
   private final WatchingSessionSubscriptionResolver subscriptionResolver;
+  private final WatchingSessionLeaseStore leaseStore;
+  private final WatchingSessionNodeId nodeId;
 
   @EventListener
   public void handleSubscribe(SessionSubscribeEvent event) {
@@ -34,13 +38,22 @@ public class WatchingSessionSubscriptionEventHandler {
     if (watcherId == null) {
       return;
     }
-    subscriptionRegistry.register(
+    WatchingSessionSubscription subscription = new WatchingSessionSubscription(watcherId, contentId.get());
+    boolean firstLocalSubscription = subscriptionRegistry.register(
         accessor.getSessionId(),
         accessor.getSubscriptionId(),
         watcherId,
         contentId.get()
     );
-    watchingSessionService.startWatchingBySubscription(watcherId, contentId.get());
+    if (firstLocalSubscription && leaseStore.acquire(subscription, nodeId.value())) {
+      try {
+        watchingSessionService.startWatchingBySubscription(watcherId, contentId.get());
+      } catch (RuntimeException e) {
+        subscriptionRegistry.unregister(accessor.getSessionId(), accessor.getSubscriptionId());
+        leaseStore.release(subscription, nodeId.value());
+        throw e;
+      }
+    }
   }
 
   @EventListener
@@ -58,7 +71,16 @@ public class WatchingSessionSubscriptionEventHandler {
   }
 
   private void endWatching(WatchingSessionSubscription subscription) {
-    watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
+    if (leaseStore.release(subscription, nodeId.value())) {
+      try {
+        watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
+      } catch (RuntimeException e) {
+        // 종료 처리 실패 시 lease를 복구해 만료 정리 작업이 재시도할 수 있게 한다.
+        leaseStore.acquire(subscription, nodeId.value());
+        log.warn("Failed to end watching session after final lease release. watcherId={}, contentId={}",
+            subscription.watcherId(), subscription.contentId(), e);
+      }
+    }
   }
 
   private Optional<UUID> resolveContentId(StompHeaderAccessor accessor) {

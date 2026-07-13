@@ -14,14 +14,14 @@ public class WatchingSessionSubscriptionRegistry {
   private final Map<SubscriptionKey, WatchingSessionSubscription> subscriptions = new HashMap<>();
   private final Map<WatchingSessionSubscription, Integer> activeCounts = new HashMap<>();
 
-  public synchronized void register(
+  public synchronized boolean register(
       String sessionId,
       String subscriptionId,
       UUID watcherId,
       UUID contentId
   ) {
     if (sessionId == null || subscriptionId == null) {
-      return;
+      return false;
     }
 
     SubscriptionKey key = new SubscriptionKey(sessionId, subscriptionId);
@@ -29,8 +29,11 @@ public class WatchingSessionSubscriptionRegistry {
         new WatchingSessionSubscription(watcherId, contentId);
     WatchingSessionSubscription previous = subscriptions.putIfAbsent(key, subscription);
     if (previous == null) {
-      activeCounts.merge(subscription, 1, Integer::sum);
+      int activeCount = activeCounts.getOrDefault(subscription, 0);
+      activeCounts.put(subscription, activeCount + 1);
+      return activeCount == 0;
     }
+    return false;
   }
 
   public synchronized List<WatchingSessionSubscription> unregister(
@@ -60,6 +63,10 @@ public class WatchingSessionSubscriptionRegistry {
       endedSubscriptions.addAll(decrement(subscription));
     }
     return endedSubscriptions;
+  }
+
+  public synchronized List<WatchingSessionSubscription> activeSubscriptions() {
+    return List.copyOf(activeCounts.keySet());
   }
 
   private List<WatchingSessionSubscription> decrement(WatchingSessionSubscription subscription) {
