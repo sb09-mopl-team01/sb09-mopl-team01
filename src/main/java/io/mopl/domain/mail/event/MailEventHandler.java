@@ -15,6 +15,6 @@ public class MailEventHandler {
   @Async
   @EventListener
   public void handleTempPasswordIssuedEvent(TempPasswordIssuedEvent event) {
-    mailService.sendTempPasswordEmail(event.email(), event.tempPassword());
+    mailService.sendTempPasswordEmail(event.userId(), event.tempPassword());
   }
 }

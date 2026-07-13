@@ -10,6 +10,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.core.ValueOperations;
 
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -43,21 +44,21 @@ class TempPasswordServiceTest {
   @Test
   @DisplayName("saveTempPassword - Redis에 3분 만료로 정상 저장")
   void saveTempPassword_Success() {
-    String email = "test@example.com";
+    UUID userId = UUID.randomUUID();
     String tempPw = "encodedPw123";
 
-    tempPasswordService.saveTempPassword(email, tempPw);
+    tempPasswordService.saveTempPassword(userId, tempPw);
 
-    verify(valueOperations).set("TEMP_PW:" + email, tempPw, 3, TimeUnit.MINUTES);
+    verify(valueOperations).set("TEMP_PW:" + userId, tempPw, 3, TimeUnit.MINUTES);
   }
 
   @Test
   @DisplayName("getTempPassword - 존재하는 임시 비밀번호 조회")
   void getTempPassword_Exists_ReturnsPassword() {
-    String email = "test@example.com";
-    when(valueOperations.get("TEMP_PW:" + email)).thenReturn("encodedPw123");
+    UUID userId = UUID.randomUUID();
+    when(valueOperations.get("TEMP_PW:" + userId)).thenReturn("encodedPw123");
 
-    String result = tempPasswordService.getTempPassword(email);
+    String result = tempPasswordService.getTempPassword(userId);
 
     assertEquals("encodedPw123", result);
   }
@@ -65,10 +66,10 @@ class TempPasswordServiceTest {
   @Test
   @DisplayName("getTempPassword - 존재하지 않으면 null 반환")
   void getTempPassword_NotExists_ReturnsNull() {
-    String email = "notfound@example.com";
-    when(valueOperations.get("TEMP_PW:" + email)).thenReturn(null);
+    UUID userId = UUID.randomUUID();
+    when(valueOperations.get("TEMP_PW:" + userId)).thenReturn(null);
 
-    String result = tempPasswordService.getTempPassword(email);
+    String result = tempPasswordService.getTempPassword(userId);
 
     assertNull(result);
   }
@@ -76,10 +77,10 @@ class TempPasswordServiceTest {
   @Test
   @DisplayName("deleteTempPassword - Redis 키 삭제 요청")
   void deleteTempPassword_Success() {
-    String email = "test@example.com";
+    UUID userId = UUID.randomUUID();
 
-    tempPasswordService.deleteTempPassword(email);
+    tempPasswordService.deleteTempPassword(userId);
 
-    verify(redisTemplate).delete("TEMP_PW:" + email);
+    verify(redisTemplate).delete("TEMP_PW:" + userId);
   }
 }

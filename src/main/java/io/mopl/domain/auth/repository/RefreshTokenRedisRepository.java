@@ -1,6 +1,7 @@
 package io.mopl.domain.auth.repository;
 
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,6 +16,7 @@ public class RefreshTokenRedisRepository implements RefreshTokenRepository {
 
   private final StringRedisTemplate redisTemplate;
   private static final String KEY_PREFIX = "AUTH:RT:";
+
   @Value("${jwt.max-active-tokens}")
   private int maxActiveTokens;
 
@@ -22,8 +24,8 @@ public class RefreshTokenRedisRepository implements RefreshTokenRepository {
   private long refreshTokenValiditySeconds;
 
   @Override
-  public void save(String email, String refreshToken) {
-    String key = KEY_PREFIX + email;
+  public void save(UUID userId, String refreshToken) {
+    String key = KEY_PREFIX + userId;
 
     redisTemplate.opsForList().rightPush(key, refreshToken);
 
@@ -35,20 +37,20 @@ public class RefreshTokenRedisRepository implements RefreshTokenRepository {
   }
 
   @Override
-  public boolean isValid(String email, String refreshToken) {
-    String key = KEY_PREFIX + email;
+  public boolean isValid(UUID userId, String refreshToken) {
+    String key = KEY_PREFIX + userId;
     List<String> tokens = redisTemplate.opsForList().range(key, 0, -1);
     return tokens != null && tokens.contains(refreshToken);
   }
 
   @Override
-  public void deleteByEmail(String email) {
-    redisTemplate.delete(KEY_PREFIX + email);
+  public void deleteByUserId(UUID userId) {
+    redisTemplate.delete(KEY_PREFIX + userId);
   }
 
   @Override
-  public void removeToken(String email, String refreshToken) {
-    String key = KEY_PREFIX + email;
+  public void removeToken(UUID userId, String refreshToken) {
+    String key = KEY_PREFIX + userId;
     redisTemplate.opsForList().remove(key, 1, refreshToken);
   }
 }

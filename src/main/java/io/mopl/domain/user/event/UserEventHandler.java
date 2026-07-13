@@ -26,10 +26,10 @@ public class UserEventHandler {
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handlePasswordChangedEvent(UserPasswordChangeEvent event) {
     try {
-      tempPasswordService.deleteTempPassword(event.email());
-      log.debug("Redis TempPassword deleted successfully for email={}", event.email());
+      tempPasswordService.deleteTempPassword(event.userId());
+      log.debug("Redis TempPassword deleted successfully for userId={}", event.userId());
     } catch (Exception e) {
-      log.warn("Redis TempPassword deletion failed after DB commit. email={}", event.email(), e);
+      log.warn("Redis TempPassword deletion failed after DB commit. userId={}", event.userId(), e);
     }
   }
 
@@ -41,10 +41,10 @@ public class UserEventHandler {
           "true",
           Duration.ofSeconds(accessTokenValiditySeconds)
       );
-      refreshTokenRepository.deleteByEmail(event.email());
-      log.debug("Redis Lock status updated successfully for user={}", event.email());
+      refreshTokenRepository.deleteByUserId(event.userId());
+      log.debug("Redis Lock status updated successfully for user={}", event.userId());
     } catch (Exception e) {
-      log.error("Redis Lock status update failed for user={}", event.email(), e);
+      log.error("Redis Lock status update failed for user={}", event.userId(), e);
     }
   }
 

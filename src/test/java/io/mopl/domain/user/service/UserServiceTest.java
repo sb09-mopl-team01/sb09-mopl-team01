@@ -23,7 +23,6 @@ import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
-import io.mopl.domain.user.storage.ProfileImageStorage;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -179,7 +178,7 @@ class UserServiceTest {
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
-    given(user.getEmail()).willReturn("test@example.com");
+    given(user.getId()).willReturn(userId);
 
     userService.changePassword(userId, request);
 
@@ -196,7 +195,6 @@ class UserServiceTest {
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(user.getId()).willReturn(userId);
-    given(user.getEmail()).willReturn("test@example.com");
 
     userService.updateUserLockStatus(userId, request);
 

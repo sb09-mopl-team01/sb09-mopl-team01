@@ -3,6 +3,7 @@ package io.mopl.domain.auth.repository;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Repository;
@@ -15,7 +16,7 @@ import java.util.concurrent.ConcurrentHashMap;
 @RequiredArgsConstructor
 public class RefreshTokenMemoryRepository implements RefreshTokenRepository{
 
-  private final Map<String, List<String>> tokenStorage = new ConcurrentHashMap<>();
+  private final Map<UUID, List<String>> tokenStorage = new ConcurrentHashMap<>();
 
   @Value("${auth.max-active-tokens}")
   private int maxActiveTokens;
@@ -23,8 +24,8 @@ public class RefreshTokenMemoryRepository implements RefreshTokenRepository{
   @Value("${auth.refresh-ttl-millis}")
   private long refreshTokenTtlMillis;
 
-  public void save(String email, String refreshToken) {
-    tokenStorage.compute(email, (key, tokens) -> {
+  public void save(UUID userId, String refreshToken) {
+    tokenStorage.compute(userId, (key, tokens) -> {
       if (tokens == null) {
         tokens = Collections.synchronizedList(new ArrayList<>());
       }
@@ -38,17 +39,17 @@ public class RefreshTokenMemoryRepository implements RefreshTokenRepository{
     });
   }
 
-  public boolean isValid(String email, String refreshToken) {
-    List<String> tokens = tokenStorage.get(email);
+  public boolean isValid(UUID userId, String refreshToken) {
+    List<String> tokens = tokenStorage.get(userId);
     return tokens != null && tokens.contains(refreshToken);
   }
 
-  public void deleteByEmail(String email) {
-    tokenStorage.remove(email);
+  public void deleteByUserId(UUID userId) {
+    tokenStorage.remove(userId);
   }
 
-  public void removeToken(String email, String refreshToken) {
-    tokenStorage.computeIfPresent(email, (key, tokens) -> {
+  public void removeToken(UUID userId, String refreshToken) {
+    tokenStorage.computeIfPresent(userId, (key, tokens) -> {
       tokens.remove(refreshToken);
       return tokens.isEmpty() ? null : tokens;
     });

@@ -125,8 +125,7 @@ public class UserService {
     String newPasswordHash = passwordEncoder.encode(request.password());
     user.changePassword(newPasswordHash);
 
-    eventPublisher.publish(new UserPasswordChangeEvent(user.getEmail()));
-
+    eventPublisher.publish(new UserPasswordChangeEvent(user.getId()));
     log.info("User Update Password Completed. id={}", userId);
   }
 
@@ -141,7 +140,7 @@ public class UserService {
 
     if (request.locked()) {
       user.lockAccount();
-      eventPublisher.publish(new UserLockedEvent(user.getId(), user.getEmail()));
+      eventPublisher.publish(new UserLockedEvent(user.getId()));
     } else {
       user.unlockAccount();
       eventPublisher.publish(new UserUnlockedEvent(user.getId()));
