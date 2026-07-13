@@ -22,6 +22,7 @@ import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -68,6 +69,9 @@ class UserServiceTest {
 
   @Mock
   private ValueOperations<String, String> valueOperations;
+
+  @Mock
+  private DomainEventPublisher eventPublisher;
 
   @Test
   @DisplayName("회원가입 성공")
@@ -144,26 +148,29 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("프로필 수정 성공")
-  void updateProfile_Success() {
+  @DisplayName("순수 프로필 정보 업데이트 성공 (S3 제외)")
+  void updateProfileInfo_Success() {
     UUID userId = UUID.randomUUID();
     UserUpdateRequest request = new UserUpdateRequest("새로운이름");
+    String newImageUrl = "https://s3.amazonaws.com/new-image.jpg";
     User user = mock(User.class);
 
     UserDto updatedUserDto = UserDto.builder()
         .id(userId)
         .name(request.name())
+        .profileImageUrl(newImageUrl)
         .build();
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(userMapper.toDto(user)).willReturn(updatedUserDto);
 
-    UserDto result = userService.updateProfile(userId, request, null);
+    UserDto result = userService.updateProfileInfo(userId, request, newImageUrl);
 
     assertThat(result.name()).isEqualTo("새로운이름");
-    verify(user).updateProfile(request.name(), null);
-  }
+    assertThat(result.profileImageUrl()).isEqualTo(newImageUrl);
 
+    verify(user).updateProfile(request.name(), newImageUrl);
+  }
   @Test
   @DisplayName("권한 변경 성공")
   void updateUserRole_Success() {
@@ -171,11 +178,14 @@ class UserServiceTest {
     UserRoleUpdateRequest request = new UserRoleUpdateRequest(Role.ADMIN);
     User user = mock(User.class);
 
+    given(user.getId()).willReturn(userId);
+    given(user.getRole()).willReturn(Role.USER);
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
 
     userService.updateUserRole(userId, request);
-
     verify(user).updateRole(request.role());
+
+    verify(eventPublisher).publish(any());
   }
 
   @Test

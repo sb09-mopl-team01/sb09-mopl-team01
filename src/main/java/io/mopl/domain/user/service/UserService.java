@@ -89,36 +89,16 @@ public class UserService {
 
   @CachePut(value = CacheKey.USER, key = "#userId")
   @Transactional
-  public UserDto updateProfile(UUID userId, UserUpdateRequest request, MultipartFile image) {
+  public UserDto updateProfileInfo(UUID userId, UserUpdateRequest request, String newImageUrl) {
     User user = userRepository.findById(userId)
         .orElseThrow(() -> {
-          log.info("User Update Profile Failed. User not found. id={}", userId);
+          log.warn("User Update Profile Failed. User not found. id={}", userId);
           return new UserNotFoundException();
         });
 
-    String oldImageUrl = user.getProfileImageUrl();
-    String newImageUrl = oldImageUrl;
-
-    if (image != null && !image.isEmpty()) {
-      try {
-        newImageUrl = profileImageStorage.store(image);
-      } catch (Exception e) {
-        log.warn("User Update Profile Image Failed. url={}", oldImageUrl);
-        throw new BaseException(ErrorCode.PROFILE_IMAGE_UPLOAD_FAIL);
-      }
-    }
-
     user.updateProfile(request.name(), newImageUrl);
 
-    if (image != null && !image.isEmpty() && oldImageUrl != null) {
-      try {
-        profileImageStorage.delete(oldImageUrl);
-      } catch (Exception e) {
-        log.warn("User Delete Previous Profile Image Failed. url={}", oldImageUrl);
-      }
-    }
-
-    log.info("User Update Profile Completed. id={}", userId);
+    log.info("User Update Profile Info Completed. id={}", userId);
     return userMapper.toDto(user);
   }
 
