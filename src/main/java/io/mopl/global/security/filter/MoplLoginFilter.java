@@ -1,8 +1,11 @@
 package io.mopl.global.security.filter;
 
+import io.mopl.global.exception.ErrorCode;
+import io.mopl.global.security.MoplUserDetails;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.authentication.LockedException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
@@ -10,9 +13,12 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 public class MoplLoginFilter extends UsernamePasswordAuthenticationFilter {
 
-  public MoplLoginFilter (AuthenticationManager authenticationManager) {
+  public MoplLoginFilter(AuthenticationManager authenticationManager) {
     super(authenticationManager);
     setFilterProcessesUrl("/api/auth/sign-in");
+
+    setUsernameParameter("username");
+    setPasswordParameter("password");
   }
 
   @Override
@@ -23,6 +29,14 @@ public class MoplLoginFilter extends UsernamePasswordAuthenticationFilter {
 
     UsernamePasswordAuthenticationToken authRequest = new UsernamePasswordAuthenticationToken(email, password);
 
-    return this.getAuthenticationManager().authenticate(authRequest);
+    Authentication authResult = this.getAuthenticationManager().authenticate(authRequest);
+
+    MoplUserDetails userDetails = (MoplUserDetails) authResult.getPrincipal();
+
+    if (!userDetails.isAccountNonLocked()) {
+      throw new LockedException(ErrorCode.ACCOUNT_LOCKED.getMessage());
+    }
+
+    return authResult;
   }
 }

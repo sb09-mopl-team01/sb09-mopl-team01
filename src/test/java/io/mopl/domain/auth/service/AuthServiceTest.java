@@ -2,12 +2,13 @@ package io.mopl.domain.auth.service;
 
 import io.mopl.domain.auth.dto.TokenRefreshResult;
 import io.mopl.domain.auth.repository.RefreshTokenRepository;
-import io.mopl.domain.mail.service.MailService;
+import io.mopl.domain.mail.event.TempPasswordIssuedEvent;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.MoplUserDetails;
@@ -22,6 +23,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.util.Optional;
+import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -38,7 +40,7 @@ class AuthServiceTest {
   @Mock private UserMapper userMapper;
   @Mock private UserRepository userRepository;
   @Mock private TempPasswordService tempPasswordService;
-  @Mock private MailService mailService;
+  @Mock private DomainEventPublisher eventPublisher;
   @Mock private PasswordEncoder passwordEncoder;
 
   @Test
@@ -46,11 +48,13 @@ class AuthServiceTest {
   void refreshTokens_Success() {
     String oldRefreshToken = "old-refresh-token";
     String email = "test@example.com";
+    UUID userId = UUID.randomUUID();
     MoplUserDetails mockUserDetails = mock(MoplUserDetails.class);
 
     when(jwtProvider.validateToken(oldRefreshToken)).thenReturn(true);
     when(jwtProvider.getUsername(oldRefreshToken)).thenReturn(email);
-    when(refreshTokenRepository.isValid(email, oldRefreshToken)).thenReturn(true);
+    when(jwtProvider.getUserId(oldRefreshToken)).thenReturn(userId);
+    when(refreshTokenRepository.isValid(userId, oldRefreshToken)).thenReturn(true);
     when(userDetailsService.loadUserByUsername(email)).thenReturn(mockUserDetails);
 
     when(mockUserDetails.isAccountNonLocked()).thenReturn(true);
@@ -66,8 +70,8 @@ class AuthServiceTest {
     assertNotNull(result);
     assertEquals("new-access-token", result.newAccessToken());
     assertEquals("new-refresh-token", result.newRefreshToken());
-    verify(refreshTokenRepository).removeToken(email, oldRefreshToken);
-    verify(refreshTokenRepository).save(email, "new-refresh-token");
+    verify(refreshTokenRepository).removeToken(userId, oldRefreshToken);
+    verify(refreshTokenRepository).save(userId, "new-refresh-token");
   }
 
   @Test
@@ -86,11 +90,11 @@ class AuthServiceTest {
   @DisplayName("refreshTokens - 저장소에 없거나 조작된 리프레시 토큰인 경우 예외 발생")
   void refreshTokens_ExpiredOrManipulatedToken_ThrowsException() {
     String manipulatedToken = "manipulated-token";
-    String email = "test@example.com";
+    UUID userId = UUID.randomUUID();
 
     when(jwtProvider.validateToken(manipulatedToken)).thenReturn(true);
-    when(jwtProvider.getUsername(manipulatedToken)).thenReturn(email);
-    when(refreshTokenRepository.isValid(email, manipulatedToken)).thenReturn(false);
+    when(jwtProvider.getUserId(manipulatedToken)).thenReturn(userId);
+    when(refreshTokenRepository.isValid(userId, manipulatedToken)).thenReturn(false);
 
     BaseException exception = assertThrows(BaseException.class,
         () -> authService.refreshTokens(manipulatedToken));
@@ -102,17 +106,21 @@ class AuthServiceTest {
   @DisplayName("resetPassword - 성공")
   void resetPassword_Success() {
     String email = "test@example.com";
+    UUID userId = UUID.randomUUID();
     String tempPw = "temp1234";
     String encodedPw = "encodedTemp1234";
 
-    when(userRepository.findByEmail(email)).thenReturn(Optional.of(mock(User.class)));
+    User user = mock(User.class);
+    when(user.getId()).thenReturn(userId);
+
+    when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
     when(tempPasswordService.generateRandomPassword()).thenReturn(tempPw);
     when(passwordEncoder.encode(tempPw)).thenReturn(encodedPw);
 
     authService.resetPassword(email);
 
-    verify(tempPasswordService).saveTempPassword(email, encodedPw);
-    verify(mailService).sendTempPasswordEmail(email, tempPw);
+    verify(tempPasswordService).saveTempPassword(userId, encodedPw);
+    verify(eventPublisher).publish(any(TempPasswordIssuedEvent.class));
   }
 
   @Test

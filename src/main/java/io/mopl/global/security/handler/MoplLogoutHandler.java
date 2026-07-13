@@ -5,6 +5,7 @@ import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.sse.SseNotificationService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.logout.LogoutHandler;
@@ -19,12 +20,10 @@ public class MoplLogoutHandler implements LogoutHandler {
 
   @Override
   public void logout(HttpServletRequest request, HttpServletResponse response, Authentication authentication) {
-    if (authentication != null) {
-      String email = authentication.getName();
-      refreshTokenRepository.deleteByEmail(email);
-      if (authentication.getPrincipal() instanceof MoplUserDetails userDetails) {
-        sseNotificationService.closeByReceiverId(userDetails.getUser().getId());
-      }
+    if (authentication != null && authentication.getPrincipal() instanceof MoplUserDetails userDetails) {
+      UUID userId = userDetails.getUser().getId();
+      refreshTokenRepository.deleteByUserId(userId);
+      sseNotificationService.closeByReceiverId(userId);
     }
   }
 }

@@ -1,48 +1,41 @@
 package io.mopl.global.security.handler;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mopl.global.exception.ErrorCode;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.AuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 
 import java.io.IOException;
-import java.util.HashMap;
-import java.util.Map;
 
 @Slf4j
 @Component
-@RequiredArgsConstructor
 public class LoginFailureHandler implements AuthenticationFailureHandler {
 
-  private final ObjectMapper objectMapper;
-
   @Override
-  public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
-      AuthenticationException exception) throws IOException, ServletException {
+  public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response, AuthenticationException exception) throws IOException, ServletException {
 
-    log.warn("LoginFailureHandler Login Fail - {}", exception.getMessage());
+    response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+    response.setContentType("application/json;charset=UTF-8");
 
-    response.setStatus(HttpStatus.UNAUTHORIZED.value());
-    response.setContentType(MediaType.APPLICATION_JSON_VALUE);
-    response.setCharacterEncoding("UTF-8");
+    String errorCode = ErrorCode.LOGIN_FAILED.toString();
+    String errorMessage = ErrorCode.LOGIN_FAILED.getMessage();
 
-    Map<String, String> errorResponse = new HashMap<>();
     if (exception instanceof LockedException) {
-      errorResponse.put("code", "ACCOUNT_LOCKED");
-      errorResponse.put("message", "계정이 잠금 처리되었습니다.");
-    } else {
-      errorResponse.put("code", "LOGIN_FAILED");
-      errorResponse.put("message", "아이디 또는 비밀번호가 일치하지 않습니다.");
+      errorCode = ErrorCode.ACCOUNT_LOCKED.toString();
+      errorMessage = ErrorCode.ACCOUNT_LOCKED.getMessage();
+      log.warn("Login attempt blocked for locked account");
     }
 
-    objectMapper.writeValue(response.getWriter(), errorResponse);
+    String jsonResponse = String.format(
+        "{\"status\": 401, \"code\": \"%s\", \"message\": \"%s\"}",
+        errorCode, errorMessage
+    );
+
+    response.getWriter().write(jsonResponse);
   }
 }

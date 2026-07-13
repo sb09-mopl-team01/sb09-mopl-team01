@@ -1,6 +1,7 @@
 package io.mopl.global.security;
 
 import io.mopl.domain.auth.service.TempPasswordService;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.authentication.AuthenticationProvider;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -25,8 +26,9 @@ public class MoplAuthenticationProvider implements AuthenticationProvider {
     String password = (String) authentication.getCredentials();
 
     MoplUserDetails userDetails = (MoplUserDetails) userDetailsService.loadUserByUsername(email);
+    UUID userId = userDetails.getUser().getId();
 
-    String tempPassword = tempPasswordService.getTempPassword(email);
+    String tempPassword = tempPasswordService.getTempPassword(userId);
     boolean isTempLogin = false;
 
     if (tempPassword != null && passwordEncoder.matches(password, tempPassword)) {

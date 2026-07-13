@@ -20,7 +20,8 @@ public enum ErrorCode {
   EMAIL_DUPLICATION(HttpStatus.CONFLICT, "USER_409", "이메일이 이미 존재합니다"),
   LOGIN_FAILED(HttpStatus.UNAUTHORIZED, "USER_401", "이메일 또는 비밀번호가 틀렸습니다"),
   FORBIDDEN(HttpStatus.FORBIDDEN, "USER_403", "권한이 없습니다"),
-  PROFILE_IMAGE_UPLOAD_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500", "프로필 이미지 저장에 실패했습니다."),
+  PROFILE_IMAGE_UPLOAD_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500_1", "프로필 이미지 저장에 실패했습니다."),
+  PROFILE_IMAGE_DELETE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500_2", "프로필 이미지 삭제에 실패했습니다."),
   PROFILE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "USER_IMAGE_400", "올바르지 않은 이미지 형식입니다."),
 
   // Auth

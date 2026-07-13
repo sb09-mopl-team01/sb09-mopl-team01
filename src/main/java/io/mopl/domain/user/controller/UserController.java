@@ -7,6 +7,7 @@ import io.mopl.domain.user.dto.request.UserCreateRequest;
 import io.mopl.domain.user.dto.request.UserLockUpdateRequest;
 import io.mopl.domain.user.dto.request.UserRoleUpdateRequest;
 import io.mopl.domain.user.dto.request.UserUpdateRequest;
+import io.mopl.domain.user.facade.UserProfileFacade;
 import io.mopl.domain.user.service.UserService;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -31,6 +32,7 @@ import java.util.UUID;
 public class UserController {
 
   private final UserService userService;
+  private final UserProfileFacade userProfileFacade;
 
   @PostMapping
   public ResponseEntity<UserDto> createUser(@Valid @RequestBody UserCreateRequest request) {
@@ -73,8 +75,8 @@ public class UserController {
       @RequestPart(value = "image", required = false) MultipartFile image
   ) {
     log.debug("User Update Profile Requested. id={}", userId);
-    UserDto response = userService.updateProfile(userId, request, image);
-    return ResponseEntity.ok(response);
+    UserDto updatedUser = userProfileFacade.updateProfile(userId, request, image);
+    return ResponseEntity.ok(updatedUser);
   }
 
   @PreAuthorize("hasRole('ADMIN')")
