@@ -82,6 +82,8 @@ class BatchSchedulerTest {
 
     double successCount = meterRegistry.counter("mopl.batch.execution.status", "jobName", "testJob", "status", "SUCCESS").count();
     assertThat(successCount).isEqualTo(1.0);
+    assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
+        .isEqualTo(1L);
   }
 
   @Test
@@ -115,6 +117,8 @@ class BatchSchedulerTest {
 
     double failCount = meterRegistry.counter("mopl.batch.execution.status", "jobName", "testJob", "status", "FAIL").count();
     assertThat(failCount).isEqualTo(1.0);
+    assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
+        .isEqualTo(1L);
   }
 
   @Test
