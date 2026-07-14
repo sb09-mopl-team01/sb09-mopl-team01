@@ -89,6 +89,8 @@ class BatchSchedulerTest {
         .contains("Batch execution completed. jobName=testJob, jobExecutionId=1")
         .contains("status=COMPLETED")
         .contains("durationMs=");
+    assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
+        .isEqualTo(1L);
   }
 
   @Test
@@ -125,6 +127,8 @@ class BatchSchedulerTest {
     assertThat(output)
         .contains("Batch execution failed. jobName=testJob, jobExecutionId=1")
         .contains("status=FAILED");
+    assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
+        .isEqualTo(1L);
   }
 
   @Test
