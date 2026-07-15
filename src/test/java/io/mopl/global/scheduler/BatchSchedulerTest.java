@@ -16,6 +16,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -25,7 +27,7 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.scheduling.config.ScheduledTaskRegistrar;
 import org.springframework.scheduling.Trigger;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class BatchSchedulerTest {
 
   @Mock
@@ -71,7 +73,7 @@ class BatchSchedulerTest {
 
   @Test
   @DisplayName("배치 작업 성공 시 SUCCESS 카운터가 증가한다")
-  void executeJob_Success_IncrementsSuccessCounter() throws Exception {
+  void executeJob_Success_IncrementsSuccessCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
     JobExecution successExecution = new JobExecution(1L);
@@ -82,6 +84,11 @@ class BatchSchedulerTest {
 
     double successCount = meterRegistry.counter("mopl.batch.execution.status", "jobName", "testJob", "status", "SUCCESS").count();
     assertThat(successCount).isEqualTo(1.0);
+    assertThat(output)
+        .contains("Batch execution started. jobName=testJob")
+        .contains("Batch execution completed. jobName=testJob, jobExecutionId=1")
+        .contains("status=COMPLETED")
+        .contains("durationMs=");
     assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
         .isEqualTo(1L);
   }
@@ -106,7 +113,7 @@ class BatchSchedulerTest {
 
   @Test
   @DisplayName("배치 작업 실패(FAILED 상태) 시 FAIL 카운터가 증가한다")
-  void executeJob_FailedStatus_IncrementsFailCounter() throws Exception {
+  void executeJob_FailedStatus_IncrementsFailCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
     JobExecution failedExecution = new JobExecution(1L);
@@ -117,13 +124,16 @@ class BatchSchedulerTest {
 
     double failCount = meterRegistry.counter("mopl.batch.execution.status", "jobName", "testJob", "status", "FAIL").count();
     assertThat(failCount).isEqualTo(1.0);
+    assertThat(output)
+        .contains("Batch execution failed. jobName=testJob, jobExecutionId=1")
+        .contains("status=FAILED");
     assertThat(meterRegistry.timer("mopl.batch.execution.time", "jobName", "testJob").count())
         .isEqualTo(1L);
   }
 
   @Test
   @DisplayName("배치 작업 중 예외 발생 시 FAIL 카운터가 증가한다")
-  void executeJob_ExceptionThrown_IncrementsFailCounter() throws Exception {
+  void executeJob_ExceptionThrown_IncrementsFailCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
     // 예외를 강제로 발생시킴
@@ -133,6 +143,10 @@ class BatchSchedulerTest {
 
     double failCount = meterRegistry.counter("mopl.batch.execution.status", "jobName", "testJob", "status", "FAIL").count();
     assertThat(failCount).isEqualTo(1.0);
+    assertThat(output)
+        .contains("Batch execution failed. jobName=testJob")
+        .contains("errorType=RuntimeException")
+        .contains("message=Job execution failed");
   }
 
   private Runnable captureScheduledAction() {
