@@ -53,15 +53,17 @@ class JwtProviderTest {
   }
 
   @Test
-  @DisplayName("리프레시 토큰 생성 성공")
+  @DisplayName("리프레시 토큰 생성 및 userId 추출 성공")
   void generateRefreshToken_Success() {
     String email = "test@example.com";
+    String userIdStr = UUID.randomUUID().toString();
 
-    String token = jwtProvider.generateRefreshToken(email);
+    String token = jwtProvider.generateRefreshToken(email, userIdStr);
 
     assertNotNull(token);
     assertTrue(jwtProvider.validateToken(token));
     assertEquals(email, jwtProvider.getUsername(token));
+    assertEquals(UUID.fromString(userIdStr), jwtProvider.getUserId(token));
   }
 
   @Test
