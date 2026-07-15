@@ -7,9 +7,11 @@ import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.content.entity.Content;
+import io.mopl.domain.content.event.ReviewStatsChangedEvent;
 import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.review.dto.ReviewDto;
 import io.mopl.domain.review.dto.request.ReviewCreateRequest;
@@ -32,6 +34,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +51,8 @@ class ReviewServiceTest {
   private ContentRepository contentRepository;
   @Mock
   private ReviewMapper reviewMapper;
+  @Mock
+  private ApplicationEventPublisher eventPublisher;
 
   private ReviewCreateRequest createReviewRequest(UUID contentId, String text, Double rating) {
     ReviewCreateRequest request = new ReviewCreateRequest();
@@ -61,11 +66,13 @@ class ReviewServiceTest {
   @DisplayName("리뷰 생성 성공")
   void createReview_Success() {
     UUID userId = UUID.randomUUID();
-    ReviewCreateRequest request = createReviewRequest(UUID.randomUUID(), "중복", 5.0);
+    UUID contentId = UUID.randomUUID();
+    ReviewCreateRequest request = createReviewRequest(contentId, "중복", 5.0);
+    Content content = mock(Content.class);
+    given(content.getId()).willReturn(contentId);
 
     given(userRepository.findById(userId)).willReturn(Optional.of(mock(User.class)));
-    given(contentRepository.findById(request.getContentId())).willReturn(
-        Optional.of(mock(Content.class)));
+    given(contentRepository.findById(request.getContentId())).willReturn(Optional.of(content));
     given(reviewRepository.existsByAuthorIdAndContentId(userId, request.getContentId())).willReturn(
         false);
 
@@ -78,6 +85,7 @@ class ReviewServiceTest {
     reviewService.createReview(userId, request);
 
     verify(reviewRepository).save(any(Review.class));
+    verify(eventPublisher).publishEvent(new ReviewStatsChangedEvent(contentId));
   }
 
   @Test
@@ -95,6 +103,7 @@ class ReviewServiceTest {
     BaseException ex = assertThrows(BaseException.class,
         () -> reviewService.createReview(userId, request));
     assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.ALREADY_REVIEWED);
+    verify(eventPublisher, never()).publishEvent(any());
   }
 
   @Test
@@ -109,16 +118,20 @@ class ReviewServiceTest {
 
     User user = mock(User.class);
     given(user.getId()).willReturn(userId);
+    UUID contentId = UUID.randomUUID();
+    Content content = mock(Content.class);
+    given(content.getId()).willReturn(contentId);
 
     Review review = mock(Review.class);
     given(review.getAuthor()).willReturn(user);
-    given(review.getContent()).willReturn(mock(Content.class));
+    given(review.getContent()).willReturn(content);
     given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
     given(reviewMapper.toDto(review)).willReturn(mock(ReviewDto.class));
 
     reviewService.updateReview(userId, reviewId, request);
 
     verify(review).update("수정", 4.0);
+    verify(eventPublisher).publishEvent(new ReviewStatsChangedEvent(contentId));
   }
 
   @Test
@@ -147,14 +160,18 @@ class ReviewServiceTest {
 
     User user = mock(User.class);
     given(user.getId()).willReturn(userId);
+    UUID contentId = UUID.randomUUID();
+    Content content = mock(Content.class);
+    given(content.getId()).willReturn(contentId);
 
     Review review = mock(Review.class);
     given(review.getAuthor()).willReturn(user);
-    given(review.getContent()).willReturn(mock(Content.class));
+    given(review.getContent()).willReturn(content);
     given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
 
     reviewService.deleteReview(userId, reviewId);
 
     verify(reviewRepository).delete(review);
+    verify(eventPublisher).publishEvent(new ReviewStatsChangedEvent(contentId));
   }
 }
