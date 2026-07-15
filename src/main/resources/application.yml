@@ -160,6 +160,14 @@ mopl:
     published-retention: ${OUTBOX_PUBLISHED_RETENTION:P7D}
     cleanup-delay: ${OUTBOX_CLEANUP_DELAY:PT1H}
     send-timeout: ${OUTBOX_SEND_TIMEOUT:PT5S}
+  notification:
+    delivery-mode: ${NOTIFICATION_DELIVERY_MODE:local}
+    kafka:
+      topic: ${NOTIFICATION_KAFKA_TOPIC:notification}
+      dlt-topic: ${NOTIFICATION_KAFKA_DLT_TOPIC:notification-dlt}
+      group-id: ${NOTIFICATION_KAFKA_GROUP_ID:mopl-notification}
+      max-retries: ${NOTIFICATION_KAFKA_MAX_RETRIES:3}
+      retry-backoff: ${NOTIFICATION_KAFKA_RETRY_BACKOFF:PT1S}
   watching-session:
     redis:
       enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
