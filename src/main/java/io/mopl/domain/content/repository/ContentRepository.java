@@ -7,6 +7,8 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ContentRepository extends JpaRepository<Content, UUID>, ContentRepositoryCustom {
@@ -28,4 +30,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
       Collection<ContentType> types,
       Collection<String> externalIds
   );
+
+  @Query("select distinct c from Content c left join fetch c.tags where c.id in :contentIds")
+  List<Content> findAllByIdWithTags(@Param("contentIds") Collection<UUID> contentIds);
 }
