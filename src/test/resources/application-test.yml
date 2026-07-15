@@ -36,6 +36,12 @@ spring:
       port: 6379
       password:
 
+mopl:
+  kafka:
+    enabled: false
+  outbox:
+    relay-enabled: false
+
 management:
   health:
     kafka:
