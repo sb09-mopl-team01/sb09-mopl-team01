@@ -16,5 +16,6 @@ ENTRYPOINT ["java", \
     "-XX:MaxRAMPercentage=75.0", \
     "-Djava.security.egd=file:/dev/./urandom", \
     "-Dspring.profiles.active=dev", \
+    "-Dspring.flyway.validate-on-migrate=false", \
     "-jar", \
     "app.jar"]

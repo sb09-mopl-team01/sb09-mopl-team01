@@ -53,8 +53,8 @@ class ContentRepositoryTest {
   }
 
   @Test
-  @DisplayName("외부 콘텐츠를 source와 externalId 조합으로 조회한다")
-  void findExternalContentBySourceAndExternalId() {
+  @DisplayName("외부 콘텐츠를 source, type, externalId 조합으로 조회한다")
+  void findExternalContentBySourceTypeAndExternalId() {
     Instant syncedAt = Instant.parse("2026-06-25T00:00:00Z");
     Content content = Content.createExternal(
         ContentType.TV_SERIES,
@@ -70,13 +70,61 @@ class ContentRepositoryTest {
     contentRepository.saveAndFlush(content);
     entityManager.clear();
 
-    assertThat(contentRepository.existsBySourceAndExternalId(ContentSource.TMDB, "12345"))
+    assertThat(contentRepository.existsBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.TV_SERIES,
+        "12345"
+    ))
         .isTrue();
-    assertThat(contentRepository.findBySourceAndExternalId(ContentSource.TMDB, "12345"))
+    assertThat(contentRepository.findBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.TV_SERIES,
+        "12345"
+    ))
         .isPresent()
         .get()
         .extracting(Content::getLastSyncedAt)
         .isEqualTo(syncedAt);
+  }
+
+  @Test
+  @DisplayName("TMDB 영화와 TV는 같은 externalId를 각각 저장할 수 있다")
+  void saveTmdbMovieAndTvWithSameExternalId() {
+    Instant syncedAt = Instant.parse("2026-06-25T00:00:00Z");
+    Content movie = Content.createExternal(
+        ContentType.MOVIE,
+        "영화",
+        "TMDB 영화",
+        null,
+        ContentSource.TMDB,
+        "100",
+        syncedAt,
+        List.of("영화")
+    );
+    Content tvSeries = Content.createExternal(
+        ContentType.TV_SERIES,
+        "TV 시리즈",
+        "TMDB TV 시리즈",
+        null,
+        ContentSource.TMDB,
+        "100",
+        syncedAt,
+        List.of("TV")
+    );
+
+    contentRepository.saveAllAndFlush(List.of(movie, tvSeries));
+    entityManager.clear();
+
+    assertThat(contentRepository.findBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.MOVIE,
+        "100"
+    )).isPresent();
+    assertThat(contentRepository.findBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.TV_SERIES,
+        "100"
+    )).isPresent();
   }
 
   @Test

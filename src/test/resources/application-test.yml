@@ -1,4 +1,7 @@
 spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.kafka.KafkaAutoConfiguration
   file:
     upload-dir: build/test-uploads/images
   cloud:
@@ -20,6 +23,8 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+  flyway:
+    enabled: false
   cache:
     type: simple
   sql:
@@ -31,7 +36,16 @@ spring:
       port: 6379
       password:
 
+mopl:
+  kafka:
+    enabled: false
+  outbox:
+    relay-enabled: false
+
 management:
+  health:
+    kafka:
+      enabled: false
   endpoints:
     web:
       exposure:

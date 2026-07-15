@@ -478,6 +478,37 @@ class ConversationServiceTest {
   }
 
   @Test
+  void sendDirectMessageRejectsNullRequest() {
+    UUID conversationId = UUID.randomUUID();
+
+    assertThatThrownBy(() -> conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        null
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  void sendDirectMessageThrowsConversationNotFoundWhenConversationDoesNotExist() {
+    UUID conversationId = UUID.randomUUID();
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findById(conversationId)).thenReturn(Optional.empty());
+
+    assertThatThrownBy(() -> conversationService.sendDirectMessage(
+        requesterId,
+        conversationId,
+        new DirectMessageSendRequest("hello")
+    ))
+        .isInstanceOf(BaseException.class)
+        .extracting("errorCode")
+        .isEqualTo(ErrorCode.CONVERSATION_NOT_FOUND);
+  }
+
+  @Test
   void sendDirectMessageRejectsContentLongerThanMaxLength() {
     Conversation conversation = Conversation.between(requesterId, withUserId);
     UUID conversationId = UUID.randomUUID();

@@ -1,5 +1,6 @@
 package io.mopl.global.config;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
@@ -147,6 +148,8 @@ public class SecurityConfig {
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
         .requestMatchers("/actuator/health").permitAll()
+        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
+        .hasRole("ADMIN")
         .anyRequest().authenticated();
   }
 }

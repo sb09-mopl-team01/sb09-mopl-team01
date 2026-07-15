@@ -20,7 +20,6 @@ import org.springframework.context.annotation.Import;
 import org.springframework.transaction.annotation.Transactional;
 
 @DataJpaTest
-@AutoConfigureTestDatabase(replace = Replace.NONE)
 @Import(UserRepositoryTest.QueryDslTestConfig.class)
 @Transactional
 class UserRepositoryTest {

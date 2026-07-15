@@ -3,7 +3,8 @@ package io.mopl.domain.watchingsession.event;
 import io.mopl.domain.watchingsession.dto.WatchingSessionChange;
 import io.mopl.domain.watchingsession.dto.WatchingSessionChangeType;
 import lombok.RequiredArgsConstructor;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import io.mopl.domain.watchingsession.realtime.WatchingSessionPresenceStore;
+import io.mopl.domain.watchingsession.realtime.WatchingSessionRealtimePublisher;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -12,39 +13,26 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class WatchingSessionWebSocketEventHandler {
 
-  private static final String WATCHING_SESSION_TOPIC = "/sub/contents/%s/watch";
-
-  private final SimpMessagingTemplate messagingTemplate;
+  private final WatchingSessionPresenceStore presenceStore;
+  private final WatchingSessionRealtimePublisher realtimePublisher;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleEntered(WatchingSessionEnteredEvent event) {
-    messagingTemplate.convertAndSend(
-        topic(event),
-        new WatchingSessionChange(
-            WatchingSessionChangeType.JOIN,
-            event.watchingSession(),
-            event.watcherCount()
-        )
-    );
+    presenceStore.enter(event.watchingSession().watcher().userId(), event.watchingSession().content().id());
+    realtimePublisher.publish(new WatchingSessionChange(
+        WatchingSessionChangeType.JOIN,
+        event.watchingSession(),
+        event.watcherCount()
+    ));
   }
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleLeft(WatchingSessionLeftEvent event) {
-    messagingTemplate.convertAndSend(
-        topic(event),
-        new WatchingSessionChange(
-            WatchingSessionChangeType.LEAVE,
-            event.watchingSession(),
-            event.watcherCount()
-        )
-    );
-  }
-
-  private String topic(WatchingSessionEnteredEvent event) {
-    return WATCHING_SESSION_TOPIC.formatted(event.watchingSession().content().id());
-  }
-
-  private String topic(WatchingSessionLeftEvent event) {
-    return WATCHING_SESSION_TOPIC.formatted(event.watchingSession().content().id());
+    presenceStore.leave(event.watchingSession().watcher().userId(), event.watchingSession().content().id());
+    realtimePublisher.publish(new WatchingSessionChange(
+        WatchingSessionChangeType.LEAVE,
+        event.watchingSession(),
+        event.watcherCount()
+    ));
   }
 }

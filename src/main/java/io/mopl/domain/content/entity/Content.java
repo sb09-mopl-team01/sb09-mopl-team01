@@ -27,8 +27,8 @@ import lombok.NoArgsConstructor;
     name = "contents",
     uniqueConstraints = {
         @UniqueConstraint(
-            name = "uk_contents_source_external_id",
-            columnNames = {"source", "external_id"}
+            name = "uk_contents_source_type_external_id",
+            columnNames = {"source", "type", "external_id"}
         )
     },
     indexes = {

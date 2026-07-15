@@ -17,8 +17,30 @@ spring:
         order_inserts: true
         order_updates: true
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: never
+
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      schema.registry.url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8081}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer
+    consumer:
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer
+    listener:
+      auto-startup: ${KAFKA_ENABLED:false}
+    admin:
+      fail-fast: false
 
   jackson:
     serialization:
@@ -36,6 +58,19 @@ spring:
           starttls:
             enable: true
 
+logging:
+  file:
+    name: ${LOG_FILE_NAME:logs/mopl.log}
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_ARCHIVE_FILE_PATTERN:logs/archive/mopl.%d{yyyy-MM-dd}.%i.log.gz}
+      max-file-size: ${LOG_MAX_FILE_SIZE:50MB}
+      max-history: ${LOG_MAX_HISTORY:14}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:2GB}
+      clean-history-on-start: ${LOG_CLEAN_HISTORY_ON_START:false}
+
 management:
   endpoints:
     web:
@@ -46,6 +81,8 @@ management:
       show-details: always
     prometheus:
       enabled: true
+    kafka:
+      enabled: ${KAFKA_ENABLED:false}
 
   cache:
     type: redis
@@ -57,6 +94,34 @@ jwt:
   max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
 
 mopl:
+  logging:
+    backup:
+      enabled: ${LOG_BACKUP_ENABLED:false}
+      cron: ${LOG_BACKUP_CRON:0 0 4 * * *}
+      archive-directory: ${LOG_ARCHIVE_DIRECTORY:logs/archive}
+      s3-key-prefix: ${LOG_BACKUP_S3_KEY_PREFIX:logs/mopl}
+      instance-id: ${LOG_BACKUP_INSTANCE_ID:${HOSTNAME:local}}
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+  outbox:
+    relay-enabled: ${OUTBOX_RELAY_ENABLED:true}
+    relay-delay: ${OUTBOX_RELAY_DELAY:PT1S}
+    batch-size: ${OUTBOX_RELAY_BATCH_SIZE:100}
+    claim-timeout: ${OUTBOX_CLAIM_TIMEOUT:PT1M}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    initial-backoff: ${OUTBOX_INITIAL_BACKOFF:PT1S}
+    backoff-multiplier: ${OUTBOX_BACKOFF_MULTIPLIER:2.0}
+    max-backoff: ${OUTBOX_MAX_BACKOFF:PT1M}
+    published-retention: ${OUTBOX_PUBLISHED_RETENTION:P7D}
+    cleanup-delay: ${OUTBOX_CLEANUP_DELAY:PT1H}
+    send-timeout: ${OUTBOX_SEND_TIMEOUT:PT5S}
+  watching-session:
+    redis:
+      enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
+      channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
+      presence-ttl: ${WATCHING_SESSION_REDIS_PRESENCE_TTL:PT24H}
+      lease-ttl: ${WATCHING_SESSION_REDIS_LEASE_TTL:PT90S}
+      lease-maintenance-delay-millis: ${WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS:30000}
   admin:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}
@@ -65,12 +130,20 @@ mopl:
     timeout:
       connect-seconds: ${EXTERNAL_API_CONNECT_TIMEOUT_SECONDS:3}
       read-seconds: ${EXTERNAL_API_READ_TIMEOUT_SECONDS:5}
+    retry:
+      max-attempts: ${EXTERNAL_API_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff-millis: ${EXTERNAL_API_RETRY_INITIAL_BACKOFF_MILLIS:1000}
+      multiplier: ${EXTERNAL_API_RETRY_MULTIPLIER:2.0}
+      max-backoff-millis: ${EXTERNAL_API_RETRY_MAX_BACKOFF_MILLIS:4000}
     tmdb:
       api-key: ${TMDB_API_KEY:}
       base-url: https://api.themoviedb.org/3
       image-base-url: https://image.tmdb.org/t/p/w500
       movie-path: /movie/popular
       tv-path: /tv/popular
+      language: ${TMDB_LANGUAGE:ko-KR}
+      region: ${TMDB_REGION:KR}
+      korean-only: ${TMDB_KOREAN_ONLY:true}
       pages: ${TMDB_SYNC_PAGES:1}
     the-sports-db:
       api-key: ${THE_SPORTS_DB_API_KEY:}
@@ -80,7 +153,7 @@ mopl:
 
   content:
     thumbnail:
-      storage-type: ${CONTENT_THUMBNAIL_STORAGE_TYPE:local}
+      storage-type: ${STORAGE_TYPE:local}
       s3:
         key-prefix: ${CONTENT_THUMBNAIL_S3_KEY_PREFIX:uploads/contents/thumbnails}
     batch:

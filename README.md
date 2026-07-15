@@ -58,9 +58,29 @@ flowchart LR
 
 ## 운영 확장 메모
 
-- WatchingSession WebSocket 구독 상태는 현재 단일 서버 기준의 인메모리 registry로 관리합니다.
-- ECS 다중 인스턴스 확장 시에는 서버 간 presence 공유를 위해 Redis 또는 broker 기반 저장소로 전환합니다.
-- 실시간 시청자 수는 현재 DB count 기준으로 계산하며, 고동시성 구간에서는 Redis counter 또는 콘텐츠별 presence cache로 분리합니다.
+- WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
+- `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. Task 비정상 종료는 lease 만료 후 정리합니다.
+- 입장·퇴장 변경 이벤트는 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. Pub/Sub은 휘발성 UI 동기화 경로이며, Kafka 기반 영속 이벤트 처리는 별도 후속 작업으로 관리합니다.
+- `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 만료 정책을 조정할 수 있습니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
+- 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
+
+## Kafka 및 스키마 마이그레이션 기반
+
+- Flyway는 기본적으로 활성화되어 있으며(`FLYWAY_ENABLED=true`), `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다.
+- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
+- Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
+- 전달 보장은 at-least-once입니다. Relay가 Kafka ACK 뒤 상태 변경 전에 중단되면 중복 발행될 수 있으므로, consumer는 `eventId`로 멱등 처리해야 합니다.
+
+| 환경 변수 | 기본값 | 용도 |
+| --- | --- | --- |
+| `KAFKA_ENABLED` | `false` | Kafka producer, listener, health check 및 Outbox Relay 활성화 여부 |
+| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
+| `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
+| `OUTBOX_RELAY_ENABLED` | `true` | Outbox Relay 및 발행 완료 데이터 정리 스케줄 활성화 여부 |
+| `OUTBOX_RELAY_BATCH_SIZE` | `100` | 한 번의 Relay 실행에서 선점할 최대 이벤트 수 |
+| `OUTBOX_MAX_ATTEMPTS` | `5` | Kafka 발행 최대 시도 횟수. 초과 시 `FAILED` 상태로 보관 |
+| `OUTBOX_CLAIM_TIMEOUT` | `PT1M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간 |
+| `FLYWAY_ENABLED` | `true` | Flyway 마이그레이션 활성화 여부 |
 
 ## 프로젝트 구조
 
@@ -94,7 +114,7 @@ chmod +x gradlew
 ```
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
-인메모리 H2 데이터베이스를 사용합니다.
+인메모리 H2 데이터베이스를 사용합니다. 테스트 프로필은 Flyway와 Kafka 자동 구성을 비활성화하므로 외부 PostgreSQL, Kafka, Schema Registry 연결이 필요하지 않습니다.
 
 
 ## 문서

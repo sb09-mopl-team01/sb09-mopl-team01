@@ -6,6 +6,7 @@ import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 import java.security.SecureRandom;
+import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -30,27 +31,27 @@ public class TempPasswordService {
     return sb.toString();
   }
 
-  public void saveTempPassword(String email, String tempPassword) {
-    log.debug("TempPassword Save Started. email={}", email);
+  public void saveTempPassword(UUID userId, String tempPassword) {
+    log.debug("TempPassword Save Started. userId={}", userId);
     redisTemplate.opsForValue().set(
-        REDIS_KEY_PREFIX + email,
+        REDIS_KEY_PREFIX + userId,
         tempPassword,
         3,
         TimeUnit.MINUTES
     );
-    log.info("TempPassword Save Completed. email={}", email);
+    log.info("TempPassword Save Completed. userId={}", userId);
   }
 
-  public String getTempPassword(String email) {
-    log.debug("TempPassword Read Started. email={}", email);
-    Object tempPassword = redisTemplate.opsForValue().get(REDIS_KEY_PREFIX + email);
-    log.debug("TempPassword Read Completed. email={}", email);
+  public String getTempPassword(UUID userId) {
+    log.debug("TempPassword Read Started. userId={}", userId);
+    Object tempPassword = redisTemplate.opsForValue().get(REDIS_KEY_PREFIX + userId);
+    log.debug("TempPassword Read Completed. userId={}", userId);
     return tempPassword != null ? tempPassword.toString() : null;
   }
 
-  public void deleteTempPassword(String email) {
-    log.debug("TempPassword Delete Started. email={}", email);
-    redisTemplate.delete(REDIS_KEY_PREFIX + email);
-    log.info("TempPassword Delete Completed. email={}", email);
+  public void deleteTempPassword(UUID userId) {
+    log.debug("TempPassword Delete Started. userId={}", userId);
+    redisTemplate.delete(REDIS_KEY_PREFIX + userId);
+    log.info("TempPassword Delete Completed. userId={}", userId);
   }
 }

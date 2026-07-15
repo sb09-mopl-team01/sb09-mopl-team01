@@ -112,6 +112,15 @@ class FollowServiceTest {
   }
 
   @Test
+  @DisplayName("팔로우 요청이 null이면 INVALID_INPUT 예외 발생")
+  void rejectFollowWhenRequestIsNull() {
+    assertThatThrownBy(() -> followService.follow(followerId, null))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT);
+    verify(eventPublisher, never()).publish(any());
+  }
+
+  @Test
   @DisplayName("팔로우 취소 성공")
   void unfollow() {
     Follow follow = Follow.create(follower, followee);
@@ -139,6 +148,18 @@ class FollowServiceTest {
     assertThatThrownBy(() -> followService.unfollow(otherUserId, followId))
         .isInstanceOf(BaseException.class)
         .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FORBIDDEN);
+  }
+
+  @Test
+  @DisplayName("팔로우 취소 시 followId가 없으면 FOLLOW_NOT_FOUND 예외 발생")
+  void rejectUnfollowWhenFollowNotFound() {
+    UUID followId = UUID.randomUUID();
+    given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
+    given(followRepository.findById(followId)).willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> followService.unfollow(followerId, followId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.FOLLOW_NOT_FOUND);
   }
 
   @Test

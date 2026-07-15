@@ -12,16 +12,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseCookie;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
-import org.springframework.security.web.csrf.CsrfToken;
 import org.springframework.stereotype.Component;
 
 @Slf4j
@@ -43,12 +42,14 @@ public class LoginSuccessHandler implements AuthenticationSuccessHandler {
     log.debug("LoginSuccessHandler Login Success Process Complete");
 
     MoplUserDetails userDetails = (MoplUserDetails) authentication.getPrincipal();
+
+    UUID userId = userDetails.getUser().getId();
     String email = userDetails.getUsername();
 
     String accessToken = jwtProvider.generateAccessToken(userDetails);
     String refreshToken = jwtProvider.generateRefreshToken(email);
 
-    refreshTokenRepository.save(email, refreshToken);
+    refreshTokenRepository.save(userId, refreshToken);
 
     ResponseCookie accessTokenCookie = cookieProvider.createAccessTokenCookie(accessToken);
     ResponseCookie refreshTokenCookie = cookieProvider.createRefreshTokenCookie(refreshToken);

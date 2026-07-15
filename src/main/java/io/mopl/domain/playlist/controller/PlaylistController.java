@@ -27,13 +27,14 @@ public class PlaylistController {
 
   @PostMapping
   @CrossOrigin(exposedHeaders = "Location")
-  public ResponseEntity<Void> createPlaylist(
+  public ResponseEntity<PlaylistDto> createPlaylist(
       @AuthenticationPrincipal MoplUserDetails userDetails,
       @Valid @RequestBody PlaylistCreateRequest request) {
 
-    UUID newPlaylistId = playlistService.createPlaylist(userDetails.getUser().getId(), request);
+    PlaylistDto createdPlaylist = playlistService.createPlaylist(userDetails.getUser().getId(), request);
 
-    return ResponseEntity.created(java.net.URI.create("/api/playlists/" + newPlaylistId)).build();
+    return ResponseEntity.created(java.net.URI.create("/api/playlists/" + createdPlaylist.id()))
+        .body(createdPlaylist);
   }
 
   @PatchMapping("/{playlistId}")
@@ -77,11 +78,10 @@ public class PlaylistController {
   @PostMapping("/{playlistId}/contents/{contentId}")
   public ResponseEntity<Void> addContentToPlaylist(
       @AuthenticationPrincipal MoplUserDetails userDetails,
-      @PathVariable String playlistId, // ✨ 핵심: 반드시 String으로 받아야 undefined를 캐치합니다!
+      @PathVariable UUID playlistId,
       @PathVariable UUID contentId) {
 
-    // 서비스의 fallback 메서드로 넘깁니다.
-    playlistService.addContentToPlaylistWithFallback(userDetails.getUser().getId(), playlistId, contentId);
+    playlistService.addContentToPlaylist(userDetails.getUser().getId(), playlistId, contentId);
     return ResponseEntity.status(HttpStatus.NO_CONTENT).build();
   }
 
