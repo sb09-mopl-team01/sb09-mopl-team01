@@ -32,3 +32,8 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+mopl:
+  content:
+    batch:
+      external-sync:
+        cron: ${CONTENT_EXTERNAL_SYNC_CRON:0 0 3 * * *}

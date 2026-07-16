@@ -5,9 +5,6 @@ import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.directmessage.event.DirectMessageSentEvent;
 import io.mopl.domain.follow.event.FollowCreatedEvent;
-import io.mopl.domain.notification.dto.NotificationCreateCommand;
-import io.mopl.domain.notification.entity.NotificationLevel;
-import io.mopl.domain.notification.service.NotificationService;
 import io.mopl.domain.playlist.event.PlaylistContentAddedEvent;
 import io.mopl.domain.playlist.event.PlaylistCreatedEvent;
 import io.mopl.domain.playlist.event.PlaylistSubscribedEvent;
@@ -18,13 +15,16 @@ import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.ApplicationEventPublisher;
 
 class NotificationDomainEventHandlerTest {
 
-  private final NotificationService notificationService =
-      org.mockito.Mockito.mock(NotificationService.class);
+  private final NotificationMessageFactory notificationMessageFactory =
+      new NotificationMessageFactory(new com.fasterxml.jackson.databind.ObjectMapper());
+  private final ApplicationEventPublisher eventPublisher =
+      org.mockito.Mockito.mock(ApplicationEventPublisher.class);
   private final NotificationDomainEventHandler eventHandler =
-      new NotificationDomainEventHandler(notificationService);
+      new NotificationDomainEventHandler(notificationMessageFactory, eventPublisher);
 
   @Test
   @DisplayName("팔로우 생성 이벤트를 팔로우 대상자의 알림으로 변환한다")
@@ -40,11 +40,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handleFollowCreated(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(followeeId)
-            && command.title().equals("새 팔로워가 생겼습니다")
-            && command.content().equals("follower님이 회원님을 팔로우했습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(followeeId)
+        && request.title().equals("새 팔로워가 생겼습니다")
+        && request.content().equals("follower님이 회원님을 팔로우했습니다.")
     ));
   }
 
@@ -62,9 +61,9 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handleFollowCreated(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(followeeId)
-            && command.content().equals("사용자님이 회원님을 팔로우했습니다.")
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(followeeId)
+        && request.content().equals("사용자님이 회원님을 팔로우했습니다.")
     ));
   }
 
@@ -83,11 +82,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handlePlaylistSubscribed(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(ownerId)
-            && command.title().equals("플레이리스트를 구독했습니다")
-            && command.content().equals("subscriber님이 '주말 영화' 플레이리스트를 구독했습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(ownerId)
+        && request.title().equals("플레이리스트를 구독했습니다")
+        && request.content().equals("subscriber님이 '주말 영화' 플레이리스트를 구독했습니다.")
     ));
   }
 
@@ -106,11 +104,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handlePlaylistContentAdded(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(subscriberId)
-            && command.title().equals("구독 중인 플레이리스트에 콘텐츠가 추가되었습니다")
-            && command.content().equals("'주말 영화' 플레이리스트에 '새 영화' 콘텐츠가 추가되었습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(subscriberId)
+        && request.title().equals("구독 중인 플레이리스트에 콘텐츠가 추가되었습니다")
+        && request.content().equals("'주말 영화' 플레이리스트에 '새 영화' 콘텐츠가 추가되었습니다.")
     ));
   }
 
@@ -129,11 +126,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handlePlaylistCreated(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(followerId)
-            && command.title().equals("팔로우한 사용자의 새 활동")
-            && command.content().equals("creator님이 새 플레이리스트를 만들었습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(followerId)
+        && request.title().equals("팔로우한 사용자의 새 활동")
+        && request.content().equals("creator님이 새 플레이리스트를 만들었습니다.")
     ));
   }
 
@@ -149,11 +145,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handleUserRoleChanged(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(userId)
-            && command.title().equals("권한이 변경되었습니다")
-            && command.content().equals("회원님의 권한이 ADMIN로 변경되었습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(userId)
+        && request.title().equals("권한이 변경되었습니다")
+        && request.content().equals("회원님의 권한이 ADMIN로 변경되었습니다.")
     ));
   }
 
@@ -172,11 +167,10 @@ class NotificationDomainEventHandlerTest {
 
     eventHandler.handleDirectMessageSent(event);
 
-    verify(notificationService).create(argThat(command ->
-        command.receiverId().equals(receiverId)
-            && command.title().equals("새 DM이 도착했습니다")
-            && command.content().equals("sender님이 메시지를 보냈습니다.")
-            && command.level() == NotificationLevel.INFO
+    verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.receiverId().equals(receiverId)
+        && request.title().equals("새 DM이 도착했습니다")
+        && request.content().equals("sender님이 메시지를 보냈습니다.")
     ));
   }
 }
