@@ -3,6 +3,8 @@ spring:
     name: mopl
   profiles:
     active: dev
+  config:
+    import: "aws-secretsmanager:mopl-prod-secrets"
   storage:
     type: ${STORAGE_TYPE:local}
     file:
@@ -57,6 +59,25 @@ spring:
           auth: true
           starttls:
             enable: true
+  cloud:
+    aws:
+      credentials:
+        access-key: ${AWS_ACCESS_KEY_ID}
+        secret-key: ${AWS_ACCESS_SECRET_KEY}
+      region:
+        static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
+      s3:
+        bucket: ${CLOUD_AWS_S3_BUCKET}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
 
   security:
     oauth2:
