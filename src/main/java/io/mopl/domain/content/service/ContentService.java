@@ -1,5 +1,8 @@
 package io.mopl.domain.content.service;
 
+import io.mopl.domain.content.cache.ContentCacheMapper;
+import io.mopl.domain.content.cache.ContentCacheService;
+import io.mopl.domain.content.cache.ContentCacheSnapshot;
 import io.mopl.domain.content.dto.ContentDto;
 import io.mopl.domain.content.dto.ContentStats;
 import io.mopl.domain.content.dto.request.ContentCreateRequest;
@@ -31,6 +34,8 @@ import org.springframework.web.multipart.MultipartFile;
 public class ContentService {
 
   private final ContentRepository contentRepository;
+  private final ContentCacheService contentCacheService;
+  private final ContentCacheMapper contentCacheMapper;
   private final ContentStatsService contentStatsService;
   private final ContentMapper contentMapper;
   private final ContentThumbnailService contentThumbnailService;
@@ -61,14 +66,13 @@ public class ContentService {
 
   @Transactional(readOnly = true)
   public ContentDto findContent(UUID contentId) {
-    Content content = contentRepository.findById(contentId)
-        .orElseThrow(() -> {
-          log.warn("Content find failed. contentId={}", contentId);
-          return new BaseException(ErrorCode.INVALID_INPUT);
-        });
-    ContentStats stats = contentStatsService.getStats(content);
-
-    return contentMapper.toDto(content, stats);
+    ContentCacheSnapshot snapshot = contentCacheService.find(contentId);
+    if (!snapshot.isComplete()) {
+      Content content = getContentOrThrow(contentId);
+      snapshot = contentCacheService.resolveMissing(content, snapshot);
+    }
+    long watcherCount = contentStatsService.getWatcherCount(contentId);
+    return contentCacheMapper.toDto(snapshot, watcherCount);
   }
 
   @Transactional(readOnly = true)
@@ -82,7 +86,7 @@ public class ContentService {
       String sortBy,
       SortDirection sortDirection
   ) {
-    CursorResponse<Content> contents = contentRepository.findContentsByCursor(
+    CursorResponse<UUID> contentIds = contentRepository.findContentIdsByCursor(
         typeEqual,
         keywordLike,
         tagsIn,
@@ -93,20 +97,39 @@ public class ContentService {
         sortDirection
     );
 
-    Map<UUID, ContentStats> statsByContentId = contentStatsService.getStatsByContents(contents.data());
+    Map<UUID, ContentCacheSnapshot> cachedByContentId = contentCacheService.findAll(contentIds.data());
+    List<UUID> missingContentIds = contentIds.data().stream()
+        .filter(contentId -> !cachedByContentId.getOrDefault(contentId, ContentCacheSnapshot.empty()).isComplete())
+        .toList();
 
-    List<ContentDto> contentDtos = contents.data().stream()
-        .map(content -> contentMapper.toDto(content, statsByContentId.get(content.getId())))
+    Map<UUID, ContentCacheSnapshot> resolvedByContentId = cachedByContentId;
+    if (!missingContentIds.isEmpty()) {
+      List<Content> missingContents = contentRepository.findAllByIdWithTags(missingContentIds);
+      resolvedByContentId = contentCacheService.resolveMissing(missingContents, cachedByContentId);
+    }
+
+    Map<UUID, Long> watcherCountsByContentId = contentStatsService.getWatcherCounts(contentIds.data());
+    Map<UUID, ContentCacheSnapshot> finalResolvedByContentId = resolvedByContentId;
+    List<ContentDto> contentDtos = contentIds.data().stream()
+        .map(contentId -> {
+          ContentCacheSnapshot snapshot = finalResolvedByContentId.get(contentId);
+          if (snapshot == null || !snapshot.isComplete()) {
+            log.warn("Content list assemble skipped. contentId={}, reason=content_missing", contentId);
+            return null;
+          }
+          return contentCacheMapper.toDto(snapshot, watcherCountsByContentId.getOrDefault(contentId, 0L));
+        })
+        .filter(java.util.Objects::nonNull)
         .toList();
 
     return new CursorResponse<>(
         contentDtos,
-        contents.nextCursor(),
-        contents.nextIdAfter(),
-        contents.hasNext(),
-        contents.totalCount(),
-        contents.sortBy(),
-        contents.sortDirection()
+        contentIds.nextCursor(),
+        contentIds.nextIdAfter(),
+        contentIds.hasNext(),
+        contentIds.totalCount(),
+        contentIds.sortBy(),
+        contentIds.sortDirection()
     );
   }
 
@@ -144,6 +167,7 @@ public class ContentService {
         return contentMapper.toDto(targetContent, contentStatsService.getStats(targetContent));
       });
 
+      contentCacheService.evictAll(contentId);
       if (thumbnailChanged) {
         contentThumbnailService.delete(currentThumbnailKey);
       }
@@ -166,6 +190,7 @@ public class ContentService {
       contentRepository.delete(content);
       return currentThumbnailKey;
     });
+    contentCacheService.evictAll(contentId);
     contentThumbnailService.delete(thumbnailKey);
     log.info("Content delete completed. contentId={}", contentId);
   }

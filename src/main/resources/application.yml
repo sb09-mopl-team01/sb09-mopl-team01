@@ -152,6 +152,9 @@ mopl:
       events-path: /{apiKey}/eventsnextleague.php
 
   content:
+    cache:
+      base-ttl: ${CONTENT_BASE_CACHE_TTL:20m}
+      stats-ttl: ${CONTENT_STATS_CACHE_TTL:3m}
     thumbnail:
       storage-type: ${STORAGE_TYPE:local}
       s3:

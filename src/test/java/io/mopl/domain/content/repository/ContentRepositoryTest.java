@@ -235,7 +235,7 @@ class ContentRepositoryTest {
     ));
     entityManager.clear();
 
-    CursorResponse<Content> result = contentRepository.findContentsByCursor(
+    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
         ContentType.MOVIE,
         "우주",
         List.of("SF"),
@@ -246,9 +246,7 @@ class ContentRepositoryTest {
         SortDirection.DESCENDING
     );
 
-    assertThat(result.data())
-        .extracting(Content::getId)
-        .containsExactly(movie.getId());
+    assertThat(result.data()).containsExactly(movie.getId());
     assertThat(result.totalCount()).isEqualTo(1);
     assertThat(result.hasNext()).isFalse();
   }
@@ -277,7 +275,7 @@ class ContentRepositoryTest {
     contentRepository.saveAndFlush(highRatedContent);
     entityManager.clear();
 
-    CursorResponse<Content> result = contentRepository.findContentsByCursor(
+    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
@@ -288,9 +286,7 @@ class ContentRepositoryTest {
         SortDirection.DESCENDING
     );
 
-    assertThat(result.data())
-        .extracting(Content::getAverageRating)
-        .containsExactly(4.5, 2.0);
+    assertThat(result.data()).containsExactly(highRatedContent.getId(), lowRatedContent.getId());
     assertThat(result.sortBy()).isEqualTo("rate");
   }
 
@@ -316,7 +312,7 @@ class ContentRepositoryTest {
     saveSession(saveUser("세 번째 시청자"), secondContent);
     entityManager.clear();
 
-    CursorResponse<Content> result = contentRepository.findContentsByCursor(
+    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
@@ -327,9 +323,7 @@ class ContentRepositoryTest {
         SortDirection.DESCENDING
     );
 
-    assertThat(result.data())
-        .extracting(Content::getId)
-        .containsExactly(firstContent.getId());
+    assertThat(result.data()).containsExactly(firstContent.getId());
     assertThat(result.nextCursor()).isEqualTo("2");
     assertThat(result.sortBy()).isEqualTo("watcherCount");
   }
