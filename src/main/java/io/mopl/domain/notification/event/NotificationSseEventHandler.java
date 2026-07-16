@@ -1,6 +1,6 @@
 package io.mopl.domain.notification.event;
 
-import io.mopl.global.sse.SseNotificationService;
+import io.mopl.domain.notification.realtime.NotificationRealtimePublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
@@ -10,14 +10,10 @@ import org.springframework.transaction.event.TransactionalEventListener;
 @RequiredArgsConstructor
 public class NotificationSseEventHandler {
 
-  private final SseNotificationService sseNotificationService;
+  private final NotificationRealtimePublisher notificationRealtimePublisher;
 
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleCreated(NotificationCreatedEvent event) {
-    sseNotificationService.sendNotification(
-        event.receiverId(),
-        event.notificationId(),
-        event.notification()
-    );
+    notificationRealtimePublisher.publish(event);
   }
 }
