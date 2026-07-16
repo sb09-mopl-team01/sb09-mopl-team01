@@ -1,4 +1,4 @@
-name: 공통 검증
+name: CI
 
 on:
   pull_request:
@@ -28,8 +28,17 @@ jobs:
       - name: Gradle Wrapper 실행 권한 부여
         run: chmod +x gradlew
 
-      - name: 테스트 실행
-        run: ./gradlew clean test jacocoTestReport
+      - name: 빌드 및 테스트 실행
+        run: ./gradlew clean test jacocoTestReport jacocoTestCoverageVerification
+        env:
+          SPRING_PROFILES_ACTIVE: test
+
+      - name: 테스트 결과 리포트 업로드
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: build/reports/tests/test/
 
       - name: 커버리지 리포트 업로드
         if: always()
