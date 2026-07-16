@@ -1,6 +1,5 @@
 package io.mopl.global.config;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
@@ -10,6 +9,9 @@ import io.mopl.global.security.handler.MoplLogoutHandler;
 import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.handler.SpaCsrfTokenRequestHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
+import io.mopl.global.security.oauth.handler.OAuth2LoginFailureHandler;
+import io.mopl.global.security.oauth.handler.OAuth2LoginSuccessHandler;
+import io.mopl.global.security.oauth.service.MoplOAuth2UserService;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -18,11 +20,14 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
+import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.*;
+import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
+import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -47,6 +52,9 @@ public class SecurityConfig {
   private final MoplLogoutHandler logoutHandler;
   private final MoplLogoutSuccessHandler logoutSuccessHandler;
   private final StatelessCsrfTokenRepository csrfTokenRepository;
+  private final MoplOAuth2UserService moplOAuth2UserService;
+  private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
+  private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
 
   @Value("${mopl.cors.allowed-origins}")
   private List<String> allowedOrigins;
@@ -69,12 +77,14 @@ public class SecurityConfig {
     http
         .cors(cors -> cors.configurationSource(corsConfigurationSource()))
         .csrf(csrf -> configureCsrf(csrf, csrfTokenRepository))
+        .oauth2Login(oauth2LoginConfiguration())
         .httpBasic(this::configureHttpBasic)
         .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
         .formLogin(this::configureFormLogin)
         .logout(this::configureLogout)
         .sessionManagement(this::configureSessionManagement)
-        .authorizeHttpRequests(this::configureAuthorizeRequests);
+        .authorizeHttpRequests(this::configureAuthorizeRequests)
+        .headers(headers -> headers.frameOptions(FrameOptionsConfig::sameOrigin));
 
     this.configureCustomFilters(http, authenticationManager);
 
@@ -151,5 +161,14 @@ public class SecurityConfig {
         .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
         .hasRole("ADMIN")
         .anyRequest().authenticated();
+  }
+
+  private Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauth2LoginConfiguration() {
+    return oauth2 -> oauth2
+        .userInfoEndpoint(userInfo -> userInfo
+            .userService(moplOAuth2UserService)
+        )
+        .successHandler(oAuth2LoginSuccessHandler)
+        .failureHandler(oAuth2LoginFailureHandler);
   }
 }

@@ -80,6 +80,12 @@ dependencies {
 
     implementation 'org.flywaydb:flyway-core'
     implementation 'org.flywaydb:flyway-database-postgresql'
+    
+    // OAuth2
+    implementation 'org.springframework.boot:spring-boot-starter-oauth2-client'
+
+    // AWS SecretManager
+    implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.0.1'
 }
 
 jacoco {

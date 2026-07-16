@@ -2,6 +2,7 @@ package io.mopl.domain.review.service;
 
 
 import io.mopl.domain.content.entity.Content;
+import io.mopl.domain.content.event.ReviewStatsChangedEvent;
 import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.review.dto.ReviewDto;
 import io.mopl.domain.review.dto.request.ReviewCreateRequest;
@@ -20,6 +21,7 @@ import java.util.List;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
@@ -34,6 +36,7 @@ public class ReviewService {
   private final UserRepository userRepository;
   private final ContentRepository contentRepository;
   private final ReviewMapper reviewMapper;
+  private final ApplicationEventPublisher eventPublisher;
 
   @Transactional
   public ReviewDto createReview(UUID userId, ReviewCreateRequest request) {
@@ -60,6 +63,7 @@ public class ReviewService {
 
     content.increaseReviewCount();
     syncContentAverageRating(content);
+    publishReviewStatsChanged(content);
 
     log.info("리뷰 생성 완료: reviewId={}, userId={}", savedReview.getId(), userId);
     return reviewMapper.toDto(savedReview);
@@ -75,8 +79,10 @@ public class ReviewService {
       log.warn("권한 없는 리뷰 수정 시도: reviewId={}, requesterId={}", reviewId, userId);
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
+    Content content = review.getContent();
     review.update(request.getText(), request.getRating());
-    syncContentAverageRating(review.getContent());
+    syncContentAverageRating(content);
+    publishReviewStatsChanged(content);
 
     log.info("리뷰 수정 완료: reviewId={}", reviewId);
     return reviewMapper.toDto(review);
@@ -137,10 +143,15 @@ public class ReviewService {
 
     log.info("리뷰 삭제 완료: reviewId={}", reviewId);
     syncContentAverageRating(content);
+    publishReviewStatsChanged(content);
   }
 
   private void syncContentAverageRating(Content content) {
     double averageRating = reviewRepository.calculateAverageRatingByContentId(content.getId());
     content.updateAverageRating(averageRating);
+  }
+
+  private void publishReviewStatsChanged(Content content) {
+    eventPublisher.publishEvent(new ReviewStatsChangedEvent(content.getId()));
   }
 }

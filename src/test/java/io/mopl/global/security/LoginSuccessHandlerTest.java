@@ -63,7 +63,8 @@ class LoginSuccessHandlerTest {
     when(user.getId()).thenReturn(userId);
 
     when(jwtProvider.generateAccessToken(userDetails)).thenReturn(accessToken);
-    when(jwtProvider.generateRefreshToken(email)).thenReturn(refreshToken);
+    when(jwtProvider.generateRefreshToken(email, userId.toString())).thenReturn(refreshToken);
+
     when(cookieProvider.createAccessTokenCookie(accessToken)).thenReturn(accessTokenCookie);
     when(cookieProvider.createRefreshTokenCookie(refreshToken)).thenReturn(refreshTokenCookie);
     when(userMapper.toDto(user)).thenReturn(userDto);

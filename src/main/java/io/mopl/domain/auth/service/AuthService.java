@@ -61,7 +61,7 @@ public class AuthService {
     }
 
     String newAccessToken = jwtProvider.generateAccessToken(userDetails);
-    String newRefreshToken = jwtProvider.generateRefreshToken(email);
+    String newRefreshToken = jwtProvider.generateRefreshToken(email, userId.toString());
 
     refreshTokenRepository.save(userId, newRefreshToken);
 

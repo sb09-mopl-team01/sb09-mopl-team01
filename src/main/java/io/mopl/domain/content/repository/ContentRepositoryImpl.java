@@ -3,11 +3,11 @@ package io.mopl.domain.content.repository;
 import static io.mopl.domain.content.entity.QContent.content;
 import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSession;
 
+import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
-import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -29,7 +29,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   private final JPAQueryFactory queryFactory;
 
   @Override
-  public CursorResponse<Content> findContentsByCursor(
+  public CursorResponse<UUID> findContentIdsByCursor(
       ContentType typeEqual,
       String keywordLike,
       Collection<String> tagsIn,
@@ -54,8 +54,9 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       );
     }
 
-    List<Content> contents = queryFactory
-        .selectFrom(content)
+    List<Tuple> rows = queryFactory
+        .select(content.id, content.createdAt, content.averageRating)
+        .from(content)
         .distinct()
         .where(
             eqType(typeEqual),
@@ -70,18 +71,22 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .limit(limit + 1)
         .fetch();
 
-    boolean hasNext = contents.size() > limit;
+    boolean hasNext = rows.size() > limit;
     if (hasNext) {
-      contents.remove(limit);
+      rows.remove(limit);
     }
 
     String nextCursor = null;
     UUID nextIdAfter = null;
-    if (!contents.isEmpty()) {
-      Content lastContent = contents.get(contents.size() - 1);
-      nextCursor = nextCursor(lastContent, resolvedSortBy);
-      nextIdAfter = lastContent.getId();
+    if (!rows.isEmpty()) {
+      Tuple lastRow = rows.get(rows.size() - 1);
+      nextCursor = nextCursor(lastRow, resolvedSortBy);
+      nextIdAfter = lastRow.get(content.id);
     }
+
+    List<UUID> contentIds = rows.stream()
+        .map(row -> row.get(content.id))
+        .toList();
 
     Long totalCount = queryFactory
         .select(content.id.countDistinct())
@@ -94,7 +99,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .fetchOne();
 
     return new CursorResponse<>(
-        contents,
+        contentIds,
         nextCursor,
         nextIdAfter,
         hasNext,
@@ -104,7 +109,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     );
   }
 
-  private CursorResponse<Content> findContentsByWatcherCountCursor(
+  private CursorResponse<UUID> findContentsByWatcherCountCursor(
       ContentType typeEqual,
       String keywordLike,
       Collection<String> tagsIn,
@@ -114,8 +119,9 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       SortDirection sortDirection
   ) {
     NumberExpression<Long> watcherCount = watchingSession.id.count();
-    List<Content> contents = queryFactory
-        .selectFrom(content)
+    List<Tuple> rows = queryFactory
+        .select(content.id, watcherCount)
+        .from(content)
         .leftJoin(watchingSession).on(watchingSession.content.id.eq(content.id))
         .where(
             eqType(typeEqual),
@@ -131,12 +137,15 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .limit(limit + 1)
         .fetch();
 
-    boolean hasNext = contents.size() > limit;
+    boolean hasNext = rows.size() > limit;
     if (hasNext) {
-      contents.remove(limit);
+      rows.remove(limit);
     }
 
-    Content lastContent = contents.isEmpty() ? null : contents.get(contents.size() - 1);
+    Tuple lastRow = rows.isEmpty() ? null : rows.get(rows.size() - 1);
+    List<UUID> contentIds = rows.stream()
+        .map(row -> row.get(content.id))
+        .toList();
     Long totalCount = queryFactory
         .select(content.id.countDistinct())
         .from(content)
@@ -148,9 +157,9 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .fetchOne();
 
     return new CursorResponse<>(
-        contents,
-        hasNext && lastContent != null ? String.valueOf(countWatchers(lastContent.getId())) : null,
-        hasNext && lastContent != null ? lastContent.getId() : null,
+        contentIds,
+        hasNext && lastRow != null ? String.valueOf(lastRow.get(watcherCount)) : null,
+        hasNext && lastRow != null ? lastRow.get(content.id) : null,
         hasNext,
         totalCount == null ? 0L : totalCount,
         SORT_BY_WATCHER_COUNT,
@@ -291,22 +300,11 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         : content.id.desc();
   }
 
-  private String nextCursor(Content content, String sortBy) {
+  private String nextCursor(Tuple row, String sortBy) {
     if (SORT_BY_RATE.equals(sortBy)) {
-      return String.valueOf(content.getAverageRating());
+      return String.valueOf(row.get(content.averageRating));
     }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return String.valueOf(countWatchers(content.getId()));
-    }
-    return content.getCreatedAt().toString();
-  }
-
-  private long countWatchers(UUID contentId) {
-    Long count = queryFactory
-        .select(watchingSession.id.count())
-        .from(watchingSession)
-        .where(watchingSession.content.id.eq(contentId))
-        .fetchOne();
-    return count == null ? 0L : count;
+    Instant createdAt = row.get(content.createdAt);
+    return createdAt == null ? null : createdAt.toString();
   }
 }

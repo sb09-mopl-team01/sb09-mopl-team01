@@ -23,8 +23,19 @@ public class ContentStatsService {
     if (content == null) {
       return ContentStats.empty();
     }
-    long watcherCount = watchingSessionRepository.countByContentId(content.getId(), null);
+    long watcherCount = getWatcherCount(content.getId());
     return new ContentStats(content.getAverageRating(), content.getReviewCount(), watcherCount);
+  }
+
+  public long getWatcherCount(UUID contentId) {
+    return watchingSessionRepository.countByContentId(contentId, null);
+  }
+
+  public Map<UUID, Long> getWatcherCounts(Collection<UUID> contentIds) {
+    if (contentIds == null || contentIds.isEmpty()) {
+      return Map.of();
+    }
+    return watchingSessionRepository.countByContentIds(List.copyOf(contentIds));
   }
 
   public Map<UUID, ContentStats> getStatsByContents(Collection<Content> contents) {
@@ -35,7 +46,7 @@ public class ContentStatsService {
     List<UUID> contentIds = contents.stream()
         .map(Content::getId)
         .toList();
-    Map<UUID, Long> watcherCountsByContentId = watchingSessionRepository.countByContentIds(contentIds);
+    Map<UUID, Long> watcherCountsByContentId = getWatcherCounts(contentIds);
 
     Map<UUID, ContentStats> statsByContentId = new LinkedHashMap<>();
     for (Content content : contents) {

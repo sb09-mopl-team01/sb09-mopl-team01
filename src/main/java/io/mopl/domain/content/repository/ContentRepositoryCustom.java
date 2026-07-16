@@ -1,6 +1,5 @@
 package io.mopl.domain.content.repository;
 
-import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -9,7 +8,7 @@ import java.util.UUID;
 
 public interface ContentRepositoryCustom {
 
-  CursorResponse<Content> findContentsByCursor(
+  CursorResponse<UUID> findContentIdsByCursor(
       ContentType typeEqual,
       String keywordLike,
       Collection<String> tagsIn,
