@@ -8,3 +8,27 @@ spring:
     username: ${RDS_USERNAME:postgres}
     password: ${RDS_PASSWORD:Moplteam01!}
     driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
+
+#  cloud:
+#    aws:
+##      credentials:
+##        access-key: ${AWS_ACCESS_KEY}
+##        secret-key: ${AWS_SECRET_KEY}
+#      region:
+#        static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
+#      s3:
+#        bucket: ${AWS_S3_BUCKET}
+#
+#  # .env 파일로 옮겨야함
+#  data:
+#    redis:
+#      host: ${REDIS_HOST:localhost}
+#      port: ${REDIS_PORT:6379}
+#      password: ${REDIS_PASSWORD:}
+#      ssl:
+#        enabled: ${REDIS_SSL_ENABLED:false}
+#      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+#      timeout: ${REDIS_TIMEOUT:2s}
