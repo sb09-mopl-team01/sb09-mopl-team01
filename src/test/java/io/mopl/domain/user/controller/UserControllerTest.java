@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.mopl.domain.auth.service.TempPasswordService;
+import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -29,6 +29,7 @@ import io.mopl.domain.user.service.UserService;
 import io.mopl.global.exception.GlobalExceptionHandler;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import io.mopl.global.security.CookieProvider;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
@@ -46,6 +47,8 @@ import org.springframework.boot.autoconfigure.security.servlet.SecurityAutoConfi
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.ComponentScan;
+import org.springframework.context.annotation.FilterType;
 import org.springframework.context.annotation.Import;
 import org.springframework.core.MethodParameter;
 import org.springframework.data.jpa.mapping.JpaMetamodelMappingContext;
@@ -60,9 +63,23 @@ import org.springframework.web.method.support.HandlerMethodArgumentResolver;
 import org.springframework.web.method.support.ModelAndViewContainer;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
+import org.springframework.boot.autoconfigure.security.oauth2.client.OAuth2ClientAutoConfiguration;
+import org.springframework.boot.autoconfigure.security.oauth2.client.servlet.OAuth2ClientWebSecurityAutoConfiguration;
+
 @WebMvcTest(
     controllers = UserController.class,
-    excludeAutoConfiguration = {SecurityAutoConfiguration.class, ManagementWebSecurityAutoConfiguration.class}
+    excludeAutoConfiguration = {
+        SecurityAutoConfiguration.class,
+        ManagementWebSecurityAutoConfiguration.class,
+        OAuth2ClientAutoConfiguration.class,
+        OAuth2ClientWebSecurityAutoConfiguration.class
+    },
+    excludeFilters = {
+        @ComponentScan.Filter(type = FilterType.ASSIGNABLE_TYPE, classes = {
+            io.mopl.global.config.SecurityConfig.class,
+            io.mopl.global.security.jwt.JwtAuthenticationFilter.class
+        })
+    }
 )
 @Import({GlobalExceptionHandler.class, UserControllerTest.MockSecurityConfig.class})
 class UserControllerTest {
@@ -124,6 +141,12 @@ class UserControllerTest {
 
   @MockitoBean
   private UserProfileFacade userProfileFacade;
+
+  @MockitoBean
+  private CookieProvider cookieProvider;
+
+  @MockitoBean
+  private RefreshTokenRepository refreshTokenRepository;
 
   @Test
   @DisplayName("POST /api/users - 회원가입 성공 시 201 반환")

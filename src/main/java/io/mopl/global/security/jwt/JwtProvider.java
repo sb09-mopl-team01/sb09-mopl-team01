@@ -136,7 +136,7 @@ public class JwtProvider {
     }
   }
 
-  public String generateRefreshToken(String email) {
+  public String generateRefreshToken(String email, String userIdStr) {
     try {
       Instant now = Instant.now();
       Instant expiration = now.plusSeconds(refreshTokenValiditySeconds);
@@ -146,6 +146,7 @@ public class JwtProvider {
           .issueTime(Date.from(now))
           .expirationTime(Date.from(expiration))
           .jwtID(UUID.randomUUID().toString())
+          .claim("userId", userIdStr)
           .build();
 
       SignedJWT signedJWT = new SignedJWT(new JWSHeader(JWSAlgorithm.HS256), claimsSet);
