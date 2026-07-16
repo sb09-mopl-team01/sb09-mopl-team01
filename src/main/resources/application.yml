@@ -4,7 +4,7 @@ spring:
   profiles:
     active: dev
   config:
-    import: "aws-secretsmanager:mopl-prod-secrets?region=${AWS_REGION:ap-northeast-2}"
+    import: "aws-secretsmanager:mopl-prod-secrets"
   storage:
     type: ${STORAGE_TYPE:local}
     file:
