@@ -1,3 +1,12 @@
 spring:
   config:
-    import: "aws-secretsmanager:mopl-prod-secrets?region=${AWS_REGION:ap-northeast-2}"
+    import: "aws-secretsmanager:mopl-prod-secrets"
+
+  datasource:
+    url: jdbc:postgresql://${RDS_HOST:localhost}:${RDS_PORT:5432}/${RDS_DB_NAME:postgres}
+    username: ${RDS_USERNAME:postgres}
+    password: ${RDS_PASSWORD:Moplteam01!}
+    driver-class-name: org.postgresql.Driver
+
+  flyway:
+    enabled: true
