@@ -35,9 +35,13 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.apache.kafka.common.serialization.StringSerializer
     consumer:
-      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
-      value-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
       auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: io.mopl.infra.kafka.FailingPayloadDeserializer
     listener:
       auto-startup: true
 
@@ -50,8 +54,8 @@ mopl:
       topic: notification
       dlt-topic: notification-dlt
       group-id: notification-kafka-integration
-      max-retries: 1
-      retry-backoff: PT0S
+      max-retries: 10
+      retry-backoff: PT5S
   outbox:
     relay-enabled: false
 

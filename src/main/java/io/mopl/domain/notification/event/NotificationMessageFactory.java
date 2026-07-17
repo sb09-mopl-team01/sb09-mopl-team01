@@ -23,6 +23,7 @@ import org.springframework.util.StringUtils;
 @RequiredArgsConstructor
 public class NotificationMessageFactory {
 
+  private static final int NOTIFICATION_EVENT_VERSION = 1;
   private static final String DEFAULT_DISPLAY_NAME = "사용자";
   private static final String FOLLOW_TITLE = "새 팔로워가 생겼습니다";
   private static final String FOLLOW_CONTENT_FORMAT = "%s님이 회원님을 팔로우했습니다.";
@@ -81,15 +82,31 @@ public class NotificationMessageFactory {
 
   public NotificationMessage fromKafkaRecord(Object value) {
     IntegrationEventEnvelope envelope = readEnvelope(value);
+    if (envelope.eventId() == null || envelope.payload() == null) {
+      throw new IllegalArgumentException("알림 Kafka 이벤트의 eventId와 payload는 필수입니다.");
+    }
     if (!NotificationRequestedEvent.class.getSimpleName().equals(envelope.eventType())) {
       throw new IllegalArgumentException("지원하지 않는 알림 Kafka 이벤트입니다. eventType=" + envelope.eventType());
+    }
+    if (envelope.eventVersion() != NOTIFICATION_EVENT_VERSION) {
+      throw new IllegalArgumentException("지원하지 않는 알림 Kafka 이벤트 버전입니다. eventVersion="
+          + envelope.eventVersion());
     }
     try {
       NotificationRequestedEvent event = objectMapper.treeToValue(
           envelope.payload(), NotificationRequestedEvent.class);
+      validate(event);
       return message(envelope.eventId(), event);
     } catch (JsonProcessingException e) {
       throw new IllegalArgumentException("알림 Kafka 이벤트 payload를 읽을 수 없습니다.", e);
+    }
+  }
+
+  private void validate(NotificationRequestedEvent event) {
+    if (event == null || event.sourceEventId() == null || event.receiverId() == null
+        || !StringUtils.hasText(event.title()) || !StringUtils.hasText(event.content())
+        || event.level() == null) {
+      throw new IllegalArgumentException("알림 Kafka 이벤트 payload가 유효하지 않습니다.");
     }
   }
 
