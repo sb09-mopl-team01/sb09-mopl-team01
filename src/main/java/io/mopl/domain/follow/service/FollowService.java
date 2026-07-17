@@ -3,6 +3,7 @@ package io.mopl.domain.follow.service;
 import io.mopl.domain.follow.dto.FollowCreateRequest;
 import io.mopl.domain.follow.dto.FollowDto;
 import io.mopl.domain.follow.entity.Follow;
+import io.mopl.domain.follow.event.FollowCancelledEvent;
 import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
@@ -73,6 +74,12 @@ public class FollowService {
     }
 
     followRepository.delete(follow);
+    eventPublisher.publish(new FollowCancelledEvent(
+        follow.getId(),
+        follower.getId(),
+        follow.getFollowee().getId(),
+        Instant.now()
+    ));
     log.debug("Follow deleted. followId={}, followerId={}, followeeId={}",
         follow.getId(), follower.getId(), follow.getFollowee().getId());
   }
