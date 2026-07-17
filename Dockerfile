@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk-alpine AS builder
 
 WORKDIR /app
 
@@ -33,7 +33,6 @@ EXPOSE 8080
 
 ENV DB_PORT=5432
 ENV AWS_REGION=ap-northeast-2
-ENV SPRING_PROFILES_ACTIVE=dev
 
 ENTRYPOINT ["java", \
     "-XX:+UseContainerSupport", \
