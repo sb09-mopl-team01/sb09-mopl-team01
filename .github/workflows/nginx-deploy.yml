@@ -5,6 +5,7 @@ on:
     branches: [ "dev", "main", "test/github-actions"]
     paths:
       - 'nginx/**'
+      - '.github/workflows/nginx-deploy.yml'
   workflow_dispatch:
 
 concurrency:
@@ -44,7 +45,7 @@ jobs:
 
       - name: Download latest task definition
         run: |
-          aws ecs describe-task-definition --task-definition mopl-nginx-task --query taskDefinition > task-definition.json
+          aws ecs describe-task-definition --task-definition mopl-nginx-task --query taskDefinition | jq 'del(.enableFaultInjection)' > task-definition.json
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def
