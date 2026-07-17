@@ -157,7 +157,7 @@ public class SecurityConfig {
         .requestMatchers("/index.html", "/*.ico", "/assets/**", "/*.svg").permitAll()
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
-        .requestMatchers("/actuator/health", "/actuator/**").permitAll()
+        .requestMatchers("/actuator/health").permitAll()
         .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
         .hasRole("ADMIN")
         .anyRequest().authenticated();

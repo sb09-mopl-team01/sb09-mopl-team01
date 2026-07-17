@@ -3,8 +3,6 @@ spring:
     name: mopl
   profiles:
     active: dev
-  config:
-    import: "aws-secretsmanager:mopl-prod-secrets"
   storage:
     type: ${STORAGE_TYPE:local}
     file:
