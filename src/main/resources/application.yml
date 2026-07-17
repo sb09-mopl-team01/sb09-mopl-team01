@@ -162,6 +162,10 @@ mopl:
     send-timeout: ${OUTBOX_SEND_TIMEOUT:PT5S}
   notification:
     delivery-mode: ${NOTIFICATION_DELIVERY_MODE:local}
+    realtime:
+      redis:
+        enabled: ${NOTIFICATION_REALTIME_REDIS_ENABLED:false}
+        channel: ${NOTIFICATION_REALTIME_REDIS_CHANNEL:notification:realtime}
     kafka:
       topic: ${NOTIFICATION_KAFKA_TOPIC:notification}
       dlt-topic: ${NOTIFICATION_KAFKA_DLT_TOPIC:notification-dlt}
@@ -223,4 +227,3 @@ mopl:
 
   frontend:
     base-url: "http://localhost:8080"
-

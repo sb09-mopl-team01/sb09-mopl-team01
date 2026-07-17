@@ -71,6 +71,7 @@ flowchart LR
 - Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
 - 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
 - 알림 consumer의 일시 오류는 blocking backoff 재시도 후 `notification-dlt`로 이동합니다. 전달 보장은 at-least-once이며, DLT 레코드는 운영자가 원인 확인·재처리 대상으로 관리합니다.
+- SSE 알림 실시간 발송은 기본적으로 현재 Task의 연결에 직접 전송합니다. `NOTIFICATION_REALTIME_REDIS_ENABLED=true`이면 생성 이벤트를 Redis Pub/Sub 채널에 발행하고, 모든 ECS Task가 수신 후 각 Task가 보유한 해당 수신자의 SSE 연결에 전달합니다. Redis Pub/Sub은 휘발성 UI 전달 경로이므로 영속적 재전송이 필요한 알림 조회는 기존 DB API를 기준으로 합니다.
 
 | 환경 변수 | 기본값 | 용도 |
 | --- | --- | --- |
@@ -78,6 +79,8 @@ flowchart LR
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
 | `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
 | `NOTIFICATION_DELIVERY_MODE` | `local` | `local` 즉시 처리 또는 `kafka` Outbox·Consumer 처리 선택 |
+| `NOTIFICATION_REALTIME_REDIS_ENABLED` | `false` | 다중 인스턴스 SSE 알림 Redis Pub/Sub 중계 활성화 여부 |
+| `NOTIFICATION_REALTIME_REDIS_CHANNEL` | `notification:realtime` | SSE 알림 Redis Pub/Sub 채널 |
 | `NOTIFICATION_KAFKA_TOPIC` | `notification` | 알림 요청 토픽 |
 | `NOTIFICATION_KAFKA_DLT_TOPIC` | `notification-dlt` | 재시도 한도 초과 레코드 토픽 |
 | `NOTIFICATION_KAFKA_MAX_RETRIES` | `3` | Consumer blocking 재시도 횟수 |

@@ -4,7 +4,7 @@ import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.notification.dto.NotificationDto;
 import io.mopl.domain.notification.entity.NotificationLevel;
-import io.mopl.global.sse.SseNotificationService;
+import io.mopl.domain.notification.realtime.NotificationRealtimePublisher;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -12,8 +12,10 @@ import org.junit.jupiter.api.Test;
 
 class NotificationSseEventHandlerTest {
 
-  private final SseNotificationService sseNotificationService = org.mockito.Mockito.mock(SseNotificationService.class);
-  private final NotificationSseEventHandler eventHandler = new NotificationSseEventHandler(sseNotificationService);
+  private final NotificationRealtimePublisher notificationRealtimePublisher =
+      org.mockito.Mockito.mock(NotificationRealtimePublisher.class);
+  private final NotificationSseEventHandler eventHandler =
+      new NotificationSseEventHandler(notificationRealtimePublisher);
 
   @Test
   @DisplayName("알림 생성 이벤트를 수신자 SSE 이벤트로 전송한다")
@@ -38,6 +40,6 @@ class NotificationSseEventHandlerTest {
 
     eventHandler.handleCreated(event);
 
-    verify(sseNotificationService).sendNotification(receiverId, notificationId, notification);
+    verify(notificationRealtimePublisher).publish(event);
   }
 }
