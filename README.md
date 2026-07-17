@@ -70,7 +70,9 @@ flowchart LR
 - 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
 - Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
 - 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. Outbox는 `sourceEventId:receiverId` 결정적 `deduplication_key`의 유니크 제약으로 중복 적재를 방지하고, `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
-- 알림 consumer의 일시 오류는 blocking backoff 재시도 후 `notification-dlt`로 이동합니다. 전달 보장은 at-least-once이며, DLT 레코드는 운영자가 원인 확인·재처리 대상으로 관리합니다.
+- 알림 consumer는 `ErrorHandlingDeserializer`로 Schema Registry 조회 실패, 잘못된 JSON Schema payload, 바이너리 역직렬화 실패를 listener poll 단계에서 격리합니다. 역직렬화 실패 원본 `byte[]`는 전용 serializer로, 정상 JSON Schema 객체는 기본 serializer로 `notification-dlt`에 보존합니다.
+- 알 수 없는 `eventType`·지원하지 않는 `eventVersion`·필수 payload 누락 같은 영구 오류는 즉시 `notification-dlt`로 이동합니다. DB·네트워크 등 일시 오류만 blocking backoff로 재시도하며, DLT는 원인 수정 후 새 consumer group 또는 명시적 offset 관리로 재처리합니다. 원인을 고치지 않은 채 원본 topic에 재발행하지 않습니다.
+- DLT topic의 partition 수는 원본 `notification` topic 이상이어야 합니다. Recoverer가 원본 partition 번호로 DLT에 발행하므로 이 조건을 만족하지 않으면 DLT 발행 자체가 실패할 수 있습니다.
 - SSE 알림 실시간 발송은 기본적으로 현재 Task의 연결에 직접 전송합니다. `NOTIFICATION_REALTIME_REDIS_ENABLED=true`이면 생성 이벤트를 Redis Pub/Sub 채널에 발행하고, 모든 ECS Task가 수신 후 각 Task가 보유한 해당 수신자의 SSE 연결에 전달합니다. Redis Pub/Sub은 휘발성 UI 전달 경로이므로 영속적 재전송이 필요한 알림 조회는 기존 DB API를 기준으로 합니다.
 
 | 환경 변수 | 기본값 | 용도 |

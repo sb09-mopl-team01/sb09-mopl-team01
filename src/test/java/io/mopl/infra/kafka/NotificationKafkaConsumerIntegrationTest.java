@@ -11,11 +11,17 @@ import java.time.Instant;
 import java.util.Collections;
 import java.util.Map;
 import java.util.UUID;
+import java.util.function.Predicate;
 import org.apache.kafka.clients.consumer.Consumer;
 import org.apache.kafka.clients.consumer.ConsumerConfig;
 import org.apache.kafka.clients.consumer.ConsumerRecord;
 import org.apache.kafka.clients.consumer.ConsumerRecords;
 import org.apache.kafka.common.serialization.StringDeserializer;
+import org.apache.kafka.common.serialization.StringSerializer;
+import org.apache.kafka.common.serialization.ByteArraySerializer;
+import org.apache.kafka.clients.producer.KafkaProducer;
+import org.apache.kafka.clients.producer.ProducerConfig;
+import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -44,7 +50,7 @@ class NotificationKafkaConsumerIntegrationTest {
   @Autowired
   private EmbeddedKafkaBroker embeddedKafkaBroker;
 
-  private Consumer<String, String> dltConsumer;
+  private Consumer<String, byte[]> dltConsumer;
 
   @AfterEach
   void closeConsumer() {
@@ -73,12 +79,27 @@ class NotificationKafkaConsumerIntegrationTest {
     dltConsumer = dltConsumer();
     kafkaTemplate.send("notification", "invalid", "{\"eventType\":\"invalid\"}").get();
 
-    ConsumerRecords<String, String> records = KafkaTestUtils.getRecords(dltConsumer, Duration.ofSeconds(10));
+    ConsumerRecord<String, byte[]> record = awaitDltRecord(
+        candidate -> new String(candidate.value()).contains("invalid"));
 
-    assertThat(records.count()).isGreaterThan(0);
-    ConsumerRecord<String, String> record = records.iterator().next();
     assertThat(record.topic()).isEqualTo("notification-dlt");
-    assertThat(record.value()).contains("invalid");
+  }
+
+  @Test
+  @DisplayName("poll 단계 바이너리 역직렬화 실패는 원본 byte[]를 보존해 DLT로 이동한다")
+  void sendsDeserializationFailureToDltWithOriginalBytes() throws Exception {
+    byte[] invalidPayload = new byte[]{0, 1, 2, 3};
+    dltConsumer = dltConsumer();
+
+    try (KafkaProducer<String, byte[]> producer = rawBytesProducer()) {
+      producer.send(new ProducerRecord<>("notification", "invalid-binary", invalidPayload)).get();
+    }
+
+    ConsumerRecord<String, byte[]> record = awaitDltRecord(
+        candidate -> "invalid-binary".equals(candidate.key()));
+
+    assertThat(record.topic()).isEqualTo("notification-dlt");
+    assertThat(record.value()).isEqualTo(invalidPayload);
   }
 
   private String envelope(UUID eventId, UUID receiverId, String title, String content) throws Exception {
@@ -95,14 +116,34 @@ class NotificationKafkaConsumerIntegrationTest {
     ));
   }
 
-  private Consumer<String, String> dltConsumer() {
+  private Consumer<String, byte[]> dltConsumer() {
     Map<String, Object> properties = KafkaTestUtils.consumerProps(
         "notification-dlt-verifier-" + UUID.randomUUID(), "true", embeddedKafkaBroker);
     properties.put(ConsumerConfig.KEY_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, StringDeserializer.class);
-    Consumer<String, String> consumer = new org.apache.kafka.clients.consumer.KafkaConsumer<>(properties);
+    properties.put(ConsumerConfig.VALUE_DESERIALIZER_CLASS_CONFIG, org.apache.kafka.common.serialization.ByteArrayDeserializer.class);
+    Consumer<String, byte[]> consumer = new org.apache.kafka.clients.consumer.KafkaConsumer<>(properties);
     consumer.subscribe(Collections.singleton("notification-dlt"));
     return consumer;
+  }
+
+  private KafkaProducer<String, byte[]> rawBytesProducer() {
+    Map<String, Object> properties = KafkaTestUtils.producerProps(embeddedKafkaBroker);
+    properties.put(ProducerConfig.KEY_SERIALIZER_CLASS_CONFIG, StringSerializer.class);
+    properties.put(ProducerConfig.VALUE_SERIALIZER_CLASS_CONFIG, ByteArraySerializer.class);
+    return new KafkaProducer<>(properties);
+  }
+
+  private ConsumerRecord<String, byte[]> awaitDltRecord(Predicate<ConsumerRecord<String, byte[]>> condition) {
+    Instant timeout = Instant.now().plusSeconds(10);
+    while (Instant.now().isBefore(timeout)) {
+      ConsumerRecords<String, byte[]> records = KafkaTestUtils.getRecords(dltConsumer, Duration.ofSeconds(1));
+      for (ConsumerRecord<String, byte[]> record : records) {
+        if (condition.test(record)) {
+          return record;
+        }
+      }
+    }
+    throw new AssertionError("조건에 맞는 DLT 레코드를 찾지 못했습니다.");
   }
 
   private void await(Condition condition) throws InterruptedException {
