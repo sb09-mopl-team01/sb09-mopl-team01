@@ -1,0 +1,35 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: mopl-perf-postgres
+    environment:
+      POSTGRES_DB: mopl_perf
+      POSTGRES_USER: mopl_perf
+      POSTGRES_PASSWORD: perf-local-only
+      TZ: Asia/Seoul
+    ports:
+      - "15432:5432"
+    volumes:
+      - mopl_perf_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mopl_perf -d mopl_perf"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    container_name: mopl-perf-redis
+    command: redis-server --save "" --appendonly no --requirepass perf-local-only
+    ports:
+      - "16379:6379"
+    environment:
+      TZ: Asia/Seoul
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "perf-local-only", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  mopl_perf_postgres_data:

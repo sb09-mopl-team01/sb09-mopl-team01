@@ -252,6 +252,87 @@ class ContentRepositoryTest {
   }
 
   @Test
+  @DisplayName("1~2글자 키워드와 3글자 이상 키워드를 제목과 설명에서 검색한다")
+  void findContentsByShortAndLongKeywords() {
+    Content titleMatch = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "우주 탐험 영화",
+        "제목에서 짧은 키워드가 검색되는 콘텐츠",
+        null,
+        List.of("SF")
+    ));
+    Content descriptionMatch = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.TV_SERIES,
+        "가족 이야기",
+        "로맨스 장르와 우주 이야기를 함께 다루는 콘텐츠",
+        null,
+        List.of("로맨스")
+    ));
+    entityManager.clear();
+
+    CursorResponse<java.util.UUID> shortKeywordResult = contentRepository.findContentIdsByCursor(
+        null, "우주", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+    CursorResponse<java.util.UUID> longKeywordResult = contentRepository.findContentIdsByCursor(
+        null, "로맨스", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+    CursorResponse<java.util.UUID> oneCharacterResult = contentRepository.findContentIdsByCursor(
+        null, "우", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(shortKeywordResult.data())
+        .containsExactlyInAnyOrder(titleMatch.getId(), descriptionMatch.getId());
+    assertThat(shortKeywordResult.totalCount()).isEqualTo(2);
+    assertThat(longKeywordResult.data()).containsExactly(descriptionMatch.getId());
+    assertThat(longKeywordResult.totalCount()).isEqualTo(1);
+    assertThat(oneCharacterResult.data())
+        .containsExactlyInAnyOrder(titleMatch.getId(), descriptionMatch.getId());
+  }
+
+  @Test
+  @DisplayName("짧은 특수문자 키워드를 와일드카드가 아닌 문자 그대로 검색한다")
+  void findContentsByLiteralSpecialCharacterKeyword() {
+    Content content = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "100% 확실한 A_B! 영화",
+        "특수문자 검색 검증 콘텐츠",
+        null,
+        List.of("테스트")
+    ));
+    entityManager.clear();
+
+    for (String keyword : List.of("%", "_", "!")) {
+      CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+          null, keyword, null, null, null, 10, "createdAt", SortDirection.DESCENDING
+      );
+
+      assertThat(result.data()).containsExactly(content.getId());
+      assertThat(result.totalCount()).isEqualTo(1);
+    }
+  }
+
+  @Test
+  @DisplayName("여러 태그가 동시에 일치해도 콘텐츠 totalCount는 중복되지 않는다")
+  void countContentOnceWhenMultipleTagsMatch() {
+    Content content = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "태그 중복 카운트 검증 영화",
+        "액션과 SF 태그가 모두 일치하는 콘텐츠",
+        null,
+        List.of("액션", "SF")
+    ));
+    entityManager.clear();
+
+    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+        null, null, List.of("액션", "SF"), null, null, 10,
+        "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(result.data()).containsExactly(content.getId());
+    assertThat(result.totalCount()).isEqualTo(1);
+  }
+
+  @Test
   @DisplayName("평점순으로 콘텐츠 목록을 조회한다")
   void findContentsByRateSort() {
     Content lowRatedContent = Content.createManual(
@@ -288,6 +369,92 @@ class ContentRepositoryTest {
 
     assertThat(result.data()).containsExactly(highRatedContent.getId(), lowRatedContent.getId());
     assertThat(result.sortBy()).isEqualTo("rate");
+  }
+
+  @Test
+  @DisplayName("생성일 커서는 이전 페이지의 마지막 행 다음부터 조회한다")
+  void findContentsByCreatedAtCursorWithoutDuplicates() {
+    List<Content> contents = List.of(
+        contentRepository.saveAndFlush(Content.createManual(
+            ContentType.MOVIE, "첫 번째", "생성일 커서 테스트", null, List.of("테스트"))),
+        contentRepository.saveAndFlush(Content.createManual(
+            ContentType.MOVIE, "두 번째", "생성일 커서 테스트", null, List.of("테스트"))),
+        contentRepository.saveAndFlush(Content.createManual(
+            ContentType.MOVIE, "세 번째", "생성일 커서 테스트", null, List.of("테스트"))),
+        contentRepository.saveAndFlush(Content.createManual(
+            ContentType.MOVIE, "네 번째", "생성일 커서 테스트", null, List.of("테스트")))
+    );
+    entityManager.clear();
+
+    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
+        null, null, null, null, null, 2, "createdAt", SortDirection.DESCENDING
+    );
+    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+        null, null, null, firstPage.nextCursor(), firstPage.nextIdAfter(),
+        2, "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(firstPage.data()).doesNotContainAnyElementsOf(secondPage.data());
+    assertThat(firstPage.data()).hasSize(2);
+    assertThat(secondPage.data()).hasSize(2);
+    assertThat(java.util.stream.Stream.concat(firstPage.data().stream(), secondPage.data().stream()))
+        .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
+
+    CursorResponse<java.util.UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
+        null, null, null, null, null, 2, "createdAt", SortDirection.ASCENDING
+    );
+    CursorResponse<java.util.UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
+        null, null, null, ascendingFirstPage.nextCursor(), ascendingFirstPage.nextIdAfter(),
+        2, "createdAt", SortDirection.ASCENDING
+    );
+    assertThat(java.util.stream.Stream.concat(
+        ascendingFirstPage.data().stream(), ascendingSecondPage.data().stream()))
+        .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
+  }
+
+  @Test
+  @DisplayName("동일 평점 콘텐츠도 id 보조 커서로 중복 없이 조회한다")
+  void findContentsByRateCursorWithoutDuplicates() {
+    Content highest = Content.createManual(
+        ContentType.MOVIE, "최고 평점", "평점 커서 테스트", null, List.of("테스트"));
+    highest.updateReviewStats(5.0, 1);
+    Content tiedFirst = Content.createManual(
+        ContentType.MOVIE, "동점 하나", "평점 커서 테스트", null, List.of("테스트"));
+    tiedFirst.updateReviewStats(4.0, 1);
+    Content tiedSecond = Content.createManual(
+        ContentType.MOVIE, "동점 둘", "평점 커서 테스트", null, List.of("테스트"));
+    tiedSecond.updateReviewStats(4.0, 1);
+    Content lowest = Content.createManual(
+        ContentType.MOVIE, "최저 평점", "평점 커서 테스트", null, List.of("테스트"));
+    lowest.updateReviewStats(3.0, 1);
+    List<Content> contents = contentRepository.saveAllAndFlush(
+        List.of(highest, tiedFirst, tiedSecond, lowest));
+    entityManager.clear();
+
+    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
+        null, null, null, null, null, 2, "rate", SortDirection.DESCENDING
+    );
+    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+        null, null, null, firstPage.nextCursor(), firstPage.nextIdAfter(),
+        2, "rate", SortDirection.DESCENDING
+    );
+
+    assertThat(firstPage.data()).doesNotContainAnyElementsOf(secondPage.data());
+    assertThat(firstPage.data()).hasSize(2);
+    assertThat(secondPage.data()).hasSize(2);
+    assertThat(java.util.stream.Stream.concat(firstPage.data().stream(), secondPage.data().stream()))
+        .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
+
+    CursorResponse<java.util.UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
+        null, null, null, null, null, 2, "rate", SortDirection.ASCENDING
+    );
+    CursorResponse<java.util.UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
+        null, null, null, ascendingFirstPage.nextCursor(), ascendingFirstPage.nextIdAfter(),
+        2, "rate", SortDirection.ASCENDING
+    );
+    assertThat(java.util.stream.Stream.concat(
+        ascendingFirstPage.data().stream(), ascendingSecondPage.data().stream()))
+        .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
   }
 
   @Test

@@ -6,6 +6,7 @@ import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSes
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.core.types.dsl.Expressions;
 import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.content.entity.ContentType;
@@ -14,6 +15,7 @@ import io.mopl.global.response.SortDirection;
 import java.time.Instant;
 import java.util.Collection;
 import java.util.List;
+import java.util.Locale;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Repository;
@@ -25,6 +27,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   private static final String SORT_BY_CREATED_AT = "createdAt";
   private static final String SORT_BY_RATE = "rate";
   private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
+  private static final int MIN_INDEXABLE_TRIGRAM_LENGTH = 3;
 
   private final JPAQueryFactory queryFactory;
 
@@ -57,7 +60,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     List<Tuple> rows = queryFactory
         .select(content.id, content.createdAt, content.averageRating)
         .from(content)
-        .distinct()
         .where(
             eqType(typeEqual),
             containsKeyword(keywordLike),
@@ -89,7 +91,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .toList();
 
     Long totalCount = queryFactory
-        .select(content.id.countDistinct())
+        .select(content.id.count())
         .from(content)
         .where(
             eqType(typeEqual),
@@ -147,7 +149,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .map(row -> row.get(content.id))
         .toList();
     Long totalCount = queryFactory
-        .select(content.id.countDistinct())
+        .select(content.id.count())
         .from(content)
         .where(
             eqType(typeEqual),
@@ -188,8 +190,31 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     }
 
     String keyword = keywordLike.trim();
+    if (!hasIndexableTrigram(keyword)) {
+      String normalizedKeyword = keyword.toLowerCase(Locale.ROOT);
+      return content.title.lower().indexOf(normalizedKeyword).goe(0)
+          .or(content.description.lower().indexOf(normalizedKeyword).goe(0));
+    }
+
     return content.title.containsIgnoreCase(keyword)
         .or(content.description.containsIgnoreCase(keyword));
+  }
+
+  private boolean hasIndexableTrigram(String keyword) {
+    int consecutiveLettersOrDigits = 0;
+    for (int offset = 0; offset < keyword.length(); ) {
+      int codePoint = keyword.codePointAt(offset);
+      if (Character.isLetterOrDigit(codePoint)) {
+        consecutiveLettersOrDigits++;
+        if (consecutiveLettersOrDigits >= MIN_INDEXABLE_TRIGRAM_LENGTH) {
+          return true;
+        }
+      } else {
+        consecutiveLettersOrDigits = 0;
+      }
+      offset += Character.charCount(codePoint);
+    }
+    return false;
   }
 
   private BooleanExpression containsAnyTag(Collection<String> tagsIn) {
@@ -221,19 +246,20 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       SortDirection sortDirection
   ) {
     Instant cursorCreatedAt = Instant.parse(cursor);
-    if (sortDirection == SortDirection.ASCENDING) {
-      BooleanExpression afterCursor = content.createdAt.gt(cursorCreatedAt);
-      if (idAfter == null) {
-        return afterCursor;
-      }
-      return afterCursor.or(content.createdAt.eq(cursorCreatedAt).and(content.id.gt(idAfter)));
+    if (idAfter == null) {
+      return sortDirection == SortDirection.ASCENDING
+          ? content.createdAt.gt(cursorCreatedAt)
+          : content.createdAt.lt(cursorCreatedAt);
     }
 
-    BooleanExpression beforeCursor = content.createdAt.lt(cursorCreatedAt);
-    if (idAfter == null) {
-      return beforeCursor;
-    }
-    return beforeCursor.or(content.createdAt.eq(cursorCreatedAt).and(content.id.lt(idAfter)));
+    String operator = sortDirection == SortDirection.ASCENDING ? ">" : "<";
+    return Expressions.booleanTemplate(
+        "({0}, {1}) " + operator + " ({2}, {3})",
+        content.createdAt,
+        content.id,
+        cursorCreatedAt,
+        idAfter
+    );
   }
 
   private BooleanExpression rateCursorCondition(
@@ -242,19 +268,20 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       SortDirection sortDirection
   ) {
     double cursorRate = Double.parseDouble(cursor);
-    if (sortDirection == SortDirection.ASCENDING) {
-      BooleanExpression afterCursor = content.averageRating.gt(cursorRate);
-      if (idAfter == null) {
-        return afterCursor;
-      }
-      return afterCursor.or(content.averageRating.eq(cursorRate).and(content.id.gt(idAfter)));
+    if (idAfter == null) {
+      return sortDirection == SortDirection.ASCENDING
+          ? content.averageRating.gt(cursorRate)
+          : content.averageRating.lt(cursorRate);
     }
 
-    BooleanExpression beforeCursor = content.averageRating.lt(cursorRate);
-    if (idAfter == null) {
-      return beforeCursor;
-    }
-    return beforeCursor.or(content.averageRating.eq(cursorRate).and(content.id.lt(idAfter)));
+    String operator = sortDirection == SortDirection.ASCENDING ? ">" : "<";
+    return Expressions.booleanTemplate(
+        "({0}, {1}) " + operator + " ({2}, {3})",
+        content.averageRating,
+        content.id,
+        cursorRate,
+        idAfter
+    );
   }
 
   private BooleanExpression watcherCountCursorCondition(

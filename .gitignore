@@ -7,6 +7,10 @@ build/
 !**/src/test/**/build/
 *.class
 
+### Python ###
+__pycache__/
+*.py[cod]
+
 .env
 *.env
 
