@@ -41,6 +41,7 @@ class NotificationDomainEventHandlerTest {
     eventHandler.handleFollowCreated(event);
 
     verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.sourceEventId().equals(event.followId())
         && request.receiverId().equals(followeeId)
         && request.title().equals("새 팔로워가 생겼습니다")
         && request.content().equals("follower님이 회원님을 팔로우했습니다.")

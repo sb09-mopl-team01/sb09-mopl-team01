@@ -6,7 +6,6 @@ import io.mopl.global.event.IntegrationEventPublisher;
 import io.mopl.infra.kafka.NotificationKafkaProperties;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.event.EventListener;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,17 +21,20 @@ public class KafkaNotificationRequestedEventHandler {
   private final ObjectMapper objectMapper;
   private final NotificationKafkaProperties properties;
 
-  @EventListener
-  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  @Transactional(propagation = Propagation.REQUIRED)
   public void handle(NotificationRequestedEvent event) {
     integrationEventPublisher.publish(new IntegrationEvent(
         properties.topic(),
-        event.receiverId().toString(),
+        deduplicationKey(event),
         NotificationRequestedEvent.class.getSimpleName(),
         1,
         AGGREGATE_TYPE,
-        event.requestId(),
+        event.sourceEventId(),
         objectMapper.valueToTree(event)
     ));
+  }
+
+  private String deduplicationKey(NotificationRequestedEvent event) {
+    return event.sourceEventId() + ":" + event.receiverId();
   }
 }

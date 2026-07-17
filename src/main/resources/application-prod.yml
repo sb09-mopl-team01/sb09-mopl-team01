@@ -1,0 +1,3 @@
+spring:
+  config:
+    import: "aws-secretsmanager:mopl-prod-secrets?region=${AWS_REGION:ap-northeast-2}"
