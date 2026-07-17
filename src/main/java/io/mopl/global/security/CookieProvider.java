@@ -21,7 +21,7 @@ public class CookieProvider {
   public ResponseCookie createAccessTokenCookie(String accessToken) {
     return ResponseCookie.from(ACCESS_TOKEN_COOKIE_NAME, accessToken)
         .httpOnly(true)
-        .secure(false) // https 적용 시 수정 필요
+        .secure(true) // https 적용 시 수정 필요
         .path(ACCESS_TOKEN_COOKIE_PATH)
         .maxAge(ACCESS_TOKEN_MAX_AGE)
         .sameSite("Lax")
@@ -31,7 +31,7 @@ public class CookieProvider {
   public ResponseCookie createRefreshTokenCookie(String refreshToken) {
     return ResponseCookie.from(REFRESH_TOKEN_COOKIE_NAME, refreshToken)
         .httpOnly(true)
-        .secure(false) // https 적용 시 수정 필요
+        .secure(true) // https 적용 시 수정 필요
         .path(REFRESH_TOKEN_COOKIE_PATH)
         .maxAge(REFRESH_TOKEN_MAX_AGE)
         .sameSite("Lax")
@@ -49,7 +49,7 @@ public class CookieProvider {
   private ResponseCookie deleteCookie(String name, String path) {
     return ResponseCookie.from(name, "")
         .httpOnly(true)
-        .secure(false) // https 적용 시 수정 필요
+        .secure(true) // https 적용 시 수정 필요
         .path(path)
         .maxAge(0)
         .sameSite("Lax")
