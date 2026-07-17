@@ -1,4 +1,7 @@
 spring:
+  config:
+    import:
+      - classpath:application-local-redis.yml
   h2:
     console:
       enabled: true

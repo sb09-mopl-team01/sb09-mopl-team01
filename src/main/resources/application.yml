@@ -2,7 +2,7 @@ spring:
   application:
     name: mopl
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
   storage:
     type: ${STORAGE_TYPE:local}
     file:
@@ -23,7 +23,7 @@ spring:
       initialize-schema: never
 
   flyway:
-    enabled: ${FLYWAY_ENABLED:true}
+    enabled: ${FLYWAY_ENABLED:false}
     locations: classpath:db/migration
     baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
 
@@ -54,8 +54,8 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: ${MAIL_USERNAME}
-    password: ${MAIL_PASSWORD}
+    username: ${MAIL_USERNAME:test@gmail.com}
+    password: ${MAIL_PASSWORD:testtesttesttest}
     properties:
       mail:
         smtp:
@@ -65,12 +65,12 @@ spring:
   cloud:
     aws:
       credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:}
-        secret-key: ${AWS_ACCESS_SECRET_KEY:}
+        access-key: ${AWS_ACCESS_KEY_ID:dummy-access-key}
+        secret-key: ${AWS_ACCESS_SECRET_KEY:dummy-secret-key}
       region:
         static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
       s3:
-        bucket: ${CLOUD_AWS_S3_BUCKET}
+        bucket: ${CLOUD_AWS_S3_BUCKET:dummy-bucket}
 
   data:
     redis:
@@ -136,7 +136,7 @@ management:
     type: redis
 
 jwt:
-  secret: ${JWT_SECRET}
+  secret: ${JWT_SECRET:bW9wbER1bW15U2VjcmV0S2V5Rm9yTG9jYWxUZXN0RW52aXJvbm1lbnQzMkJ5dGVz}
   access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:3600}
   refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:604800}
   max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
@@ -196,7 +196,7 @@ mopl:
       multiplier: ${EXTERNAL_API_RETRY_MULTIPLIER:2.0}
       max-backoff-millis: ${EXTERNAL_API_RETRY_MAX_BACKOFF_MILLIS:4000}
     tmdb:
-      api-key: ${TMDB_API_KEY:}
+      api-key: ${TMDB_API_KEY:dummy-tmdb-api-key}
       base-url: https://api.themoviedb.org/3
       image-base-url: https://image.tmdb.org/t/p/w500
       movie-path: /movie/popular
@@ -206,9 +206,9 @@ mopl:
       korean-only: ${TMDB_KOREAN_ONLY:true}
       pages: ${TMDB_SYNC_PAGES:1}
     the-sports-db:
-      api-key: ${THE_SPORTS_DB_API_KEY:}
+      api-key: ${THE_SPORTS_DB_API_KEY:dummy-sports-api-key}
       base-url: https://www.thesportsdb.com/api/v1/json
-      league-id: ${THE_SPORTS_DB_LEAGUE_ID:}
+      league-id: ${THE_SPORTS_DB_LEAGUE_ID:dummy-league-id}
       events-path: /{apiKey}/eventsnextleague.php
 
   content:
@@ -229,4 +229,4 @@ mopl:
     allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,Accept,X-XSRF-TOKEN,X-Requested-With}
 
   frontend:
-    base-url: "http://localhost:8080"
+    base-url: ${BASE_URL:"http://localhost:8080"}
