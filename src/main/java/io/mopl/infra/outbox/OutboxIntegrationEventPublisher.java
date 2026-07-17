@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.annotation.Propagation;
 
 @Component
 @RequiredArgsConstructor
@@ -21,8 +22,12 @@ public class OutboxIntegrationEventPublisher implements IntegrationEventPublishe
   private final Clock clock;
 
   @Override
-  @Transactional
+  @Transactional(propagation = Propagation.REQUIRED)
   public void publish(IntegrationEvent event) {
+    if (outboxEventRepository.findByDeduplicationKey(event.key()).isPresent()) {
+      log.debug("Duplicate integration event ignored. deduplicationKey={}", event.key());
+      return;
+    }
     String payload = serialize(event);
     OutboxEvent outboxEvent = OutboxEvent.create(event, payload, Instant.now(clock));
     outboxEventRepository.save(outboxEvent);

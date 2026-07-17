@@ -67,9 +67,9 @@ flowchart LR
 ## Kafka 및 스키마 마이그레이션 기반
 
 - Flyway는 기본적으로 활성화되어 있으며(`FLYWAY_ENABLED=true`), `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다.
-- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
+- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
 - Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
-- 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
+- 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. Outbox는 `sourceEventId:receiverId` 결정적 `deduplication_key`의 유니크 제약으로 중복 적재를 방지하고, `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
 - 알림 consumer의 일시 오류는 blocking backoff 재시도 후 `notification-dlt`로 이동합니다. 전달 보장은 at-least-once이며, DLT 레코드는 운영자가 원인 확인·재처리 대상으로 관리합니다.
 - SSE 알림 실시간 발송은 기본적으로 현재 Task의 연결에 직접 전송합니다. `NOTIFICATION_REALTIME_REDIS_ENABLED=true`이면 생성 이벤트를 Redis Pub/Sub 채널에 발행하고, 모든 ECS Task가 수신 후 각 Task가 보유한 해당 수신자의 SSE 연결에 전달합니다. Redis Pub/Sub은 휘발성 UI 전달 경로이므로 영속적 재전송이 필요한 알림 조회는 기존 DB API를 기준으로 합니다.
 
@@ -89,6 +89,9 @@ flowchart LR
 | `OUTBOX_MAX_ATTEMPTS` | `5` | Kafka 발행 최대 시도 횟수. 초과 시 `FAILED` 상태로 보관 |
 | `OUTBOX_CLAIM_TIMEOUT` | `PT1M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간 |
 | `FLYWAY_ENABLED` | `true` | Flyway 마이그레이션 활성화 여부 |
+
+`application-prod.yml`에서만 AWS Secrets Manager import를 수행합니다. 따라서 `test`와 `local` 프로필은 외부 Secrets Manager 연결 없이 실행됩니다.
+이번 변경은 내부 이벤트·Outbox 저장 경계만 다루며 Swagger 엔드포인트와 요청·응답 DTO에는 영향이 없습니다.
 
 ## 프로젝트 구조
 
@@ -123,6 +126,7 @@ chmod +x gradlew
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
 인메모리 H2 데이터베이스를 사용합니다. 테스트 프로필은 Flyway와 Kafka 자동 구성을 비활성화하므로 외부 PostgreSQL, Kafka, Schema Registry 연결이 필요하지 않습니다.
+`test.ignoreFailures=false`이므로 어떤 테스트라도 실패하면 Gradle과 CI가 실패합니다. 이번 Outbox 검증에는 LOCAL 알림 회귀, 원본 트랜잭션 롤백 시 Outbox 미적재, 동일 이벤트 중복 적재 방지가 포함됩니다.
 
 
 ## 문서

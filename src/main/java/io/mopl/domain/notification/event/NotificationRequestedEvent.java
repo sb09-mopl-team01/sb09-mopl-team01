@@ -7,7 +7,7 @@ import java.util.UUID;
  * 알림 생성에 필요한 정보를 전달하는 내부 이벤트입니다.
  */
 public record NotificationRequestedEvent(
-    UUID requestId,
+    UUID sourceEventId,
     UUID receiverId,
     String title,
     String content,

@@ -94,7 +94,7 @@ jacoco {
 }
 
 test {
-    ignoreFailures = true
+    ignoreFailures = false
     useJUnitPlatform()
     systemProperty 'spring.profiles.active', 'test'
     finalizedBy jacocoTestReport
