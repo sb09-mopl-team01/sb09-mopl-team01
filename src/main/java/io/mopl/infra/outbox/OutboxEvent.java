@@ -45,6 +45,9 @@ public class OutboxEvent {
   @Column(name = "event_key", nullable = false, length = 255)
   private String eventKey;
 
+  @Column(name = "deduplication_key", nullable = false, unique = true, length = 255)
+  private String deduplicationKey;
+
   @JdbcTypeCode(SqlTypes.JSON)
   @Column(nullable = false)
   private String payload;
@@ -80,6 +83,7 @@ public class OutboxEvent {
     this.eventVersion = event.eventVersion();
     this.topic = event.topic();
     this.eventKey = event.key();
+    this.deduplicationKey = event.key();
     this.payload = payload;
     this.status = OutboxStatus.PENDING;
     this.retryCount = 0;

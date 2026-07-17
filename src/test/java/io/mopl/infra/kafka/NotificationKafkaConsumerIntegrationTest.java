@@ -90,7 +90,7 @@ class NotificationKafkaConsumerIntegrationTest {
         "eventVersion", 1,
         "occurredAt", Instant.now(),
         "aggregateType", "notification",
-        "aggregateId", requestedEvent.requestId(),
+        "aggregateId", requestedEvent.sourceEventId(),
         "payload", requestedEvent
     ));
   }

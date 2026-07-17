@@ -42,41 +42,41 @@ public class NotificationMessageFactory {
   private final ObjectMapper objectMapper;
 
   public List<NotificationRequestedEvent> from(FollowCreatedEvent event) {
-    return List.of(request(event.followeeId(), FOLLOW_TITLE,
+    return List.of(request(event.followId(), event.followeeId(), FOLLOW_TITLE,
         FOLLOW_CONTENT_FORMAT.formatted(displayName(event.followerName()))));
   }
 
   public List<NotificationRequestedEvent> from(PlaylistSubscribedEvent event) {
-    return List.of(request(event.ownerId(), PLAYLIST_SUBSCRIBED_TITLE,
+    return List.of(request(sourceEventId(event.playlistId(), event.subscriberId()), event.ownerId(), PLAYLIST_SUBSCRIBED_TITLE,
         PLAYLIST_SUBSCRIBED_CONTENT_FORMAT.formatted(displayName(event.subscriberName()), event.playlistTitle())));
   }
 
   public List<NotificationRequestedEvent> from(PlaylistContentAddedEvent event) {
     return event.subscriberIds().stream()
-        .map(receiverId -> request(receiverId, PLAYLIST_CONTENT_ADDED_TITLE,
+        .map(receiverId -> request(sourceEventId(event.playlistId(), event.contentId()), receiverId, PLAYLIST_CONTENT_ADDED_TITLE,
             PLAYLIST_CONTENT_ADDED_CONTENT_FORMAT.formatted(event.playlistTitle(), event.contentTitle())))
         .toList();
   }
 
   public List<NotificationRequestedEvent> from(PlaylistCreatedEvent event) {
     return event.followerIds().stream()
-        .map(receiverId -> request(receiverId, FOLLOWEE_ACTIVITY_TITLE,
+        .map(receiverId -> request(event.playlistId(), receiverId, FOLLOWEE_ACTIVITY_TITLE,
             FOLLOWEE_ACTIVITY_CONTENT_FORMAT.formatted(displayName(event.ownerName()))))
         .toList();
   }
 
   public List<NotificationRequestedEvent> from(UserRoleChangedEvent event) {
-    return List.of(request(event.userId(), USER_ROLE_CHANGED_TITLE,
+    return List.of(request(sourceEventId(event.userId(), event.occurredAt().toEpochMilli()), event.userId(), USER_ROLE_CHANGED_TITLE,
         USER_ROLE_CHANGED_CONTENT_FORMAT.formatted(event.role().name())));
   }
 
   public List<NotificationRequestedEvent> from(DirectMessageSentEvent event) {
-    return List.of(request(event.receiverId(), DIRECT_MESSAGE_TITLE,
+    return List.of(request(event.directMessageId(), event.receiverId(), DIRECT_MESSAGE_TITLE,
         DIRECT_MESSAGE_CONTENT_FORMAT.formatted(displayName(event.senderName()))));
   }
 
   public NotificationMessage from(NotificationRequestedEvent event) {
-    return message(event.requestId(), event);
+    return message(event.sourceEventId(), event);
   }
 
   public NotificationMessage fromKafkaRecord(Object value) {
@@ -115,8 +115,12 @@ public class NotificationMessageFactory {
     return objectMapper.valueToTree(value);
   }
 
-  private NotificationRequestedEvent request(UUID receiverId, String title, String content) {
-    return new NotificationRequestedEvent(UUID.randomUUID(), receiverId, title, content, NotificationLevel.INFO);
+  private NotificationRequestedEvent request(UUID sourceEventId, UUID receiverId, String title, String content) {
+    return new NotificationRequestedEvent(sourceEventId, receiverId, title, content, NotificationLevel.INFO);
+  }
+
+  private UUID sourceEventId(UUID first, Object second) {
+    return UUID.nameUUIDFromBytes((first + ":" + second).getBytes(java.nio.charset.StandardCharsets.UTF_8));
   }
 
   private NotificationMessage message(UUID eventId, NotificationRequestedEvent event) {
