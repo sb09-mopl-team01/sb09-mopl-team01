@@ -24,6 +24,9 @@ import io.mopl.domain.content.storage.ContentThumbnailFile;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +43,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
+
+  private static final Instant FIXED_NOW = Instant.parse("2026-07-20T00:00:00Z");
 
   private ContentService contentService;
 
@@ -70,7 +75,8 @@ class ContentServiceTest {
         contentStatsService,
         contentMapper,
         contentThumbnailService,
-        new ResourcelessTransactionManager()
+        new ResourcelessTransactionManager(),
+        Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     );
   }
 
@@ -284,9 +290,10 @@ class ContentServiceTest {
 
     contentService.deleteContent(contentId);
 
-    verify(contentRepository).delete(content);
+    assertThat(content.getDeletedAt()).isEqualTo(FIXED_NOW);
+    verify(contentRepository, never()).delete(any());
     verify(contentCacheService).evictAll(contentId);
-    verify(contentThumbnailService).delete("current.jpg");
+    verify(contentThumbnailService, never()).delete(any());
   }
 
   @Test

@@ -13,6 +13,7 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.repository.ContentRepository;
+import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -62,6 +63,9 @@ class ContentAdminControllerIntegrationTest {
 
   @Autowired
   private TransactionTemplate transactionTemplate;
+
+  @Autowired
+  private EntityManager entityManager;
 
   @AfterEach
   void tearDown() throws Exception {
@@ -150,7 +154,13 @@ class ContentAdminControllerIntegrationTest {
             .with(csrf()))
         .andExpect(status().isOk());
 
-    assertThat(contentRepository.existsById(contentId)).isFalse();
+    assertThat(contentRepository.findById(contentId)).isEmpty();
+    transactionTemplate.executeWithoutResult(status -> {
+      Content deletedContent = entityManager.find(Content.class, contentId);
+      assertThat(deletedContent).isNotNull();
+      assertThat(deletedContent.getDeletedAt()).isNotNull();
+      assertThat(deletedContent.getThumbnailKey()).isNotBlank().endsWith(".png");
+    });
   }
 
   private MockMultipartFile jsonPart(String name, Object value) throws Exception {
