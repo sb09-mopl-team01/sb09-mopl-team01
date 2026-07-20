@@ -2,7 +2,7 @@ name: Mopl-prod
 
 on:
   push:
-    branches: [ "dev", "main" ]
+    branches: [ "dev", "main", "chore/dockerfile" ]
 
 concurrency:
   group: deploy-${{ github.ref }}
