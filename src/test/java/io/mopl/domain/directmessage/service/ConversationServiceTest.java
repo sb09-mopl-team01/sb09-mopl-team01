@@ -186,8 +186,8 @@ class ConversationServiceTest {
         PageRequest.of(0, 2)
     )).thenReturn(List.of(conversation));
     when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
-    when(directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId))
-        .thenReturn(Optional.empty());
+    when(directMessageRepository.findLastestByConversationIds(List.of(conversationId)))
+        .thenReturn(List.of());
     when(conversationMapper.toDto(conversation, withUser, null, false)).thenReturn(expected);
     when(conversationRepository.countMyConversations(requesterId, "receiver")).thenReturn(1L);
 
@@ -248,8 +248,8 @@ class ConversationServiceTest {
         PageRequest.of(0, 2)
     )).thenReturn(List.of(conversation));
     when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
-    when(directMessageRepository.findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversationId))
-        .thenReturn(Optional.of(lastestMessage));
+    when(directMessageRepository.findLastestByConversationIds(List.of(conversationId)))
+        .thenReturn(List.of(lastestMessage));
     when(userRepository.findAllById(List.of(withUserId, requesterId)))
         .thenReturn(List.of(withUser, requester));
     when(directMessageMapper.toDto(lastestMessage, withUser, requester)).thenReturn(lastestMessageDto);

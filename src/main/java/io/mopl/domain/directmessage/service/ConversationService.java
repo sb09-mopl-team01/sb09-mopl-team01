@@ -23,7 +23,6 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -436,11 +435,11 @@ public class ConversationService {
   }
 
   private Map<UUID, DirectMessageDto> findLastestMessageDtos(List<Conversation> conversations) {
-    List<DirectMessage> lastestMessages = conversations.stream()
-        .map(conversation -> directMessageRepository
-            .findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()))
-        .flatMap(Optional::stream)
+    List<UUID> conversationIds = conversations.stream()
+        .map(Conversation::getId)
         .toList();
+    List<DirectMessage> lastestMessages = directMessageRepository
+        .findLastestByConversationIds(conversationIds);
 
     if (lastestMessages.isEmpty()) {
       return Map.of();
