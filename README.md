@@ -66,8 +66,8 @@ flowchart LR
 
 ## Kafka 및 스키마 마이그레이션 기반
 
-- Flyway는 기본적으로 활성화되어 있으며(`FLYWAY_ENABLED=true`), `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다.
-- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. `OutboxRelay`는 QueryDSL 비관적 잠금으로 이벤트를 선점하고 Kafka broker ACK 이후에만 발행 완료로 변경합니다.
+- Flyway는 `dev`·`prod` 프로필에서 활성화되어 `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다. 공통 설정의 `FLYWAY_ENABLED` 기본값은 `false`이며, `test` 프로필은 Flyway를 비활성화합니다.
+- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. 다중 Relay는 PostgreSQL `FOR UPDATE SKIP LOCKED`로 이미 선점된 이벤트를 건너뛰고, Kafka broker ACK 이후에만 발행 완료로 변경합니다.
 - Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
 - 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. Outbox는 `sourceEventId:receiverId` 결정적 `deduplication_key`의 유니크 제약으로 중복 적재를 방지하고, `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
 - 알림 consumer는 `ErrorHandlingDeserializer`로 Schema Registry 조회 실패, 잘못된 JSON Schema payload, 바이너리 역직렬화 실패를 listener poll 단계에서 격리합니다. 역직렬화 실패 원본 `byte[]`는 전용 serializer로, 정상 JSON Schema 객체는 기본 serializer로 `notification-dlt`에 보존합니다.
@@ -87,10 +87,10 @@ flowchart LR
 | `NOTIFICATION_KAFKA_DLT_TOPIC` | `notification-dlt` | 재시도 한도 초과 레코드 토픽 |
 | `NOTIFICATION_KAFKA_MAX_RETRIES` | `3` | Consumer blocking 재시도 횟수 |
 | `OUTBOX_RELAY_ENABLED` | `true` | Outbox Relay 및 발행 완료 데이터 정리 스케줄 활성화 여부 |
-| `OUTBOX_RELAY_BATCH_SIZE` | `100` | 한 번의 Relay 실행에서 선점할 최대 이벤트 수 |
+| `OUTBOX_RELAY_BATCH_SIZE` | `20` | 한 번의 Relay 실행에서 선점할 최대 이벤트 수 |
 | `OUTBOX_MAX_ATTEMPTS` | `5` | Kafka 발행 최대 시도 횟수. 초과 시 `FAILED` 상태로 보관 |
-| `OUTBOX_CLAIM_TIMEOUT` | `PT1M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간 |
-| `FLYWAY_ENABLED` | `true` | Flyway 마이그레이션 활성화 여부 |
+| `OUTBOX_CLAIM_TIMEOUT` | `PT2M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간. 기본 `send-timeout` 5초 기준 최대 20건을 순차 발행하는 시간을 포함합니다. |
+| `FLYWAY_ENABLED` | `false` | 공통 설정에서 Flyway 마이그레이션을 활성화할지 여부 (`dev`·`prod`는 별도 활성화) |
 
 `application-prod.yml`에서만 AWS Secrets Manager import를 수행합니다. 따라서 `test`와 `local` 프로필은 외부 Secrets Manager 연결 없이 실행됩니다.
 이번 변경은 내부 이벤트·Outbox 저장 경계만 다루며 Swagger 엔드포인트와 요청·응답 DTO에는 영향이 없습니다.
