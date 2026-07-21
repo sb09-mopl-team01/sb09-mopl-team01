@@ -1,0 +1,137 @@
+package io.mopl.domain.watchingsession.repository;
+
+import static io.mopl.domain.user.entity.QUser.user;
+import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSession;
+
+import com.querydsl.core.Tuple;
+import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.impl.JPAQueryFactory;
+import io.mopl.domain.watchingsession.entity.WatchingSession;
+import io.mopl.global.response.SortDirection;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.UUID;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Pageable;
+import org.springframework.stereotype.Repository;
+import org.springframework.util.StringUtils;
+
+@Repository
+@RequiredArgsConstructor
+public class WatchingSessionRepositoryImpl implements WatchingSessionRepositoryCustom {
+
+  private final JPAQueryFactory queryFactory;
+
+  @Override
+  public List<WatchingSession> findByContentIdWithCursorDesc(
+      UUID contentId,
+      String watcherNameLike,
+      Instant cursor,
+      UUID idAfter,
+      Pageable pageable
+  ) {
+    return queryFactory
+        .selectFrom(watchingSession)
+        .join(watchingSession.watcher, user).fetchJoin()
+        .join(watchingSession.content).fetchJoin()
+        .where(
+            watchingSession.content.id.eq(contentId),
+            watcherNameContains(watcherNameLike),
+            cursorCondition(cursor, idAfter, SortDirection.DESCENDING)
+        )
+        .orderBy(watchingSession.createdAt.desc(), watchingSession.id.desc())
+        .limit(pageable.getPageSize())
+        .fetch();
+  }
+
+  @Override
+  public List<WatchingSession> findByContentIdWithCursorAsc(
+      UUID contentId,
+      String watcherNameLike,
+      Instant cursor,
+      UUID idAfter,
+      Pageable pageable
+  ) {
+    return queryFactory
+        .selectFrom(watchingSession)
+        .join(watchingSession.watcher, user).fetchJoin()
+        .join(watchingSession.content).fetchJoin()
+        .where(
+            watchingSession.content.id.eq(contentId),
+            watcherNameContains(watcherNameLike),
+            cursorCondition(cursor, idAfter, SortDirection.ASCENDING)
+        )
+        .orderBy(watchingSession.createdAt.asc(), watchingSession.id.asc())
+        .limit(pageable.getPageSize())
+        .fetch();
+  }
+
+  @Override
+  public long countByContentId(UUID contentId, String watcherNameLike) {
+    Long count = queryFactory
+        .select(watchingSession.id.count())
+        .from(watchingSession)
+        .join(watchingSession.watcher, user)
+        .where(
+            watchingSession.content.id.eq(contentId),
+            watcherNameContains(watcherNameLike)
+        )
+        .fetchOne();
+    return count == null ? 0L : count;
+  }
+
+  @Override
+  public Map<UUID, Long> countByContentIds(List<UUID> contentIds) {
+    if (contentIds == null || contentIds.isEmpty()) {
+      return Map.of();
+    }
+
+    List<Tuple> rows = queryFactory
+        .select(watchingSession.content.id, watchingSession.id.count())
+        .from(watchingSession)
+        .where(watchingSession.content.id.in(contentIds))
+        .groupBy(watchingSession.content.id)
+        .fetch();
+
+    Map<UUID, Long> countsByContentId = new HashMap<>();
+    for (Tuple row : rows) {
+      UUID contentId = row.get(watchingSession.content.id);
+      Long count = row.get(watchingSession.id.count());
+      if (contentId != null) {
+        countsByContentId.put(contentId, count == null ? 0L : count);
+      }
+    }
+    return countsByContentId;
+  }
+
+  private BooleanExpression watcherNameContains(String watcherNameLike) {
+    if (!StringUtils.hasText(watcherNameLike)) {
+      return null;
+    }
+    return user.name.containsIgnoreCase(watcherNameLike.trim());
+  }
+
+  private BooleanExpression cursorCondition(Instant cursor, UUID idAfter, SortDirection sortDirection) {
+    if (cursor == null) {
+      return null;
+    }
+
+    BooleanExpression comparedAt = sortDirection == SortDirection.ASCENDING
+        ? watchingSession.createdAt.gt(cursor)
+        : watchingSession.createdAt.lt(cursor);
+    if (idAfter == null) {
+      return comparedAt;
+    }
+
+    BooleanExpression comparedId = sortDirection == SortDirection.ASCENDING
+        ? watchingSession.id.gt(idAfter)
+        : watchingSession.id.lt(idAfter);
+
+    return comparedAt.or(
+        watchingSession.createdAt.eq(cursor)
+            .and(comparedId)
+    );
+  }
+}

@@ -1,21 +1,123 @@
+server:
+  forward-headers-strategy: framework
+
 spring:
   application:
     name: mopl
   profiles:
-    active: dev
+    active: ${SPRING_PROFILES_ACTIVE:dev}
+  storage:
+    type: ${STORAGE_TYPE:local}
+    file:
+      upload-dir: ${PROFILE_IMAGE_DIR:uploads/images/profile}
+
   jpa:
+    hibernate:
+      ddl-auto: none
     properties:
       hibernate:
         jdbc.batch_size: 1000
         order_inserts: true
         order_updates: true
   batch:
+    job:
+      enabled: false
     jdbc:
       initialize-schema: never
+
+  flyway:
+    enabled: ${FLYWAY_ENABLED:false}
+    locations: classpath:db/migration
+    baseline-on-migrate: ${FLYWAY_BASELINE_ON_MIGRATE:false}
+
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:localhost:9092}
+    properties:
+      schema.registry.url: ${KAFKA_SCHEMA_REGISTRY_URL:http://localhost:8081}
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: io.confluent.kafka.serializers.json.KafkaJsonSchemaSerializer
+    consumer:
+      key-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.ErrorHandlingDeserializer
+      auto-offset-reset: earliest
+      enable-auto-commit: false
+      properties:
+        spring.deserializer.key.delegate.class: org.apache.kafka.common.serialization.StringDeserializer
+        spring.deserializer.value.delegate.class: io.confluent.kafka.serializers.json.KafkaJsonSchemaDeserializer
+    listener:
+      auto-startup: ${KAFKA_ENABLED:false}
+    admin:
+      fail-fast: false
 
   jackson:
     serialization:
       write-dates-as-timestamps: false
+
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${MAIL_USERNAME:test@gmail.com}
+    password: ${MAIL_PASSWORD:testtesttesttest}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  cloud:
+    aws:
+      region:
+        static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
+      s3:
+        bucket: ${CLOUD_AWS_S3_BUCKET:dummy-bucket}
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+      ssl:
+        enabled: ${REDIS_SSL_ENABLED:false}
+      connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
+      timeout: ${REDIS_TIMEOUT:2s}
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:dummy-google-client-id}
+            client-secret: ${GOOGLE_CLIENT_SECRET:dummy-google-client-secret}
+            scope:
+              - profile
+              - email
+          kakao:
+            client-id: ${KAKAO_CLIENT_ID:dummy-kakao-client-id}
+            client-secret: ${KAKAO_CLIENT_SECRET:dummy-kakao-client-secret}
+            client-name: Kakao
+            authorization-grant-type: authorization_code
+            redirect-uri: "{baseUrl}/login/oauth2/code/kakao"
+            client-authentication-method: client_secret_post
+        provider:
+          kakao:
+            authorization-uri: https://kauth.kakao.com/oauth/authorize
+            token-uri: https://kauth.kakao.com/oauth/token
+            user-info-uri: https://kapi.kakao.com/v2/user/me
+            user-name-attribute: id
+
+logging:
+  file:
+    name: ${LOG_FILE_NAME:logs/mopl.log}
+  level:
+    root: ${LOG_LEVEL_ROOT:INFO}
+  logback:
+    rollingpolicy:
+      file-name-pattern: ${LOG_ARCHIVE_FILE_PATTERN:logs/archive/mopl.%d{yyyy-MM-dd}.%i.log.gz}
+      max-file-size: ${LOG_MAX_FILE_SIZE:50MB}
+      max-history: ${LOG_MAX_HISTORY:14}
+      total-size-cap: ${LOG_TOTAL_SIZE_CAP:2GB}
+      clean-history-on-start: ${LOG_CLEAN_HISTORY_ON_START:false}
 
 management:
   endpoints:
@@ -27,3 +129,104 @@ management:
       show-details: always
     prometheus:
       enabled: true
+    kafka:
+      enabled: ${KAFKA_ENABLED:false}
+
+  cache:
+    type: redis
+
+jwt:
+  secret: ${JWT_SECRET:bW9wbER1bW15U2VjcmV0S2V5Rm9yTG9jYWxUZXN0RW52aXJvbm1lbnQzMkJ5dGVz}
+  access-token-validity-seconds: ${JWT_ACCESS_TOKEN_VALIDITY_SECONDS:3600}
+  refresh-token-validity-seconds: ${JWT_REFRESH_TOKEN_VALIDITY_SECONDS:604800}
+  max-active-tokens: ${JWT_MAX_ACTIVE_TOKENS:1}
+
+mopl:
+  logging:
+    backup:
+      enabled: ${LOG_BACKUP_ENABLED:false}
+      cron: ${LOG_BACKUP_CRON:0 0 4 * * *}
+      archive-directory: ${LOG_ARCHIVE_DIRECTORY:logs/archive}
+      s3-key-prefix: ${LOG_BACKUP_S3_KEY_PREFIX:logs/mopl}
+      instance-id: ${LOG_BACKUP_INSTANCE_ID:${HOSTNAME:local}}
+  kafka:
+    enabled: ${KAFKA_ENABLED:false}
+  outbox:
+    relay-enabled: ${OUTBOX_RELAY_ENABLED:true}
+    relay-delay: ${OUTBOX_RELAY_DELAY:PT1S}
+    batch-size: ${OUTBOX_RELAY_BATCH_SIZE:20}
+    claim-timeout: ${OUTBOX_CLAIM_TIMEOUT:PT2M}
+    max-attempts: ${OUTBOX_MAX_ATTEMPTS:5}
+    initial-backoff: ${OUTBOX_INITIAL_BACKOFF:PT1S}
+    backoff-multiplier: ${OUTBOX_BACKOFF_MULTIPLIER:2.0}
+    max-backoff: ${OUTBOX_MAX_BACKOFF:PT1M}
+    published-retention: ${OUTBOX_PUBLISHED_RETENTION:P7D}
+    cleanup-delay: ${OUTBOX_CLEANUP_DELAY:PT1H}
+    send-timeout: ${OUTBOX_SEND_TIMEOUT:PT5S}
+  notification:
+    delivery-mode: ${NOTIFICATION_DELIVERY_MODE:local}
+    realtime:
+      redis:
+        enabled: ${NOTIFICATION_REALTIME_REDIS_ENABLED:false}
+        channel: ${NOTIFICATION_REALTIME_REDIS_CHANNEL:notification:realtime}
+    kafka:
+      topic: ${NOTIFICATION_KAFKA_TOPIC:notification}
+      dlt-topic: ${NOTIFICATION_KAFKA_DLT_TOPIC:notification-dlt}
+      group-id: ${NOTIFICATION_KAFKA_GROUP_ID:mopl-notification}
+      max-retries: ${NOTIFICATION_KAFKA_MAX_RETRIES:3}
+      retry-backoff: ${NOTIFICATION_KAFKA_RETRY_BACKOFF:PT1S}
+  watching-session:
+    redis:
+      enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
+      channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
+      presence-ttl: ${WATCHING_SESSION_REDIS_PRESENCE_TTL:PT24H}
+      lease-ttl: ${WATCHING_SESSION_REDIS_LEASE_TTL:PT90S}
+      lease-maintenance-delay-millis: ${WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS:30000}
+  admin:
+    username: ${ADMIN_USERNAME:admin}
+    email: ${ADMIN_EMAIL:admin@mopl.com}
+    password: ${ADMIN_PASSWORD:admin1234}
+  external:
+    timeout:
+      connect-seconds: ${EXTERNAL_API_CONNECT_TIMEOUT_SECONDS:3}
+      read-seconds: ${EXTERNAL_API_READ_TIMEOUT_SECONDS:5}
+    retry:
+      max-attempts: ${EXTERNAL_API_RETRY_MAX_ATTEMPTS:3}
+      initial-backoff-millis: ${EXTERNAL_API_RETRY_INITIAL_BACKOFF_MILLIS:1000}
+      multiplier: ${EXTERNAL_API_RETRY_MULTIPLIER:2.0}
+      max-backoff-millis: ${EXTERNAL_API_RETRY_MAX_BACKOFF_MILLIS:4000}
+    tmdb:
+      api-key: ${TMDB_API_KEY:dummy-tmdb-api-key}
+      base-url: https://api.themoviedb.org/3
+      image-base-url: https://image.tmdb.org/t/p/w500
+      movie-path: /movie/popular
+      tv-path: /tv/popular
+      language: ${TMDB_LANGUAGE:ko-KR}
+      region: ${TMDB_REGION:KR}
+      korean-only: ${TMDB_KOREAN_ONLY:true}
+      pages: ${TMDB_SYNC_PAGES:1}
+    the-sports-db:
+      api-key: ${THE_SPORTS_DB_API_KEY:dummy-sports-api-key}
+      base-url: https://www.thesportsdb.com/api/v1/json
+      league-id: ${THE_SPORTS_DB_LEAGUE_ID:dummy-league-id}
+      events-path: /{apiKey}/eventsnextleague.php
+
+  content:
+    cache:
+      base-ttl: ${CONTENT_BASE_CACHE_TTL:20m}
+      stats-ttl: ${CONTENT_STATS_CACHE_TTL:3m}
+    thumbnail:
+      storage-type: ${STORAGE_TYPE:local}
+      s3:
+        key-prefix: ${CONTENT_THUMBNAIL_S3_KEY_PREFIX:uploads/contents/thumbnails}
+    batch:
+      external-sync:
+        cron: ${CONTENT_EXTERNAL_SYNC_CRON:0 0 3 * * *}
+
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}
+    allowed-methods: ${CORS_ALLOWED_METHODS:GET,POST,PUT,PATCH,DELETE,OPTIONS}
+    allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,Accept,X-XSRF-TOKEN,X-Requested-With}
+
+  frontend:
+    base-url: ${BASE_URL:"http://localhost:8080"}

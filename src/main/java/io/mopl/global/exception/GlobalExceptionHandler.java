@@ -1,6 +1,7 @@
 package io.mopl.global.exception;
 
 import jakarta.servlet.http.HttpServletRequest;
+import java.time.format.DateTimeParseException;
 import java.util.stream.Collectors;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
@@ -8,8 +9,11 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.ServletRequestBindingException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.context.request.async.AsyncRequestNotUsableException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 @Slf4j
@@ -37,6 +41,26 @@ public class GlobalExceptionHandler {
     return ResponseEntity
         .status(HttpStatus.INTERNAL_SERVER_ERROR)
         .body(new ErrorResponse(ErrorCode.INTERNAL_SERVER_ERROR.getCode(), "서버 내부에서 예상치 못한 오류가 발생했습니다."));
+  }
+
+  @ExceptionHandler(AsyncRequestNotUsableException.class)
+  protected void handleAsyncRequestNotUsableException(
+      AsyncRequestNotUsableException e, HttpServletRequest request) {
+
+    log.debug("Async request disconnected. uri={}, method={}, message={}",
+        request.getRequestURI(), request.getMethod(), e.getMessage());
+  }
+
+  @ExceptionHandler(NoResourceFoundException.class)
+  protected ResponseEntity<ErrorResponse> handleNoResourceFoundException(
+      NoResourceFoundException e, HttpServletRequest request) {
+
+    log.debug("Static resource not found. uri={}, method={}",
+        request.getRequestURI(), request.getMethod());
+
+    return ResponseEntity
+        .status(ErrorCode.RESOURCE_NOT_FOUND.getStatus())
+        .body(ErrorResponse.of(ErrorCode.RESOURCE_NOT_FOUND));
   }
 
   @ExceptionHandler(BaseException.class)
@@ -67,11 +91,31 @@ public class GlobalExceptionHandler {
         .body(new ErrorResponse(ErrorCode.INVALID_INPUT.getCode(), message));
   }
 
+  @ExceptionHandler(ServletRequestBindingException.class)
+  protected ResponseEntity<ErrorResponse> handleServletRequestBindingException(
+      ServletRequestBindingException e, HttpServletRequest request) {
+
+    log.warn("Required request binding value is missing. uri={}, method={}, message={}",
+        request.getRequestURI(), request.getMethod(), e.getMessage());
+
+    return ResponseEntity
+        .status(ErrorCode.AUTHENTICATION_REQUIRED.getStatus())
+        .body(ErrorResponse.of(ErrorCode.AUTHENTICATION_REQUIRED));
+  }
+
 
   private String formatFieldErrors(BindingResult bindingResult) {
     return bindingResult.getFieldErrors()
         .stream()
         .map(fieldError -> fieldError.getField() + ": " + fieldError.getDefaultMessage())
         .collect(Collectors.joining(", "));
+  }
+
+  @ExceptionHandler({DateTimeParseException.class, NumberFormatException.class})
+  public ResponseEntity<ErrorResponse> handleParsingException(Exception e) {
+    ErrorCode errorCode = ErrorCode.INVALID_INPUT;
+    return ResponseEntity
+        .status(errorCode.getStatus())
+        .body(new ErrorResponse(errorCode.getCode(), "유효하지 않은 커서 형식입니다."));
   }
 }

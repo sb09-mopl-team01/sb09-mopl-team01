@@ -7,12 +7,22 @@ build/
 !**/src/test/**/build/
 *.class
 
+### Python ###
+__pycache__/
+*.py[cod]
+
 .env
 *.env
 
 backups/
 
 logs/
+
+# 로컬 작업 문서
+docs/**/*.md
+local-docs/
+*.local.md
+AGENTS.md
 
 ### STS ###
 .apt_generated

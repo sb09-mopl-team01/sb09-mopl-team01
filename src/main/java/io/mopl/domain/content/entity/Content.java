@@ -1,0 +1,258 @@
+package io.mopl.domain.content.entity;
+
+import io.mopl.global.entity.BaseUpdatableEntity;
+import jakarta.persistence.CollectionTable;
+import jakarta.persistence.Column;
+import jakarta.persistence.ElementCollection;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.Index;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Table;
+import jakarta.persistence.UniqueConstraint;
+import java.time.Instant;
+import java.util.Collection;
+import java.util.LinkedHashSet;
+import java.util.Objects;
+import java.util.Set;
+import lombok.AccessLevel;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+
+@Getter
+@Entity
+@Table(
+    name = "contents",
+    uniqueConstraints = {
+        @UniqueConstraint(
+            name = "uk_contents_source_type_external_id",
+            columnNames = {"source", "type", "external_id"}
+        )
+    },
+    indexes = {
+        @Index(name = "idx_contents_type", columnList = "type"),
+        @Index(name = "idx_contents_created_at_id", columnList = "created_at, id"),
+        @Index(name = "idx_contents_average_rating_id", columnList = "average_rating, id")
+    }
+)
+@NoArgsConstructor(access = AccessLevel.PROTECTED)
+public class Content extends BaseUpdatableEntity {
+
+  @Column(nullable = false, length = 20)
+  private ContentType type;
+
+  @Column(nullable = false, length = 255)
+  private String title;
+
+  @Column(nullable = false, length = 2000)
+  private String description;
+
+  @Column(name = "thumbnail_url", length = 2048)
+  private String thumbnailUrl;
+
+  @Column(name = "thumbnail_key", length = 512)
+  private String thumbnailKey;
+
+  @Enumerated(EnumType.STRING)
+  @Column(nullable = false, length = 30)
+  private ContentSource source;
+
+  @Column(name = "external_id", length = 100)
+  private String externalId;
+
+  @Column(name = "last_synced_at")
+  private Instant lastSyncedAt;
+
+  @Column(name = "average_rating", nullable = false)
+  private double averageRating = 0.0;
+
+  @Column(name = "review_count", nullable = false)
+  private int reviewCount = 0;
+
+  @ElementCollection(fetch = FetchType.LAZY)
+  @CollectionTable(
+      name = "content_tags",
+      joinColumns = @JoinColumn(name = "content_id"),
+      uniqueConstraints = {
+          @UniqueConstraint(
+              name = "uk_content_tags_content_id_tag",
+              columnNames = {"content_id", "tag"}
+          )
+      },
+      indexes = {
+          @Index(name = "idx_content_tags_tag_content_id", columnList = "tag, content_id")
+      }
+  )
+  @Column(name = "tag", nullable = false, length = 50)
+  private Set<String> tags = new LinkedHashSet<>();
+
+  private Content(
+      ContentType type,
+      String title,
+      String description,
+      String thumbnailUrl,
+      String thumbnailKey,
+      ContentSource source,
+      String externalId,
+      Instant lastSyncedAt,
+      Collection<String> tags
+  ) {
+    validateExternalId(source, externalId);
+    this.type = Objects.requireNonNull(type, "콘텐츠 타입은 필수입니다.");
+    this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
+    this.description = requireText(description, "콘텐츠 설명은 필수입니다.");
+    this.thumbnailUrl = normalizeNullableText(thumbnailUrl);
+    this.thumbnailKey = normalizeNullableText(thumbnailKey);
+    this.source = Objects.requireNonNull(source, "콘텐츠 출처는 필수입니다.");
+    this.externalId = normalizeNullableText(externalId);
+    this.lastSyncedAt = lastSyncedAt;
+    this.tags = normalizeTags(tags);
+  }
+
+  public static Content createManual(
+      ContentType type,
+      String title,
+      String description,
+      String thumbnailUrl,
+      Collection<String> tags
+  ) {
+    return createManual(type, title, description, thumbnailUrl, null, tags);
+  }
+
+  public static Content createManual(
+      ContentType type,
+      String title,
+      String description,
+      String thumbnailUrl,
+      String thumbnailKey,
+      Collection<String> tags
+  ) {
+    return new Content(type, title, description, thumbnailUrl, thumbnailKey, ContentSource.MANUAL, null, null, tags);
+  }
+
+  public static Content createExternal(
+      ContentType type,
+      String title,
+      String description,
+      String thumbnailUrl,
+      ContentSource source,
+      String externalId,
+      Instant lastSyncedAt,
+      Collection<String> tags
+  ) {
+    if (source == ContentSource.MANUAL) {
+      throw new IllegalArgumentException("외부 콘텐츠는 MANUAL 출처를 사용할 수 없습니다.");
+    }
+    return new Content(type, title, description, thumbnailUrl, null, source, externalId, lastSyncedAt, tags);
+  }
+
+  public void markSyncedAt(Instant syncedAt) {
+    if (!source.isExternal()) {
+      throw new IllegalStateException("수동 등록 콘텐츠는 동기화 시각을 갱신할 수 없습니다.");
+    }
+    this.lastSyncedAt = Objects.requireNonNull(syncedAt, "동기화 시각은 필수입니다.");
+  }
+
+  public void updateManual(
+      String title,
+      String description,
+      Collection<String> tags,
+      String thumbnailUrl
+  ) {
+    updateManual(title, description, tags, thumbnailUrl, this.thumbnailKey);
+  }
+
+  public void updateManual(
+      String title,
+      String description,
+      Collection<String> tags,
+      String thumbnailUrl,
+      String thumbnailKey
+  ) {
+    if (title != null) {
+      this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
+    }
+    if (description != null) {
+      this.description = requireText(description, "콘텐츠 설명은 필수입니다.");
+    }
+    if (tags != null) {
+      this.tags = normalizeTags(tags);
+    }
+    if (thumbnailUrl != null) {
+      this.thumbnailUrl = normalizeNullableText(thumbnailUrl);
+      this.thumbnailKey = normalizeNullableText(thumbnailKey);
+    }
+  }
+
+  private static void validateExternalId(ContentSource source, String externalId) {
+    if (source == null) {
+      return;
+    }
+    String normalizedExternalId = normalizeNullableText(externalId);
+    if (source.isExternal() && normalizedExternalId == null) {
+      throw new IllegalArgumentException("외부 콘텐츠는 externalId가 필수입니다.");
+    }
+    if (!source.isExternal() && normalizedExternalId != null) {
+      throw new IllegalArgumentException("수동 등록 콘텐츠는 externalId를 가질 수 없습니다.");
+    }
+  }
+
+  private static String requireText(String value, String message) {
+    String normalized = normalizeNullableText(value);
+    if (normalized == null) {
+      throw new IllegalArgumentException(message);
+    }
+    return normalized;
+  }
+
+  private static String normalizeNullableText(String value) {
+    if (value == null) {
+      return null;
+    }
+    String trimmed = value.trim();
+    return trimmed.isEmpty() ? null : trimmed;
+  }
+
+  private static Set<String> normalizeTags(Collection<String> tags) {
+    if (tags == null) {
+      throw new IllegalArgumentException("콘텐츠 태그는 필수입니다.");
+    }
+
+    Set<String> normalizedTags = new LinkedHashSet<>();
+    for (String tag : tags) {
+      String normalizedTag = requireText(tag, "콘텐츠 태그는 빈 값일 수 없습니다.");
+      if (normalizedTag.length() > 50) {
+        throw new IllegalArgumentException("콘텐츠 태그는 50자를 초과할 수 없습니다.");
+      }
+      normalizedTags.add(normalizedTag);
+    }
+
+    if (normalizedTags.isEmpty()) {
+      throw new IllegalArgumentException("콘텐츠 태그는 하나 이상 필요합니다.");
+    }
+    return normalizedTags;
+  }
+
+  public void updateAverageRating(double newAverage) {
+    this.averageRating = newAverage;
+  }
+
+  public void updateReviewStats(double averageRating, int reviewCount) {
+    if (reviewCount < 0) {
+      throw new IllegalArgumentException("리뷰 수는 음수일 수 없습니다.");
+    }
+    this.averageRating = averageRating;
+    this.reviewCount = reviewCount;
+  }
+
+  // 리뷰 수 증감
+  public void increaseReviewCount() {
+    this.reviewCount++;
+  }
+
+  public void decreaseReviewCount() {
+    if (this.reviewCount > 0) this.reviewCount--;
+  }
+}

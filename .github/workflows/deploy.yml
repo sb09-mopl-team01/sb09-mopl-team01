@@ -1,0 +1,89 @@
+name: Mopl-prod
+
+on:
+  push:
+    branches: [ "main" ]
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Register Confluent Cloud schema
+        env:
+          CONFLUENT_SCHEMA_SECRET_ID: mopl-prod-secrets
+          CONFLUENT_SCHEMA_PATH: src/main/resources/contracts/events/integration-event-envelope.json
+          CONFLUENT_SCHEMA_SUBJECT: notification-value
+        run: |
+          SECRET_JSON="$(aws secretsmanager get-secret-value --secret-id "$CONFLUENT_SCHEMA_SECRET_ID" --query SecretString --output text)"
+          export KAFKA_SCHEMA_REGISTRY_URL="$(jq -er '.KAFKA_SCHEMA_REGISTRY_URL' <<< "$SECRET_JSON")"
+          export KAFKA_SCHEMA_REGISTRY_API_KEY="$(jq -er '.KAFKA_SCHEMA_REGISTRY_API_KEY' <<< "$SECRET_JSON")"
+          export KAFKA_SCHEMA_REGISTRY_API_SECRET="$(jq -er '.KAFKA_SCHEMA_REGISTRY_API_SECRET' <<< "$SECRET_JSON")"
+          echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_URL"
+          echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_API_KEY"
+          echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_API_SECRET"
+          bash ./scripts/register-confluent-schema.sh "$CONFLUENT_SCHEMA_PATH" "$CONFLUENT_SCHEMA_SUBJECT"
+          bash ./scripts/register-confluent-schema.sh "$CONFLUENT_SCHEMA_PATH" "notification-dlt-value"
+
+      - name: Login ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push Docker Image
+        env:
+          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+          ECR_REPOSITORY: ${{ secrets.AWS_ECR_REPOSITORY }}
+          IMAGE_TAG: ${{ github.sha }}
+        run: |
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+
+      - name: Render AWS Account ID in Task Definition
+        run: envsubst < task-definition.json > task-def-rendered.json
+        env:
+          AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+
+      - name: Inject CloudWatch Log Configuration
+        run: |
+          jq '.containerDefinitions[0] += {
+            "logConfiguration": {
+              "logDriver": "awslogs",
+              "options": {
+                "awslogs-group": "/ecs/mopl-backend-task",
+                "awslogs-region": "${{ secrets.AWS_REGION }}",
+                "awslogs-stream-prefix": "ecs",
+                "awslogs-create-group": "true"
+              }
+            }
+          }' task-def-rendered.json > task-def-with-logs.json
+
+      - name: Fill in the new image ID in the Amazon ECS task definition
+        id: task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: task-def-with-logs.json
+          container-name: mopl-backend-container
+          image: ${{ steps.login-ecr.outputs.registry }}/${{ secrets.AWS_ECR_REPOSITORY }}:${{ github.sha }}
+
+      - name: Deploy Amazon ECS task definition
+        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
+        with:
+          task-definition: ${{ steps.task-def.outputs.task-definition }}
+          service: mopl-backend-service
+          cluster: mopl-cluster
+          wait-for-service-stability: true
