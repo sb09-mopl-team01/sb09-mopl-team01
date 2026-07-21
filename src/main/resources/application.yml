@@ -234,4 +234,4 @@ mopl:
     allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,Accept,X-XSRF-TOKEN,X-Requested-With}
 
   frontend:
-    base-url: ${BASE_URL:"http://localhost:8080"}
+    base-url: ${BASE_URL:http://localhost:8080}
