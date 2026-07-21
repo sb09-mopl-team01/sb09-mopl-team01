@@ -29,7 +29,7 @@ spring:
       sasl.mechanism: PLAIN
       sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY:}" password="${KAFKA_API_SECRET:}";'
       basic.auth.credentials.source: USER_INFO
-      basic.auth.user.info: "${KAFKA_SCHEMA_REGISTRY_RUNTIME_API_KEY:}:${KAFKA_SCHEMA_REGISTRY_RUNTIME_API_SECRET:}"
+      basic.auth.user.info: "${KAFKA_SCHEMA_REGISTRY_API_KEY:}:${KAFKA_SCHEMA_REGISTRY_API_SECRET:}"
       auto.register.schemas: false
 
 management:

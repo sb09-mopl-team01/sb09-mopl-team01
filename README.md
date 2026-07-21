@@ -102,10 +102,8 @@ ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함�
 | `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
 | `KAFKA_API_KEY` | 없음 | Confluent Kafka runtime 서비스 계정 API key (prod secret) |
 | `KAFKA_API_SECRET` | 없음 | Confluent Kafka runtime 서비스 계정 API secret (prod secret) |
-| `KAFKA_SCHEMA_REGISTRY_RUNTIME_API_KEY` | 없음 | ECS runtime Schema Registry Read 계정 API key (prod secret) |
-| `KAFKA_SCHEMA_REGISTRY_RUNTIME_API_SECRET` | 없음 | ECS runtime Schema Registry Read 계정 API secret (prod secret) |
-| `KAFKA_SCHEMA_REGISTRY_DEPLOY_API_KEY` | 없음 | CI schema 등록·호환성 검사 Write 계정 API key (`mopl-confluent-deploy-secrets`) |
-| `KAFKA_SCHEMA_REGISTRY_DEPLOY_API_SECRET` | 없음 | CI schema 등록·호환성 검사 Write 계정 API secret (`mopl-confluent-deploy-secrets`) |
+| `KAFKA_SCHEMA_REGISTRY_API_KEY` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API key (`mopl-prod-secrets`) |
+| `KAFKA_SCHEMA_REGISTRY_API_SECRET` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API secret (`mopl-prod-secrets`) |
 | `NOTIFICATION_DELIVERY_MODE` | `local` | `local` 즉시 처리 또는 `kafka` Outbox·Consumer 처리 선택 |
 | `NOTIFICATION_REALTIME_REDIS_ENABLED` | `false` | 다중 인스턴스 SSE 알림 Redis Pub/Sub 중계 활성화 여부 |
 | `NOTIFICATION_REALTIME_REDIS_CHANNEL` | `notification:realtime` | SSE 알림 Redis Pub/Sub 채널 |
@@ -124,8 +122,8 @@ ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함�
 ### Confluent Cloud 운영 적용
 
 - Confluent Cloud에는 `notification`, `notification-dlt` topic을 만들고 DLT partition 수를 원본 이상으로 설정합니다.
-- `mopl-prod-secrets`에는 ECS runtime용 Confluent bootstrap/Schema Registry URL과 Kafka·Schema Registry Read API key를 등록합니다. `mopl-confluent-deploy-secrets`에는 CI schema 등록용 Schema Registry URL과 Write API key만 등록합니다. ECS Task Role은 전자에만, GitHub Actions 배포 IAM principal은 두 secret 모두에 `secretsmanager:GetSecretValue` 권한이 필요하며, ECS security group은 Confluent bootstrap endpoint의 9092/TCP와 Schema Registry의 443/TCP outbound를 허용해야 합니다.
-- 배포 workflow는 `notification-value`와 `notification-dlt-value` subject의 호환성을 `BACKWARD`로 설정하고 검증한 뒤 새 version을 등록합니다. ECS runtime은 Schema Registry Read 전용 계정을, CI는 schema 등록·호환성 변경용 Write 계정을 사용하며, 런타임 자동 schema 등록은 하지 않습니다.
+- `mopl-prod-secrets` 하나에 ECS runtime 및 CI용 Confluent bootstrap/Schema Registry URL과 Kafka·Schema Registry API key를 등록합니다. ECS Task Role과 GitHub Actions 배포 IAM 사용자는 이 Secret에만 `secretsmanager:GetSecretValue` 권한이 필요하며, ECS security group은 Confluent bootstrap endpoint의 9092/TCP와 Schema Registry의 443/TCP outbound를 허용해야 합니다.
+- 배포 workflow는 `notification-value`와 `notification-dlt-value` subject의 호환성을 `BACKWARD`로 설정하고 검증한 뒤 새 version을 등록합니다. ECS runtime과 CI는 동일한 Schema Registry API key를 사용하며, 런타임 자동 schema 등록은 하지 않습니다.
 - 배포 뒤 새 ECS revision/ECR digest, `event_outbox`의 `PUBLISHED` 전환, `processed_kafka_events` 중복 방지, `notification-dlt` 이동을 확인합니다. consumer lag, `FAILED` Outbox 누적, DLT 증가, `Kafka publish failed` 로그를 알람 대상으로 관리합니다.
 - Kafka broker 연결은 readiness probe에서 제외합니다. broker 장애가 HTTP 트래픽 전체를 비정상으로 만들지 않도록 하고, 발행 실패는 Outbox 재시도로 복구합니다. secret rotation 후에는 새 ECS deployment가 필요합니다.
 
