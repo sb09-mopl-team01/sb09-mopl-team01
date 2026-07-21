@@ -44,9 +44,10 @@
 
 ```mermaid
 flowchart LR
-    Client["Client"] --> NGINX["NGINX"]
-    NGINX --> ALB["AWS ALB"]
-    ALB --> ECS["AWS ECS"]
+    Client["Client"] --> ALB["AWS ALB (HTTPS)"]
+    ALB --> NGINX["Nginx ECS service"]
+    NGINX --> CloudMap["Cloud Map: app.mopl.local"]
+    CloudMap --> ECS["Spring Boot ECS service"]
     ECS --> RDS["PostgreSQL"]
     ECS --> S3["S3"]
     ECS --> Redis["Redis"]
@@ -57,6 +58,25 @@ flowchart LR
 ```
 
 ## 운영 확장 메모
+
+- ECS는 ALB → Nginx 서비스 → Cloud Map(`app.mopl.local`) → Spring Boot 서비스 순서로 요청을 전달합니다. ALB target group은 Nginx의 `/nginx-health`를, 운영 점검은 Spring Boot의 `/actuator/health/liveness`와 `/actuator/health/readiness`를 사용합니다.
+- prod 프로필은 `server.forward-headers-strategy=framework`로 ALB·Nginx가 전달한 `X-Forwarded-*` 헤더를 Spring MVC 요청과 리다이렉트 URL에 반영합니다. Spring Boot Task의 security group은 Nginx Task security group만 인바운드 8080을 허용해야 하며, 클라이언트가 `X-Forwarded-*` 헤더를 직접 주입할 수 없어야 합니다.
+- Nginx는 `/api/sse`에서 buffering을 끄고, `/ws`의 WebSocket/SockJS Upgrade를 전달합니다. Nginx와 Spring Boot 서비스는 모두 최소 2개 Task로 운영해야 단일 Task 장애에 대응할 수 있습니다.
+- `application-prod.yml`은 AWS Secrets Manager `mopl-prod-secrets`에서 DB 및 Confluent Cloud 자격 증명을 읽습니다. `KAFKA_API_KEY`, `KAFKA_API_SECRET`, `KAFKA_SCHEMA_REGISTRY_API_KEY`, `KAFKA_SCHEMA_REGISTRY_API_SECRET`은 Git이나 Task Definition에 넣지 않습니다.
+
+## ECS 이미지 빌드 및 배포
+
+GitHub Actions의 prod 배포는 `main` 병합 시에만 실행됩니다. 로컬에서 ECR 이미지를 검증·업로드해야 하는 경우 Fargate의 기본 x86_64 런타임과 맞도록 `linux/amd64` 플랫폼을 명시합니다.
+
+```bash
+docker buildx build --platform linux/amd64 --load -t "$ECR_APP_URI:$IMAGE_TAG" .
+docker push "$ECR_APP_URI:$IMAGE_TAG"
+
+docker buildx build --platform linux/amd64 --load -t "$ECR_NGINX_URI:$IMAGE_TAG" ./nginx
+docker push "$ECR_NGINX_URI:$IMAGE_TAG"
+```
+
+ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함께 확인합니다. 소스의 이미지 태그만 바뀌고 서비스가 새 revision을 채택하지 않은 상태는 배포 완료가 아닙니다.
 
 - WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
 - `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. Task 비정상 종료는 lease 만료 후 정리합니다.

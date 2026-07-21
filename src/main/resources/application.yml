@@ -67,9 +67,6 @@ spring:
             enable: true
   cloud:
     aws:
-      credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:dummy-access-key}
-        secret-key: ${AWS_ACCESS_SECRET_KEY:dummy-secret-key}
       region:
         static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
       s3:
