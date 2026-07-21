@@ -14,11 +14,15 @@
       "portMappings": [{ "containerPort": 8080, "hostPort": 8080 }],
       "environment": [
         { "name": "SPRING_PROFILES_ACTIVE", "value": "prod" },
-        { "name": "AWS_S3_BUCKET", "value": "mopl-s3-storage-945504686053-ap-northeast-2-an" },
+        { "name": "CLOUD_AWS_S3_BUCKET", "value": "mopl-s3-storage-945504686053-ap-northeast-2-an" },
         { "name": "AWS_REGION", "value": "ap-northeast-2" },
         { "name": "REDIS_SSL_ENABLED", "value": "true" },
+        { "name": "NOTIFICATION_REALTIME_REDIS_ENABLED", "value": "true" },
+        { "name": "WATCHING_SESSION_REDIS_ENABLED", "value": "true" },
         { "name": "STORAGE_TYPE", "value": "s3" },
         { "name": "FLYWAY_ENABLED", "value":"true"},
+        { "name": "KAFKA_ENABLED", "value": "true" },
+        { "name": "NOTIFICATION_DELIVERY_MODE", "value": "kafka" },
         { "name": "BASE_URL", "value": "https://mopl-domain.ooguy.com"}
       ]
     }
