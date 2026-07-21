@@ -35,7 +35,7 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
       criteria = criteria.and("role").is(roleEqual.toUpperCase());
     }
     if (isLocked != null) {
-      criteria = criteria.and("locked").is(isLocked);
+      criteria = criteria.and("isLocked").is(isLocked);
     }
 
     CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);

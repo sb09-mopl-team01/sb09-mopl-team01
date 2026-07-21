@@ -227,9 +227,13 @@ public class UserService {
         .map(userMapper::toDto)
         .toList();
 
-    String nextCursor = (searchResponse.nextSortValues() != null && !searchResponse.nextSortValues().isEmpty())
-        ? searchResponse.nextSortValues().get(0).toString()
-        : null;
+    String nextCursor = null;
+    if (searchResponse.nextSortValues() != null && !searchResponse.nextSortValues().isEmpty()) {
+      String joined = searchResponse.nextSortValues().stream()
+          .map(Object::toString)
+          .collect(Collectors.joining(","));
+      nextCursor = java.util.Base64.getEncoder().encodeToString(joined.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
 
     UUID nextIdAfter = !userIds.isEmpty() ? userIds.get(userIds.size() - 1) : null;
 
@@ -272,6 +276,11 @@ public class UserService {
     if (cursor == null || cursor.isBlank()) {
       return null;
     }
-    return List.of(cursor);
+    try {
+      String decoded = new String(java.util.Base64.getDecoder().decode(cursor), java.nio.charset.StandardCharsets.UTF_8);
+      return List.of(decoded.split(","));
+    } catch (Exception e) {
+      return List.of(cursor);
+    }
   }
 }
