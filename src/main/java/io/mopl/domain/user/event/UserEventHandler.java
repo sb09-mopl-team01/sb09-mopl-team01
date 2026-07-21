@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.event.TransactionPhase;
 import org.springframework.transaction.event.TransactionalEventListener;
@@ -28,6 +29,7 @@ public class UserEventHandler {
   @Value("${jwt.access-token-validity-seconds}")
   private long accessTokenValiditySeconds;
 
+  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handlePasswordChangedEvent(UserPasswordChangeEvent event) {
     try {
@@ -38,6 +40,7 @@ public class UserEventHandler {
     }
   }
 
+  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleUserLockedEvent(UserLockedEvent event) {
     try {
@@ -53,6 +56,7 @@ public class UserEventHandler {
     }
   }
 
+  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleUserUnlockedEvent(UserUnlockedEvent event) {
     try {
@@ -63,6 +67,7 @@ public class UserEventHandler {
     }
   }
 
+  @Async
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleUserSync(UserSyncedEvent event) {
     if (userSearchRepository == null) return;
