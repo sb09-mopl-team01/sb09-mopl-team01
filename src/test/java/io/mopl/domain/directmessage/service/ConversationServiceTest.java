@@ -426,15 +426,13 @@ class ConversationServiceTest {
     Instant createdAt = Instant.now();
     ReflectionTestUtils.setField(savedDirectMessage, "id", directMessageId);
     ReflectionTestUtils.setField(savedDirectMessage, "createdAt", createdAt);
-    DirectMessageDto expected = createDirectMessageDto(directMessageId, conversationId, createdAt);
 
     when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
     when(conversationRepository.findById(conversationId)).thenReturn(Optional.of(conversation));
     when(userRepository.findById(withUserId)).thenReturn(Optional.of(withUser));
     when(directMessageRepository.save(any(DirectMessage.class))).thenReturn(savedDirectMessage);
-    when(directMessageMapper.toDto(savedDirectMessage, requester, withUser)).thenReturn(expected);
 
-    DirectMessageDto result = conversationService.sendDirectMessage(
+    conversationService.sendDirectMessage(
         requesterId,
         conversationId,
         new DirectMessageSendRequest("  hello  ")
@@ -447,7 +445,6 @@ class ConversationServiceTest {
     assertThat(capturedDirectMessage.getSenderId()).isEqualTo(requesterId);
     assertThat(capturedDirectMessage.getReceiverId()).isEqualTo(withUserId);
     assertThat(capturedDirectMessage.getContent()).isEqualTo("hello");
-    assertThat(result).isEqualTo(expected);
     verify(eventPublisher).publish(argThat(event -> event instanceof DirectMessageSentEvent sentEvent
         && sentEvent.directMessageId().equals(directMessageId)
         && sentEvent.conversationId().equals(conversationId)
