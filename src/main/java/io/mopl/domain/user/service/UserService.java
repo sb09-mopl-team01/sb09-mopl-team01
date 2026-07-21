@@ -278,7 +278,12 @@ public class UserService {
     }
     try {
       String decoded = new String(java.util.Base64.getDecoder().decode(cursor), java.nio.charset.StandardCharsets.UTF_8);
-      return List.of(decoded.split(","));
+      String[] parts = decoded.split(",");
+      List<Object> list = new java.util.ArrayList<>();
+      for (String part : parts) {
+        list.add(part);
+      }
+      return list;
     } catch (Exception e) {
       return List.of(cursor);
     }
