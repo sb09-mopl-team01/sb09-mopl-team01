@@ -8,19 +8,7 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 
 @Entity
-@Table(
-    name = "users",
-    uniqueConstraints = {
-        @UniqueConstraint(
-            name = "uk_users_email",
-            columnNames = {"email"}
-        )
-    },
-    indexes = {
-        @Index(name = "idx_users_created_at", columnList = "created_at"),
-        @Index(name = "idx_users_name", columnList = "name"),
-    }
-)
+@Table(name = "users")
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseUpdatableEntity {

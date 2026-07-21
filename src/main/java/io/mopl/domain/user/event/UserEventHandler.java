@@ -2,9 +2,12 @@ package io.mopl.domain.user.event;
 
 import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.auth.service.TempPasswordService;
+import io.mopl.domain.user.document.UserDocument;
+import io.mopl.domain.user.repository.search.UserSearchRepository;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
@@ -19,6 +22,8 @@ public class UserEventHandler {
   private final TempPasswordService tempPasswordService;
   private final StringRedisTemplate redisTemplate;
   private final RefreshTokenRepository refreshTokenRepository;
+  @Autowired(required = false)
+  private final UserSearchRepository userSearchRepository;
 
   @Value("${jwt.access-token-validity-seconds}")
   private long accessTokenValiditySeconds;
@@ -55,6 +60,25 @@ public class UserEventHandler {
       log.debug("Redis Unlock status updated successfully for userId={}", event.userId());
     } catch (Exception e) {
       log.error("Redis Unlock status update failed for userId={}", event.userId(), e);
+    }
+  }
+
+  @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
+  public void handleUserSync(UserSyncedEvent event) {
+    if (userSearchRepository == null) return;
+    try {
+      UserDocument document = UserDocument.builder()
+          .id(event.userId())
+          .name(event.name())
+          .email(event.email())
+          .role(event.role())
+          .isLocked(event.isLocked())
+          .createdAt(event.createdAt())
+          .build();
+
+      userSearchRepository.save(document);
+    } catch (Exception e) {
+      log.error("OpenSearch sync failed. userId={}", event.userId(), e);
     }
   }
 }
