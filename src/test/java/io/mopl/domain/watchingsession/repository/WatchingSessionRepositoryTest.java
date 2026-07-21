@@ -6,6 +6,8 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.watchingsession.entity.WatchingSession;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -82,21 +84,29 @@ class WatchingSessionRepositoryTest {
   @DisplayName("커서 이후 시청 세션만 오래된순으로 조회한다")
   void findByContentIdWithCursorAscAfterCursor() {
     Content content = saveContent("라라랜드");
-    saveSession(saveUser("첫 번째"), content);
-    WatchingSession second = saveSession(saveUser("두 번째"), content);
-    WatchingSession third = saveSession(saveUser("세 번째"), content);
+    List<WatchingSession> sessions = List.of(
+        saveSession(saveUser("첫 번째"), content),
+        saveSession(saveUser("두 번째"), content),
+        saveSession(saveUser("세 번째"), content)
+    ).stream()
+        .sorted(Comparator
+            .comparing((WatchingSession session) -> session.getCreatedAt()
+                .truncatedTo(ChronoUnit.MICROS))
+            .thenComparing(WatchingSession::getId))
+        .toList();
+    WatchingSession cursor = sessions.get(1);
 
     List<WatchingSession> result = watchingSessionRepository.findByContentIdWithCursorAsc(
         content.getId(),
         null,
-        second.getCreatedAt(),
-        second.getId(),
+        cursor.getCreatedAt(),
+        cursor.getId(),
         PageRequest.of(0, 10)
     );
 
     assertThat(result)
         .extracting(WatchingSession::getId)
-        .containsExactly(third.getId());
+        .containsExactly(sessions.get(2).getId());
   }
 
   @Test
