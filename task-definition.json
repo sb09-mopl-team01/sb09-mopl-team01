@@ -21,6 +21,8 @@
         { "name": "WATCHING_SESSION_REDIS_ENABLED", "value": "true" },
         { "name": "STORAGE_TYPE", "value": "s3" },
         { "name": "FLYWAY_ENABLED", "value":"true"},
+        { "name": "KAFKA_ENABLED", "value": "true" },
+        { "name": "NOTIFICATION_DELIVERY_MODE", "value": "kafka" },
         { "name": "BASE_URL", "value": "https://mopl-domain.ooguy.com"}
       ]
     }
