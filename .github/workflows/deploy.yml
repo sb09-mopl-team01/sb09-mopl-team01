@@ -26,18 +26,19 @@ jobs:
 
       - name: Register Confluent Cloud schema
         env:
-          CONFLUENT_SECRET_ID: mopl-prod-secrets
+          CONFLUENT_SCHEMA_SECRET_ID: mopl-confluent-deploy-secrets
           CONFLUENT_SCHEMA_PATH: src/main/resources/contracts/events/integration-event-envelope.json
           CONFLUENT_SCHEMA_SUBJECT: notification-value
         run: |
-          SECRET_JSON="$(aws secretsmanager get-secret-value --secret-id "$CONFLUENT_SECRET_ID" --query SecretString --output text)"
+          SECRET_JSON="$(aws secretsmanager get-secret-value --secret-id "$CONFLUENT_SCHEMA_SECRET_ID" --query SecretString --output text)"
           export KAFKA_SCHEMA_REGISTRY_URL="$(jq -er '.KAFKA_SCHEMA_REGISTRY_URL' <<< "$SECRET_JSON")"
-          export KAFKA_SCHEMA_REGISTRY_API_KEY="$(jq -er '.KAFKA_SCHEMA_REGISTRY_API_KEY' <<< "$SECRET_JSON")"
-          export KAFKA_SCHEMA_REGISTRY_API_SECRET="$(jq -er '.KAFKA_SCHEMA_REGISTRY_API_SECRET' <<< "$SECRET_JSON")"
+          export KAFKA_SCHEMA_REGISTRY_API_KEY="$(jq -er '.KAFKA_SCHEMA_REGISTRY_DEPLOY_API_KEY' <<< "$SECRET_JSON")"
+          export KAFKA_SCHEMA_REGISTRY_API_SECRET="$(jq -er '.KAFKA_SCHEMA_REGISTRY_DEPLOY_API_SECRET' <<< "$SECRET_JSON")"
           echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_URL"
           echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_API_KEY"
           echo "::add-mask::$KAFKA_SCHEMA_REGISTRY_API_SECRET"
           bash ./scripts/register-confluent-schema.sh "$CONFLUENT_SCHEMA_PATH" "$CONFLUENT_SCHEMA_SUBJECT"
+          bash ./scripts/register-confluent-schema.sh "$CONFLUENT_SCHEMA_PATH" "notification-dlt-value"
 
       - name: Login ECR
         id: login-ecr
