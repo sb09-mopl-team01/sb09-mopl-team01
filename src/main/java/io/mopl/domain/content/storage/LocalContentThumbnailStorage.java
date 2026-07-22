@@ -59,15 +59,14 @@ public class LocalContentThumbnailStorage implements ContentThumbnailStorage {
 
     Path targetPath = storagePath.resolve(thumbnailKey).normalize();
     if (!targetPath.startsWith(storagePath)) {
-      log.warn("Content thumbnail delete rejected. storage=local thumbnailKey={}", thumbnailKey);
-      return;
+      throw new IllegalArgumentException("콘텐츠 썸네일 저장 경로를 벗어난 키입니다.");
     }
 
     try {
       Files.deleteIfExists(targetPath);
       log.info("Content thumbnail delete completed. storage=local thumbnailKey={}", thumbnailKey);
     } catch (IOException e) {
-      log.warn("Content thumbnail delete failed. storage=local thumbnailKey={}", thumbnailKey, e);
+      throw new IllegalStateException("콘텐츠 썸네일 삭제에 실패했습니다.", e);
     }
   }
 

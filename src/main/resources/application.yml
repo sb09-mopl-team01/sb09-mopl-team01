@@ -67,9 +67,6 @@ spring:
             enable: true
   cloud:
     aws:
-      credentials:
-        access-key: ${AWS_ACCESS_KEY_ID:dummy-access-key}
-        secret-key: ${AWS_ACCESS_SECRET_KEY:dummy-secret-key}
       region:
         static: ${CLOUD_AWS_REGION_STATIC:ap-northeast-2}
       s3:
@@ -108,6 +105,11 @@ spring:
             token-uri: https://kauth.kakao.com/oauth/token
             user-info-uri: https://kapi.kakao.com/v2/user/me
             user-name-attribute: id
+
+  opensearch:
+    uris: ${OPENSEARCH_URI:http://localhost:9200}
+    username: ${OPENSEARCH_USERNAME:""}
+    password: ${OPENSEARCH_PASSWORD:""}
 
 logging:
   file:
@@ -232,4 +234,4 @@ mopl:
     allowed-headers: ${CORS_ALLOWED_HEADERS:Authorization,Content-Type,Accept,X-XSRF-TOKEN,X-Requested-With}
 
   frontend:
-    base-url: ${BASE_URL:"http://localhost:8080"}
+    base-url: ${BASE_URL:http://localhost:8080}

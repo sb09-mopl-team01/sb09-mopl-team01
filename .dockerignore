@@ -1,0 +1,16 @@
+.git
+.github
+.gradle
+.idea
+.env
+.env.*
+build
+logs
+uploads
+backups
+out
+*.iml
+*.ipr
+*.iws
+README.md
+AGENTS.md

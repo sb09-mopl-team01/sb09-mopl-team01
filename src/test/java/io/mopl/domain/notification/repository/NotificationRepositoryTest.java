@@ -5,6 +5,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import io.mopl.domain.notification.entity.Notification;
 import io.mopl.domain.notification.entity.NotificationLevel;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
+import java.util.Comparator;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -77,20 +79,28 @@ class NotificationRepositoryTest {
   @DisplayName("커서 이후 알림만 오래된순으로 조회한다")
   void findByReceiverIdWithCursorAscAfterCursor() {
     UUID receiverId = UUID.randomUUID();
-    saveNotification(receiverId, "첫 번째 알림");
-    Notification second = saveNotification(receiverId, "두 번째 알림");
-    Notification third = saveNotification(receiverId, "세 번째 알림");
+    List<Notification> notifications = List.of(
+        saveNotification(receiverId, "첫 번째 알림"),
+        saveNotification(receiverId, "두 번째 알림"),
+        saveNotification(receiverId, "세 번째 알림")
+    ).stream()
+        .sorted(Comparator
+            .comparing((Notification notification) -> notification.getCreatedAt()
+                .truncatedTo(ChronoUnit.MICROS))
+            .thenComparing(Notification::getId))
+        .toList();
+    Notification cursor = notifications.get(1);
 
     List<Notification> result = notificationRepository.findByReceiverIdWithCursorAsc(
         receiverId,
-        second.getCreatedAt(),
-        second.getId(),
+        cursor.getCreatedAt(),
+        cursor.getId(),
         PageRequest.of(0, 10)
     );
 
     assertThat(result)
         .extracting(Notification::getId)
-        .containsExactly(third.getId());
+        .containsExactly(notifications.get(2).getId());
   }
 
   @Test

@@ -24,6 +24,9 @@ import io.mopl.domain.content.storage.ContentThumbnailFile;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -40,6 +43,8 @@ import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class ContentServiceTest {
+
+  private static final Instant FIXED_NOW = Instant.parse("2026-07-20T00:00:00Z");
 
   private ContentService contentService;
 
@@ -70,7 +75,8 @@ class ContentServiceTest {
         contentStatsService,
         contentMapper,
         contentThumbnailService,
-        new ResourcelessTransactionManager()
+        new ResourcelessTransactionManager(),
+        Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     );
   }
 
@@ -276,6 +282,52 @@ class ContentServiceTest {
   }
 
   @Test
+  void updateContentWithThumbnailDeletesPreviousThumbnailAfterDatabaseUpdate() {
+    UUID contentId = UUID.randomUUID();
+    ContentUpdateRequest request = new ContentUpdateRequest(
+        "updated title",
+        "updated description",
+        Set.of("updated-tag")
+    );
+    MockMultipartFile thumbnail = thumbnail();
+    ContentThumbnailFile replacement = new ContentThumbnailFile(
+        "/content-thumbnails/replacement.jpg",
+        "replacement.jpg"
+    );
+    Content content = manualContent(
+        "movie",
+        "description",
+        "/content-thumbnails/current.jpg",
+        "current.jpg",
+        Set.of("action")
+    );
+    ReflectionTestUtils.setField(content, "id", contentId);
+    ContentStats stats = ContentStats.empty();
+    ContentDto expectedDto = dto(
+        contentId,
+        "updated title",
+        "updated description",
+        replacement.url(),
+        Set.of("updated-tag"),
+        0.0,
+        0
+    );
+    given(contentThumbnailService.uploadOptional(thumbnail)).willReturn(replacement);
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+    given(contentStatsService.getStats(content)).willReturn(stats);
+    given(contentMapper.toDto(content, stats)).willReturn(expectedDto);
+
+    ContentDto result = contentService.updateContent(contentId, request, thumbnail);
+
+    assertThat(result).isEqualTo(expectedDto);
+    assertThat(content.getThumbnailUrl()).isEqualTo(replacement.url());
+    assertThat(content.getThumbnailKey()).isEqualTo(replacement.key());
+    verify(contentCacheService).evictAll(contentId);
+    verify(contentThumbnailService).delete("current.jpg");
+    verify(contentThumbnailService, never()).delete("replacement.jpg");
+  }
+
+  @Test
   void deleteContent() {
     UUID contentId = UUID.randomUUID();
     Content content = manualContent("movie", "description", "/content-thumbnails/current.jpg", "current.jpg", Set.of("action"));
@@ -284,9 +336,10 @@ class ContentServiceTest {
 
     contentService.deleteContent(contentId);
 
-    verify(contentRepository).delete(content);
+    assertThat(content.getDeletedAt()).isEqualTo(FIXED_NOW);
+    verify(contentRepository, never()).delete(any());
     verify(contentCacheService).evictAll(contentId);
-    verify(contentThumbnailService).delete("current.jpg");
+    verify(contentThumbnailService, never()).delete(any());
   }
 
   @Test
@@ -301,16 +354,32 @@ class ContentServiceTest {
   void doesNotEvictCacheWhenUpdateTransactionFails() {
     UUID contentId = UUID.randomUUID();
     ContentUpdateRequest request = new ContentUpdateRequest("updated", "description", Set.of("tag"));
-    Content content = manualContent("current", "description", null, Set.of("tag"));
-    ReflectionTestUtils.setField(content, "id", contentId);
-    given(contentRepository.findById(contentId))
-        .willReturn(Optional.of(content))
-        .willThrow(new RuntimeException("db failed"));
+    given(contentRepository.findById(contentId)).willThrow(new RuntimeException("db failed"));
 
     assertThatThrownBy(() -> contentService.updateContent(contentId, request, null))
         .isInstanceOf(RuntimeException.class)
         .hasMessage("db failed");
 
+    verify(contentCacheService, never()).evictAll(contentId);
+  }
+
+  @Test
+  void deletesReplacementThumbnailWhenUpdateTransactionFails() {
+    UUID contentId = UUID.randomUUID();
+    ContentUpdateRequest request = new ContentUpdateRequest("updated", "description", Set.of("tag"));
+    MockMultipartFile thumbnail = thumbnail();
+    ContentThumbnailFile replacement = new ContentThumbnailFile(
+        "/content-thumbnails/replacement.jpg",
+        "replacement.jpg"
+    );
+    given(contentThumbnailService.uploadOptional(thumbnail)).willReturn(replacement);
+    given(contentRepository.findById(contentId)).willThrow(new RuntimeException("db failed"));
+
+    assertThatThrownBy(() -> contentService.updateContent(contentId, request, thumbnail))
+        .isInstanceOf(RuntimeException.class)
+        .hasMessage("db failed");
+
+    verify(contentThumbnailService).delete("replacement.jpg");
     verify(contentCacheService, never()).evictAll(contentId);
   }
 
