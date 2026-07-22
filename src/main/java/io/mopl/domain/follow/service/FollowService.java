@@ -8,6 +8,7 @@ import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.cache.CacheKey;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -15,6 +16,9 @@ import java.time.Instant;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -27,6 +31,7 @@ public class FollowService {
   private final FollowRepository followRepository;
   private final UserRepository userRepository;
   private final DomainEventPublisher eventPublisher;
+  private final CacheManager cacheManager;
 
   @Transactional
   public FollowDto follow(UUID followerId, FollowCreateRequest request) {
@@ -53,6 +58,7 @@ public class FollowService {
         followee.getId(),
         Instant.now()
     ));
+    evictFollowCaches(follower.getId(), followee.getId());
     log.debug("Follow created. followId={}, followerId={}, followeeId={}",
         follow.getId(), follower.getId(), followee.getId());
     return toDto(follow);
@@ -73,17 +79,20 @@ public class FollowService {
       throw new BaseException(ErrorCode.FORBIDDEN);
     }
 
+    UUID followeeId = follow.getFollowee().getId();
     followRepository.delete(follow);
     eventPublisher.publish(new FollowCancelledEvent(
         follow.getId(),
         follower.getId(),
-        follow.getFollowee().getId(),
+        followeeId,
         Instant.now()
     ));
+    evictFollowCaches(follower.getId(), followeeId);
     log.debug("Follow deleted. followId={}, followerId={}, followeeId={}",
-        follow.getId(), follower.getId(), follow.getFollowee().getId());
+        follow.getId(), follower.getId(), followeeId);
   }
 
+  @Cacheable(value = CacheKey.FOLLOW, key = "'count:' + #followeeId")
   public long countFollowers(UUID followeeId) {
     User followee = getUser(followeeId);
     long count = followRepository.countByFollowee(followee);
@@ -91,6 +100,10 @@ public class FollowService {
     return count;
   }
 
+  @Cacheable(
+      value = CacheKey.FOLLOW,
+      key = "'relation:' + #followerId.toString() + ':' + #followeeId.toString()"
+  )
   public FollowDto findFollowedByMe(UUID followerId, UUID followeeId) {
     User follower = getUser(followerId);
     User followee = getUser(followeeId);
@@ -125,5 +138,25 @@ public class FollowService {
         .followeeId(follow.getFollowee().getId())
         .followerId(follow.getFollower().getId())
         .build();
+  }
+
+  private void evictFollowCaches(UUID followerId, UUID followeeId) {
+    evict(CacheKey.FOLLOW, followerCountCacheKey(followeeId));
+    evict(CacheKey.FOLLOW, followRelationCacheKey(followerId, followeeId));
+  }
+
+  private String followerCountCacheKey(UUID followeeId) {
+    return "count:" + followeeId;
+  }
+
+  private String followRelationCacheKey(UUID followerId, UUID followeeId) {
+    return "relation:" + followerId + ":" + followeeId;
+  }
+
+  private void evict(String cacheName, Object key) {
+    Cache cache = cacheManager.getCache(cacheName);
+    if (cache != null) {
+      cache.evict(key);
+    }
   }
 }
