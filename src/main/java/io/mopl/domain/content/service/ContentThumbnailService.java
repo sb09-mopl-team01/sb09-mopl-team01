@@ -44,11 +44,18 @@ public class ContentThumbnailService {
       return;
     }
     try {
-      contentThumbnailStorage.delete(thumbnailKey);
+      deleteOrThrow(thumbnailKey);
     } catch (RuntimeException e) {
       log.warn("Content thumbnail delete failed. thumbnailKey={}, errorType={}",
           thumbnailKey, e.getClass().getSimpleName(), e);
     }
+  }
+
+  public void deleteOrThrow(String thumbnailKey) {
+    if (thumbnailKey == null || thumbnailKey.isBlank()) {
+      return;
+    }
+    contentThumbnailStorage.delete(thumbnailKey);
   }
 
   private void validateThumbnail(MultipartFile thumbnail, boolean required) {
