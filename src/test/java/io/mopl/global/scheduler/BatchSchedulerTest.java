@@ -94,7 +94,7 @@ class BatchSchedulerTest {
   void executeJob_Success_IncrementsSuccessCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
-    given(mockLock.tryLock(0, 30, TimeUnit.MINUTES)).willReturn(true);
+    given(mockLock.tryLock(0, -1, TimeUnit.SECONDS)).willReturn(true);
     given(mockLock.isHeldByCurrentThread()).willReturn(true);
 
     JobExecution successExecution = new JobExecution(1L);
@@ -119,7 +119,7 @@ class BatchSchedulerTest {
   void executeJob_LockAcquisitionFailed_SkipsExecution(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
-    given(mockLock.tryLock(0, 30, TimeUnit.MINUTES)).willReturn(false);
+    given(mockLock.tryLock(0, -1, TimeUnit.SECONDS)).willReturn(false);
 
     scheduledAction.run();
 
@@ -148,7 +148,7 @@ class BatchSchedulerTest {
   void executeJob_PassesUniqueJobParameters() throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
-    given(mockLock.tryLock(0, 30, TimeUnit.MINUTES)).willReturn(true);
+    given(mockLock.tryLock(0, -1, TimeUnit.SECONDS)).willReturn(true);
     given(mockLock.isHeldByCurrentThread()).willReturn(true);
 
     JobExecution successExecution = new JobExecution(1L);
@@ -170,7 +170,7 @@ class BatchSchedulerTest {
   void executeJob_FailedStatus_IncrementsFailCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
-    given(mockLock.tryLock(0, 30, TimeUnit.MINUTES)).willReturn(true);
+    given(mockLock.tryLock(0, -1, TimeUnit.SECONDS)).willReturn(true);
     given(mockLock.isHeldByCurrentThread()).willReturn(true);
 
     JobExecution failedExecution = new JobExecution(1L);
@@ -193,7 +193,8 @@ class BatchSchedulerTest {
   void executeJob_ExceptionThrown_IncrementsFailCounter(CapturedOutput output) throws Exception {
     Runnable scheduledAction = captureScheduledAction();
 
-    given(mockLock.tryLock(0, 30, TimeUnit.MINUTES)).willReturn(true);
+    // 💡 수정된 파라미터 적용
+    given(mockLock.tryLock(0, -1, TimeUnit.SECONDS)).willReturn(true);
     given(mockLock.isHeldByCurrentThread()).willReturn(true);
 
     given(jobLauncher.run(any(), any())).willThrow(new RuntimeException("Job execution failed"));
