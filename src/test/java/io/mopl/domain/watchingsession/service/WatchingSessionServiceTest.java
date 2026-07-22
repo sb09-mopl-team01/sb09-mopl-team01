@@ -13,6 +13,7 @@ import io.mopl.domain.watchingsession.entity.WatchingSession;
 import io.mopl.domain.watchingsession.event.WatchingSessionEnteredEvent;
 import io.mopl.domain.watchingsession.event.WatchingSessionLeftEvent;
 import io.mopl.domain.watchingsession.repository.WatchingSessionRepository;
+import io.mopl.global.config.BaseIntegrationTest;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -32,7 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 @Transactional
 @RecordApplicationEvents
-class WatchingSessionServiceTest {
+class WatchingSessionServiceTest extends BaseIntegrationTest {
 
   @Autowired
   private WatchingSessionService watchingSessionService;
