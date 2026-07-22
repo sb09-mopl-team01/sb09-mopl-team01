@@ -66,6 +66,12 @@ class ContentServiceTest {
   @Mock
   private ContentThumbnailService contentThumbnailService;
 
+  @Mock
+  private ContentSearchQueryService contentSearchQueryService;
+
+  @Mock
+  private ContentSearchIndexService contentSearchIndexService;
+
   @BeforeEach
   void setUp() {
     contentService = new ContentService(
@@ -75,6 +81,8 @@ class ContentServiceTest {
         contentStatsService,
         contentMapper,
         contentThumbnailService,
+        contentSearchQueryService,
+        contentSearchIndexService,
         new ResourcelessTransactionManager(),
         Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     );
@@ -137,6 +145,16 @@ class ContentServiceTest {
         "createdAt",
         SortDirection.DESCENDING
     )).willReturn(repositoryResponse);
+    given(contentSearchQueryService.search(
+        ContentType.MOVIE,
+        "movie",
+        List.of("action"),
+        null,
+        null,
+        10,
+        "createdAt",
+        SortDirection.DESCENDING
+    )).willReturn(Optional.empty());
     Map<UUID, ContentCacheSnapshot> cached = Map.of(contentId, ContentCacheSnapshot.empty());
     Map<UUID, ContentCacheSnapshot> resolved = Map.of(contentId, snapshot(content));
     given(contentCacheService.findAll(List.of(contentId))).willReturn(cached);
@@ -216,6 +234,25 @@ class ContentServiceTest {
   }
 
   @Test
+  void findContentsUsesOpenSearchIdsForSupportedKeywordQuery() {
+    CursorResponse<UUID> searchResponse = new CursorResponse<>(
+        List.of(), null, null, false, 0L, "createdAt", SortDirection.DESCENDING
+    );
+    given(contentSearchQueryService.search(
+        null, "검색어", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    )).willReturn(Optional.of(searchResponse));
+
+    CursorResponse<ContentDto> result = contentService.findContents(
+        null, "검색어", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(result.data()).isEmpty();
+    verify(contentRepository, never()).findContentIdsByCursor(
+        any(), any(), any(), any(), any(), any(Integer.class), any(), any()
+    );
+  }
+
+  @Test
   void createContent() {
     ContentCreateRequest request = createRequest("movie", "description", Set.of("action"));
     MockMultipartFile thumbnail = thumbnail();
@@ -236,6 +273,7 @@ class ContentServiceTest {
 
     assertThat(result).isEqualTo(expectedDto);
     verify(contentRepository).save(content);
+    verify(contentSearchIndexService).index(contentId);
   }
 
   @Test
@@ -279,6 +317,7 @@ class ContentServiceTest {
     assertThat(content.getTitle()).isEqualTo("updated title");
     assertThat(content.getThumbnailUrl()).isEqualTo("/content-thumbnails/current.jpg");
     verify(contentCacheService).evictAll(contentId);
+    verify(contentSearchIndexService).index(contentId);
   }
 
   @Test
@@ -323,6 +362,7 @@ class ContentServiceTest {
     assertThat(content.getThumbnailUrl()).isEqualTo(replacement.url());
     assertThat(content.getThumbnailKey()).isEqualTo(replacement.key());
     verify(contentCacheService).evictAll(contentId);
+    verify(contentSearchIndexService).index(contentId);
     verify(contentThumbnailService).delete("current.jpg");
     verify(contentThumbnailService, never()).delete("replacement.jpg");
   }
@@ -339,6 +379,7 @@ class ContentServiceTest {
     assertThat(content.getDeletedAt()).isEqualTo(FIXED_NOW);
     verify(contentRepository, never()).delete(any());
     verify(contentCacheService).evictAll(contentId);
+    verify(contentSearchIndexService).delete(contentId);
     verify(contentThumbnailService, never()).delete(any());
   }
 
