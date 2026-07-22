@@ -3,10 +3,14 @@ package io.mopl.domain.user.service;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
+import io.mopl.domain.user.document.UserDocument;
 import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.dto.request.ChangePasswordRequest;
 import io.mopl.domain.user.dto.request.UserCreateRequest;
@@ -23,14 +27,17 @@ import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.repository.search.UserSearchRepository;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
+import io.mopl.global.response.OpenSearchCursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -38,6 +45,7 @@ import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
 class UserServiceTest {
@@ -49,6 +57,9 @@ class UserServiceTest {
   private UserRepository userRepository;
 
   @Mock
+  private UserSearchRepository userSearchRepository;
+
+  @Mock
   private UserMapper userMapper;
 
   @Mock
@@ -56,6 +67,11 @@ class UserServiceTest {
 
   @Mock
   private DomainEventPublisher eventPublisher;
+
+  @BeforeEach
+  void setUp() {
+    ReflectionTestUtils.setField(userService, "userSearchRepository", userSearchRepository);
+  }
 
   @Test
   @DisplayName("회원가입 성공")
@@ -88,6 +104,7 @@ class UserServiceTest {
     assertThat(result.name()).isEqualTo(request.name());
 
     verify(userRepository).save(any(User.class));
+    verify(eventPublisher).publish(any(io.mopl.domain.user.event.UserSyncedEvent.class));
   }
 
   @Test
@@ -144,12 +161,18 @@ class UserServiceTest {
         .build();
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(user.getId()).willReturn(userId);
+    given(user.getName()).willReturn("새로운이름");
+    given(user.getEmail()).willReturn("test@example.com");
+    given(user.getRole()).willReturn(Role.USER);
+    given(user.getCreatedAt()).willReturn(Instant.now());
     given(userMapper.toDto(user)).willReturn(updatedUserDto);
 
     UserDto result = userService.updateProfileInfo(userId, request, null);
 
     assertThat(result.name()).isEqualTo("새로운이름");
     verify(user).updateProfile(request.name(), null);
+    verify(eventPublisher).publish(any(io.mopl.domain.user.event.UserSyncedEvent.class));
   }
 
   @Test
@@ -162,6 +185,9 @@ class UserServiceTest {
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(user.getRole()).willReturn(Role.USER);
     given(user.getId()).willReturn(userId);
+    given(user.getName()).willReturn("홍길동");
+    given(user.getEmail()).willReturn("test@example.com");
+    given(user.getCreatedAt()).willReturn(Instant.now());
 
     userService.updateUserRole(userId, request);
 
@@ -195,6 +221,10 @@ class UserServiceTest {
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(user.getId()).willReturn(userId);
+    given(user.getRole()).willReturn(Role.USER);
+    given(user.getName()).willReturn("홍길동");
+    given(user.getEmail()).willReturn("test@example.com");
+    given(user.getCreatedAt()).willReturn(Instant.now());
 
     userService.updateUserLockStatus(userId, request);
 
@@ -211,6 +241,10 @@ class UserServiceTest {
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
     given(user.getId()).willReturn(userId);
+    given(user.getRole()).willReturn(Role.USER);
+    given(user.getName()).willReturn("홍길동");
+    given(user.getEmail()).willReturn("test@example.com");
+    given(user.getCreatedAt()).willReturn(Instant.now());
 
     userService.updateUserLockStatus(userId, request);
 
@@ -219,8 +253,48 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("목록 조회 성공")
-  void findUsers_Success() {
+  @DisplayName("목록 조회 성공: OpenSearch 검색 경로 (emailLike 존재 시)")
+  void findUsers_Success_OpenSearch() {
+    UUID userId = UUID.randomUUID();
+    UserDocument userDocument = UserDocument.builder()
+        .id(userId)
+        .name("홍길동")
+        .email("test@example.com")
+        .build();
+
+    User user = mock(User.class);
+    UserDto userDto = UserDto.builder()
+        .id(userId)
+        .email("test@example.com")
+        .name("홍길동")
+        .build();
+
+    OpenSearchCursorResponse<UserDocument> openSearchResponse = new OpenSearchCursorResponse<>(
+        List.of(userDocument), List.of("sortVal", userId.toString()), true, 10L
+    );
+
+    given(userSearchRepository.searchUsersByCursor(
+        eq("test"), eq("USER"), eq(false), any(), eq(10), eq("createdAt"), eq(SortDirection.DESCENDING)
+    )).willReturn(openSearchResponse);
+
+    given(userRepository.findAllByIdIn(List.of(userId))).willReturn(List.of(user));
+    given(user.getId()).willReturn(userId);
+    given(userMapper.toDto(user)).willReturn(userDto);
+
+    CursorResponse<UserDto> result = userService.findUsers(
+        "test", "USER", false, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.data().get(0).name()).isEqualTo("홍길동");
+    assertThat(result.hasNext()).isTrue();
+    assertThat(result.totalCount()).isEqualTo(10L);
+    verify(userSearchRepository).searchUsersByCursor(any(), any(), any(), any(), anyInt(), any(), any());
+  }
+
+  @Test
+  @DisplayName("목록 조회 성공: Database 검색 경로 (emailLike 미존재 시)")
+  void findUsers_Success_Database() {
     User user = mock(User.class);
 
     UserDto userDto = UserDto.builder()
@@ -234,18 +308,19 @@ class UserServiceTest {
     );
 
     given(userRepository.findUsersByCursor(
-        "test", "USER", false, "cursor", entityResponse.nextIdAfter(), 10, "createdAt", SortDirection.DESCENDING
+        null, "USER", false, "cursor", entityResponse.nextIdAfter(), 10, "createdAt", SortDirection.DESCENDING
     )).willReturn(entityResponse);
 
     given(userMapper.toDto(user)).willReturn(userDto);
 
     CursorResponse<UserDto> result = userService.findUsers(
-        "test", "USER", false, "cursor", entityResponse.nextIdAfter(), 10, "createdAt", SortDirection.DESCENDING
+        null, "USER", false, "cursor", entityResponse.nextIdAfter(), 10, "createdAt", SortDirection.DESCENDING
     );
 
     assertThat(result.data()).hasSize(1);
     assertThat(result.data().get(0).name()).isEqualTo("홍길동");
     assertThat(result.hasNext()).isTrue();
     assertThat(result.totalCount()).isEqualTo(10L);
+    verify(userRepository).findUsersByCursor(any(), any(), any(), any(), any(), anyInt(), any(), any());
   }
 }

@@ -6,6 +6,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.notification.entity.NotificationLevel;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.domain.notification.event.NotificationRequestedEvent;
+import io.mopl.global.config.BaseIntegrationTest;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Collections;
@@ -36,7 +37,7 @@ import org.springframework.test.context.ActiveProfiles;
 @SpringBootTest
 @ActiveProfiles("kafka-integration")
 @EmbeddedKafka(partitions = 1, topics = {"notification", "notification-dlt"})
-class NotificationKafkaConsumerIntegrationTest {
+class NotificationKafkaConsumerIntegrationTest extends BaseIntegrationTest {
 
   @Autowired
   private KafkaTemplate<String, Object> kafkaTemplate;

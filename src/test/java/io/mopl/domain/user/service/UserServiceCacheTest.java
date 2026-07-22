@@ -6,20 +6,19 @@ import static org.mockito.BDDMockito.given;
 
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
-import io.mopl.domain.user.service.UserService;
 import io.mopl.domain.user.storage.ProfileImageStorage;
+// 💡 BaseIntegrationTest가 위치한 패키지를 import 해주세요 (예시 경로)
+import io.mopl.global.config.BaseIntegrationTest;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 
-@SpringBootTest
 @ActiveProfiles("test")
-class UserServiceCacheTest {
+class UserServiceCacheTest extends BaseIntegrationTest {
 
   @Autowired
   private UserService userService;

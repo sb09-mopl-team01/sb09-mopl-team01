@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
     "mopl.content.thumbnail.storage-type=local",
     "spring.data.redis.password="
 })
-class ActuatorSecurityIntegrationTest {
+class ActuatorSecurityIntegrationTest extends BaseIntegrationTest{
 
   @Autowired
   private MockMvc mockMvc;

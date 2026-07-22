@@ -147,9 +147,16 @@ chmod +x gradlew
 
 ## 로컬 환경 Docker 기반 Redis 컨테이너 실행
 ```bash
+  cd docker-compose
    docker-compose -f docker-compose-redis.yml up -d
 ````
 기본 개발 프로필은 `dev`이며, 로컬 개발 환경에서는 H2 기반 설정을 사용합니다.
+
+## 로컬 환경 Docker 기반 OpenSearch 컨테이너 실행
+```bash
+  cd docker-compose
+   docker-compose -f docker-compose-opensearch.yml up -d
+````
 
 ## 테스트
 
