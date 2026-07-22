@@ -92,6 +92,39 @@ class ContentExternalSyncServiceIntegrationTest {
     assertThat(statistics.getTransactionCount()).isEqualTo(3);
   }
 
+  @Test
+  void syncExternalContents_keepsDeletedContentAsTombstone() {
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(
+        List.of(candidate("tmdb-deleted"))
+    );
+    Content deletedContent = Content.createExternal(
+        ContentType.MOVIE,
+        "삭제된 외부 영화",
+        "삭제된 외부 영화 설명",
+        null,
+        ContentSource.TMDB,
+        "tmdb-deleted",
+        FIRST_SYNCED_AT,
+        List.of("영화")
+    );
+    deletedContent.softDelete(Instant.parse("2026-07-15T00:00:00Z"));
+    contentRepository.saveAndFlush(deletedContent);
+
+    ExternalContentSyncResult result = serviceWith(client, SECOND_SYNCED_AT)
+        .syncExternalContents();
+
+    assertThat(result.createdCount()).isZero();
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(contentRepository.count()).isEqualTo(1);
+    Content storedContent = contentRepository.findBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.MOVIE,
+        "tmdb-deleted"
+    ).orElseThrow();
+    assertThat(storedContent.isDeleted()).isTrue();
+    assertThat(storedContent.getLastSyncedAt()).isEqualTo(FIRST_SYNCED_AT);
+  }
+
   private ContentExternalSyncService serviceWith(ExternalContentClient client, Instant syncedAt) {
     return new ContentExternalSyncService(
         List.of(client),

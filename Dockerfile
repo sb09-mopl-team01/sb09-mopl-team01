@@ -1,4 +1,4 @@
-FROM eclipse-temurin:17-jdk-alpine
+FROM eclipse-temurin:17-jdk-jammy AS builder
 
 WORKDIR /app
 
@@ -6,7 +6,7 @@ COPY build.gradle settings.gradle ./
 COPY gradlew ./
 COPY gradle ./gradle/
 
-RUN chmod +x gradlew && ./gradlew dependencies --no-daemon || true
+RUN chmod +x gradlew && ./gradlew dependencies --no-daemon
 
 COPY src ./src
 RUN ./gradlew bootJar --no-daemon -x test
@@ -33,7 +33,6 @@ EXPOSE 8080
 
 ENV DB_PORT=5432
 ENV AWS_REGION=ap-northeast-2
-ENV SPRING_PROFILES_ACTIVE=dev
 
 ENTRYPOINT ["java", \
     "-XX:+UseContainerSupport", \

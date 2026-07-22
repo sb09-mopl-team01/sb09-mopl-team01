@@ -44,6 +44,8 @@ dependencies {
     testImplementation 'org.springframework.boot:spring-boot-starter-test'
     testImplementation 'org.springframework.kafka:spring-kafka-test'
     testImplementation 'org.springframework.security:spring-security-test'
+    testImplementation 'org.testcontainers:junit-jupiter'
+    testImplementation 'org.testcontainers:postgresql'
     testCompileOnly 'org.projectlombok:lombok'
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testAnnotationProcessor 'org.projectlombok:lombok'
@@ -87,6 +89,9 @@ dependencies {
 
     // AWS SecretManager
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.0.1'
+
+    // OpenSearch
+    implementation 'org.opensearch.client:spring-data-opensearch-starter:1.7.0'
 }
 
 jacoco {

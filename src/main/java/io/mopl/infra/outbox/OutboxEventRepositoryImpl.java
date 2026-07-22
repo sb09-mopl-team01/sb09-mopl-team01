@@ -4,7 +4,7 @@ import static io.mopl.infra.outbox.QOutboxEvent.outboxEvent;
 
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import jakarta.persistence.EntityManager;
-import jakarta.persistence.LockModeType;
+import java.nio.ByteBuffer;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
@@ -20,17 +20,19 @@ public class OutboxEventRepositoryImpl implements OutboxEventRepositoryCustom {
 
   @Override
   public List<UUID> findClaimableIds(Instant now, int batchSize) {
-    return queryFactory
-        .select(outboxEvent.id)
-        .from(outboxEvent)
-        .where(
-            outboxEvent.status.eq(OutboxStatus.PENDING),
-            outboxEvent.nextAttemptAt.loe(now)
-        )
-        .orderBy(outboxEvent.createdAt.asc(), outboxEvent.id.asc())
-        .limit(batchSize)
-        .setLockMode(LockModeType.PESSIMISTIC_WRITE)
-        .fetch();
+    List<?> eventIds = entityManager.createNativeQuery("""
+        SELECT id
+        FROM event_outbox
+        WHERE status = :status
+          AND next_attempt_at <= :now
+        ORDER BY created_at ASC, id ASC
+        FOR UPDATE SKIP LOCKED
+        """)
+        .setParameter("status", OutboxStatus.PENDING.name())
+        .setParameter("now", now)
+        .setMaxResults(batchSize)
+        .getResultList();
+    return eventIds.stream().map(this::toUuid).toList();
   }
 
   @Override
@@ -66,5 +68,16 @@ public class OutboxEventRepositoryImpl implements OutboxEventRepositoryCustom {
   private void clearPersistenceContext() {
     entityManager.flush();
     entityManager.clear();
+  }
+
+  private UUID toUuid(Object value) {
+    if (value instanceof UUID eventId) {
+      return eventId;
+    }
+    if (value instanceof byte[] bytes && bytes.length == 16) {
+      ByteBuffer buffer = ByteBuffer.wrap(bytes);
+      return new UUID(buffer.getLong(), buffer.getLong());
+    }
+    return UUID.fromString(value.toString());
   }
 }

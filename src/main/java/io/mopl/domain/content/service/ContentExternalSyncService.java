@@ -168,7 +168,9 @@ public class ContentExternalSyncService {
     for (ExternalContentCandidate candidate : candidates) {
       Content existingContent = existingByKey.get(ExternalContentKey.from(candidate));
       if (existingContent != null) {
-        existingContent.markSyncedAt(syncedAt);
+        if (!existingContent.isDeleted()) {
+          existingContent.markSyncedAt(syncedAt);
+        }
         skippedCount++;
         continue;
       }
