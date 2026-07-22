@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import io.awspring.cloud.s3.S3Template;
+import io.mopl.global.config.BaseIntegrationTest;
 import io.mopl.global.scheduler.BatchTask;
 import io.mopl.global.scheduler.LogArchiveBackupBatchTask;
 import io.mopl.global.scheduler.LogArchiveBackupJobConfig;
@@ -28,7 +29,7 @@ import org.springframework.test.context.bean.override.mockito.MockitoBean;
     "spring.cloud.aws.region.static=ap-northeast-2",
     "spring.batch.job.enabled=false"
 })
-class LogArchiveBackupContextIntegrationTest {
+class LogArchiveBackupContextIntegrationTest extends BaseIntegrationTest {
 
   @MockitoBean
   private S3Template s3Template;

@@ -89,6 +89,9 @@ dependencies {
 
     // AWS SecretManager
     implementation 'io.awspring.cloud:spring-cloud-aws-starter-secrets-manager:3.0.1'
+
+    // OpenSearch
+    implementation 'org.opensearch.client:spring-data-opensearch-starter:1.7.0'
 }
 
 jacoco {

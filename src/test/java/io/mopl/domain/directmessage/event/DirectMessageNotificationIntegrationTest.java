@@ -9,6 +9,7 @@ import io.mopl.domain.directmessage.service.ConversationService;
 import io.mopl.domain.notification.repository.NotificationRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.config.BaseIntegrationTest;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -18,7 +19,7 @@ import org.springframework.test.context.ActiveProfiles;
 
 @SpringBootTest
 @ActiveProfiles("test")
-class DirectMessageNotificationIntegrationTest {
+class DirectMessageNotificationIntegrationTest extends BaseIntegrationTest {
 
   @Autowired
   private ConversationService conversationService;
