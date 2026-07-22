@@ -47,7 +47,7 @@ public class S3ContentThumbnailStorage implements ContentThumbnailStorage {
       s3Service.deleteFileByKey(thumbnailKey);
       log.info("Content thumbnail delete completed. storage=s3 thumbnailKey={}", thumbnailKey);
     } catch (RuntimeException e) {
-      log.warn("Content thumbnail delete failed. storage=s3 thumbnailKey={}", thumbnailKey, e);
+      throw new IllegalStateException("콘텐츠 썸네일 삭제에 실패했습니다.", e);
     }
   }
 }

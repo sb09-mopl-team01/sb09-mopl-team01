@@ -94,7 +94,7 @@ public class WatchingSessionService {
     endWatchingInternal(watcherId, contentId);
   }
 
-  @Transactional
+  @Transactional(timeoutString = "${mopl.watching-session.redis.recovery-db-timeout-seconds:10}")
   public void endWatchingIfPresent(UUID watcherId, UUID contentId) {
     if (watcherId == null) {
       throw new BaseException(ErrorCode.INVALID_INPUT);

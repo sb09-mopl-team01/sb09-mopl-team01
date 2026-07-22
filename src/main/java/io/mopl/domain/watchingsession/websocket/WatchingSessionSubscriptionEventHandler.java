@@ -1,5 +1,6 @@
 package io.mopl.domain.watchingsession.websocket;
 
+import io.mopl.domain.watchingsession.realtime.WatchingSessionLeaseRecoveryCoordinator;
 import io.mopl.domain.watchingsession.realtime.WatchingSessionLeaseStore;
 import io.mopl.domain.watchingsession.realtime.WatchingSessionNodeId;
 import io.mopl.domain.watchingsession.service.WatchingSessionService;
@@ -25,6 +26,7 @@ public class WatchingSessionSubscriptionEventHandler {
   private final WatchingSessionSubscriptionResolver subscriptionResolver;
   private final WatchingSessionLeaseStore leaseStore;
   private final WatchingSessionNodeId nodeId;
+  private final WatchingSessionLeaseRecoveryCoordinator recoveryCoordinator;
 
   @EventListener
   public void handleSubscribe(SessionSubscribeEvent event) {
@@ -72,14 +74,7 @@ public class WatchingSessionSubscriptionEventHandler {
 
   private void endWatching(WatchingSessionSubscription subscription) {
     if (leaseStore.release(subscription, nodeId.value())) {
-      try {
-        watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
-      } catch (RuntimeException e) {
-        // 종료 처리 실패 시 lease를 복구해 만료 정리 작업이 재시도할 수 있게 한다.
-        leaseStore.acquire(subscription, nodeId.value());
-        log.warn("Failed to end watching session after final lease release. watcherId={}, contentId={}",
-            subscription.watcherId(), subscription.contentId(), e);
-      }
+      recoveryCoordinator.recover(subscription);
     }
   }
 

@@ -13,6 +13,10 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface ContentRepository extends JpaRepository<Content, UUID>, ContentRepositoryCustom {
 
+  @Override
+  @Query("select c from Content c where c.id = :contentId and c.deletedAt is null")
+  Optional<Content> findById(@Param("contentId") UUID contentId);
+
   boolean existsBySourceAndTypeAndExternalId(
       ContentSource source,
       ContentType type,
@@ -31,6 +35,7 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
       Collection<String> externalIds
   );
 
-  @Query("select distinct c from Content c left join fetch c.tags where c.id in :contentIds")
+  @Query("select distinct c from Content c left join fetch c.tags "
+      + "where c.id in :contentIds and c.deletedAt is null")
   List<Content> findAllByIdWithTags(@Param("contentIds") Collection<UUID> contentIds);
 }

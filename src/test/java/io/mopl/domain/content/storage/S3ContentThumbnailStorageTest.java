@@ -1,7 +1,6 @@
 package io.mopl.domain.content.storage;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -75,12 +74,14 @@ class S3ContentThumbnailStorageTest {
   }
 
   @Test
-  void delete_doesNotPropagateS3DeleteFailure() {
+  void delete_throwsIllegalStateExceptionWhenS3DeleteFails() {
     String thumbnailKey = "uploads/contents/thumbnails/poster.png";
     org.mockito.Mockito.doThrow(new RuntimeException("network failed"))
         .when(s3Service).deleteFileByKey(thumbnailKey);
 
-    assertThatCode(() -> storage.delete(thumbnailKey)).doesNotThrowAnyException();
+    assertThatThrownBy(() -> storage.delete(thumbnailKey))
+        .isInstanceOf(IllegalStateException.class)
+        .hasMessage("콘텐츠 썸네일 삭제에 실패했습니다.");
   }
 
   private MockMultipartFile thumbnail() {
