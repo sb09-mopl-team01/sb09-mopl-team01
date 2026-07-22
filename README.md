@@ -79,11 +79,28 @@ docker push "$ECR_NGINX_URI:$IMAGE_TAG"
 ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함께 확인합니다. 소스의 이미지 태그만 바뀌고 서비스가 새 revision을 채택하지 않은 상태는 배포 완료가 아닙니다.
 
 - WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
-- `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. Task 비정상 종료는 lease 만료 후 정리합니다.
+- `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. lease 만료 시각과 정리 판단은 ECS Task 시간이 아닌 Redis `TIME`을 기준으로 합니다.
+- 정상 해제 또는 Task 비정상 종료로 마지막 lease가 제거되면 같은 Redis ZSET에 DB 종료 복구 마커를 원자적으로 남깁니다. DB 종료 중에는 close guard가 새 lease 획득을 막고, guard 획득 전에 새 구독이 생기면 복구를 취소하여 현재 시청 세션을 종료하지 않습니다. DB 종료는 `endWatchingIfPresent`로 멱등 처리하며, 실패 시 다음 maintenance에서 지수 backoff로 재시도합니다.
+- 자동 복구는 기본 24시간·10회로 제한합니다. 한도를 넘으면 자동 재시도를 중단하고 failed 마커를 7일 보관한 뒤 Redis TTL로 정리합니다. `mopl.watching.session.lease.recovery{outcome="exhausted"}` 증가와 `requires operational action` 로그는 DB 상태 확인 및 수동 정리 대상입니다. lease 키 자체도 기본 7일 보존하므로 전체 ECS 중단이 이 기간을 넘으면 PostgreSQL의 잔존 WatchingSession을 별도로 점검해야 합니다.
 - 입장·퇴장 변경 이벤트는 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. Pub/Sub은 휘발성 UI 동기화 경로이며, Kafka 기반 영속 이벤트 처리는 별도 후속 작업으로 관리합니다.
 - WebSocket STOMP 연결은 JWT 인증이 필요합니다. `/sub/contents/{contentId}/watch`는 인증 사용자를, `/sub/contents/{contentId}/chat`은 해당 콘텐츠의 현재 WatchingSession 참여자를, `/sub/conversations/{conversationId}/direct-messages`는 대화 참여자만 구독할 수 있습니다.
-- `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 만료 정책을 조정할 수 있습니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
+- `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 기본 만료 정책을 조정할 수 있습니다. 복구 close guard TTL은 DB 종료 transaction timeout보다 길어야 합니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
 - 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
+
+| WatchingSession lease 환경 변수 | 기본값 | 용도 |
+| --- | --- | --- |
+| `WATCHING_SESSION_REDIS_LEASE_KEY_RETENTION` | `P7D` | Task 전체 중단 후에도 만료 lease를 복구할 수 있도록 lease 키를 보존하는 상한 |
+| `WATCHING_SESSION_REDIS_RECOVERY_DB_TIMEOUT_SECONDS` | `10` | 멱등 DB 종료 transaction timeout |
+| `WATCHING_SESSION_REDIS_RECOVERY_LOCK_TTL` | `PT30S` | DB 종료 중 새 lease 획득을 막는 close guard TTL |
+| `WATCHING_SESSION_REDIS_RECOVERY_RETENTION` | `PT24H` | 자동 복구 pending 상태 최대 보존 기간 |
+| `WATCHING_SESSION_REDIS_RECOVERY_FAILED_RETENTION` | `P7D` | 자동 복구 한도 초과 failed 마커 보존 기간 |
+| `WATCHING_SESSION_REDIS_RECOVERY_MAX_ATTEMPTS` | `10` | 자동 DB 종료 최대 시도 횟수 |
+| `WATCHING_SESSION_REDIS_RECOVERY_BATCH_SIZE` | `100` | maintenance 한 번에 처리할 최대 복구 건수 |
+| `WATCHING_SESSION_REDIS_RECOVERY_INITIAL_BACKOFF` | `PT5S` | 첫 복구 실패 후 재시도 대기 시간 |
+| `WATCHING_SESSION_REDIS_RECOVERY_BACKOFF_MULTIPLIER` | `2.0` | 복구 재시도 지수 backoff 배수 |
+| `WATCHING_SESSION_REDIS_RECOVERY_MAX_BACKOFF` | `PT5M` | 복구 재시도 최대 대기 시간 |
+
+운영에서는 `mopl.watching.session.lease.recovery`의 `retry_scheduled`, `exhausted`, `claim_error`, `completion_error`, `record_error` 결과를 모니터링합니다. `exhausted` 또는 Redis 오류 결과가 발생하면 `SCAN MATCH watching-session:lease:watcher:*`와 해당 키의 `ZRANGE ... WITHSCORES`로 복구·failed 마커를 확인하고, PostgreSQL의 watcher/content WatchingSession 존재 여부를 대조합니다.
 
 ## Kafka 및 스키마 마이그레이션 기반
 

@@ -186,7 +186,17 @@ mopl:
       channel: ${WATCHING_SESSION_REDIS_CHANNEL:watching-session:changes}
       presence-ttl: ${WATCHING_SESSION_REDIS_PRESENCE_TTL:PT24H}
       lease-ttl: ${WATCHING_SESSION_REDIS_LEASE_TTL:PT90S}
+      lease-key-retention: ${WATCHING_SESSION_REDIS_LEASE_KEY_RETENTION:P7D}
       lease-maintenance-delay-millis: ${WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS:30000}
+      recovery-db-timeout-seconds: ${WATCHING_SESSION_REDIS_RECOVERY_DB_TIMEOUT_SECONDS:10}
+      recovery-lock-ttl: ${WATCHING_SESSION_REDIS_RECOVERY_LOCK_TTL:PT30S}
+      recovery-retention: ${WATCHING_SESSION_REDIS_RECOVERY_RETENTION:PT24H}
+      recovery-failed-retention: ${WATCHING_SESSION_REDIS_RECOVERY_FAILED_RETENTION:P7D}
+      recovery-max-attempts: ${WATCHING_SESSION_REDIS_RECOVERY_MAX_ATTEMPTS:10}
+      recovery-batch-size: ${WATCHING_SESSION_REDIS_RECOVERY_BATCH_SIZE:100}
+      recovery-initial-backoff: ${WATCHING_SESSION_REDIS_RECOVERY_INITIAL_BACKOFF:PT5S}
+      recovery-backoff-multiplier: ${WATCHING_SESSION_REDIS_RECOVERY_BACKOFF_MULTIPLIER:2.0}
+      recovery-max-backoff: ${WATCHING_SESSION_REDIS_RECOVERY_MAX_BACKOFF:PT5M}
   admin:
     username: ${ADMIN_USERNAME:admin}
     email: ${ADMIN_EMAIL:admin@mopl.com}
