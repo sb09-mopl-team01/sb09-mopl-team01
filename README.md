@@ -44,9 +44,10 @@
 
 ```mermaid
 flowchart LR
-    Client["Client"] --> NGINX["NGINX"]
-    NGINX --> ALB["AWS ALB"]
-    ALB --> ECS["AWS ECS"]
+    Client["Client"] --> ALB["AWS ALB (HTTPS)"]
+    ALB --> NGINX["Nginx ECS service"]
+    NGINX --> CloudMap["Cloud Map: app.mopl.local"]
+    CloudMap --> ECS["Spring Boot ECS service"]
     ECS --> RDS["PostgreSQL"]
     ECS --> S3["S3"]
     ECS --> Redis["Redis"]
@@ -58,6 +59,25 @@ flowchart LR
 
 ## 운영 확장 메모
 
+- ECS는 ALB → Nginx 서비스 → Cloud Map(`app.mopl.local`) → Spring Boot 서비스 순서로 요청을 전달합니다. ALB target group은 Nginx의 `/nginx-health`를, 운영 점검은 Spring Boot의 `/actuator/health/liveness`와 `/actuator/health/readiness`를 사용합니다.
+- prod 프로필은 `server.forward-headers-strategy=framework`로 ALB·Nginx가 전달한 `X-Forwarded-*` 헤더를 Spring MVC 요청과 리다이렉트 URL에 반영합니다. Spring Boot Task의 security group은 Nginx Task security group만 인바운드 8080을 허용해야 하며, 클라이언트가 `X-Forwarded-*` 헤더를 직접 주입할 수 없어야 합니다.
+- Nginx는 `/api/sse`에서 buffering을 끄고, `/ws`의 WebSocket/SockJS Upgrade를 전달합니다. Nginx와 Spring Boot 서비스는 모두 최소 2개 Task로 운영해야 단일 Task 장애에 대응할 수 있습니다.
+- `application-prod.yml`은 AWS Secrets Manager `mopl-prod-secrets`에서 DB 및 Confluent Cloud 연결 정보를 읽습니다. Kafka·Schema Registry API key와 secret은 Git이나 Task Definition에 넣지 않습니다.
+
+## ECS 이미지 빌드 및 배포
+
+GitHub Actions의 prod 배포는 `main` 병합 시에만 실행됩니다. 로컬에서 ECR 이미지를 검증·업로드해야 하는 경우 Fargate의 기본 x86_64 런타임과 맞도록 `linux/amd64` 플랫폼을 명시합니다.
+
+```bash
+docker buildx build --platform linux/amd64 --load -t "$ECR_APP_URI:$IMAGE_TAG" .
+docker push "$ECR_APP_URI:$IMAGE_TAG"
+
+docker buildx build --platform linux/amd64 --load -t "$ECR_NGINX_URI:$IMAGE_TAG" ./nginx
+docker push "$ECR_NGINX_URI:$IMAGE_TAG"
+```
+
+ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함께 확인합니다. 소스의 이미지 태그만 바뀌고 서비스가 새 revision을 채택하지 않은 상태는 배포 완료가 아닙니다.
+
 - WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
 - `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. Task 비정상 종료는 lease 만료 후 정리합니다.
 - 입장·퇴장 변경 이벤트는 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. Pub/Sub은 휘발성 UI 동기화 경로이며, Kafka 기반 영속 이벤트 처리는 별도 후속 작업으로 관리합니다.
@@ -68,7 +88,7 @@ flowchart LR
 
 - Flyway는 `dev`·`prod` 프로필에서 활성화되어 `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다. 공통 설정의 `FLYWAY_ENABLED` 기본값은 `false`이며, `test` 프로필은 Flyway를 비활성화합니다.
 - 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. 다중 Relay는 PostgreSQL `FOR UPDATE SKIP LOCKED`로 이미 선점된 이벤트를 건너뛰고, Kafka broker ACK 이후에만 발행 완료로 변경합니다.
-- Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. 활성화 시 JSON Schema 기반 이벤트 envelope를 Schema Registry에 등록하며, 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
+- Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. ECS prod Task는 `KAFKA_ENABLED=true`, `NOTIFICATION_DELIVERY_MODE=kafka`로 활성화합니다. 런타임은 Schema Registry에 자동 등록하지 않으며, main 배포 워크플로가 `notification-value`와 `notification-dlt-value` subject의 BACKWARD 호환성을 확인하고 스키마를 등록한 뒤 배포합니다. 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
 - 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. Outbox는 `sourceEventId:receiverId` 결정적 `deduplication_key`의 유니크 제약으로 중복 적재를 방지하고, `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
 - 알림 consumer는 `ErrorHandlingDeserializer`로 Schema Registry 조회 실패, 잘못된 JSON Schema payload, 바이너리 역직렬화 실패를 listener poll 단계에서 격리합니다. 역직렬화 실패 원본 `byte[]`는 전용 serializer로, 정상 JSON Schema 객체는 기본 serializer로 `notification-dlt`에 보존합니다.
 - 알 수 없는 `eventType`·지원하지 않는 `eventVersion`·필수 payload 누락 같은 영구 오류는 즉시 `notification-dlt`로 이동합니다. DB·네트워크 등 일시 오류만 blocking backoff로 재시도하며, DLT는 원인 수정 후 새 consumer group 또는 명시적 offset 관리로 재처리합니다. 원인을 고치지 않은 채 원본 topic에 재발행하지 않습니다.
@@ -80,6 +100,10 @@ flowchart LR
 | `KAFKA_ENABLED` | `false` | Kafka producer, listener, health check 및 Outbox Relay 활성화 여부 |
 | `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
 | `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
+| `KAFKA_API_KEY` | 없음 | Confluent Kafka runtime 서비스 계정 API key (prod secret) |
+| `KAFKA_API_SECRET` | 없음 | Confluent Kafka runtime 서비스 계정 API secret (prod secret) |
+| `KAFKA_SCHEMA_REGISTRY_API_KEY` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API key (`mopl-prod-secrets`) |
+| `KAFKA_SCHEMA_REGISTRY_API_SECRET` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API secret (`mopl-prod-secrets`) |
 | `NOTIFICATION_DELIVERY_MODE` | `local` | `local` 즉시 처리 또는 `kafka` Outbox·Consumer 처리 선택 |
 | `NOTIFICATION_REALTIME_REDIS_ENABLED` | `false` | 다중 인스턴스 SSE 알림 Redis Pub/Sub 중계 활성화 여부 |
 | `NOTIFICATION_REALTIME_REDIS_CHANNEL` | `notification:realtime` | SSE 알림 Redis Pub/Sub 채널 |
@@ -94,6 +118,14 @@ flowchart LR
 
 `application-prod.yml`에서만 AWS Secrets Manager import를 수행합니다. 따라서 `test`와 `local` 프로필은 외부 Secrets Manager 연결 없이 실행됩니다.
 이번 변경은 내부 이벤트·Outbox 저장 경계만 다루며 Swagger 엔드포인트와 요청·응답 DTO에는 영향이 없습니다.
+
+### Confluent Cloud 운영 적용
+
+- Confluent Cloud에는 `notification`, `notification-dlt` topic을 만들고 DLT partition 수를 원본 이상으로 설정합니다.
+- `mopl-prod-secrets` 하나에 ECS runtime 및 CI용 Confluent bootstrap/Schema Registry URL과 Kafka·Schema Registry API key를 등록합니다. ECS Task Role과 GitHub Actions 배포 IAM 사용자는 이 Secret에만 `secretsmanager:GetSecretValue` 권한이 필요하며, ECS security group은 Confluent bootstrap endpoint의 9092/TCP와 Schema Registry의 443/TCP outbound를 허용해야 합니다.
+- 배포 workflow는 `notification-value`와 `notification-dlt-value` subject의 호환성을 `BACKWARD`로 설정하고 검증한 뒤 새 version을 등록합니다. ECS runtime과 CI는 동일한 Schema Registry API key를 사용하며, 런타임 자동 schema 등록은 하지 않습니다.
+- 배포 뒤 새 ECS revision/ECR digest, `event_outbox`의 `PUBLISHED` 전환, `processed_kafka_events` 중복 방지, `notification-dlt` 이동을 확인합니다. consumer lag, `FAILED` Outbox 누적, DLT 증가, `Kafka publish failed` 로그를 알람 대상으로 관리합니다.
+- Kafka broker 연결은 readiness probe에서 제외합니다. broker 장애가 HTTP 트래픽 전체를 비정상으로 만들지 않도록 하고, 발행 실패는 Outbox 재시도로 복구합니다. secret rotation 후에는 새 ECS deployment가 필요합니다.
 
 ## 프로젝트 구조
 

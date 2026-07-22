@@ -2,7 +2,7 @@ name: Deploy Nginx to Amazon ECS
 
 on:
   push:
-    branches: [ "dev", "main", "test/github-actions"]
+    branches: [ "main" ]
     paths:
       - 'nginx/**'
       - '.github/workflows/nginx-deploy.yml'
