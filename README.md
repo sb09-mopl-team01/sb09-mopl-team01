@@ -81,6 +81,7 @@ ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함�
 - WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
 - `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. Task 비정상 종료는 lease 만료 후 정리합니다.
 - 입장·퇴장 변경 이벤트는 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. Pub/Sub은 휘발성 UI 동기화 경로이며, Kafka 기반 영속 이벤트 처리는 별도 후속 작업으로 관리합니다.
+- WebSocket STOMP 연결은 JWT 인증이 필요합니다. `/sub/contents/{contentId}/watch`는 인증 사용자를, `/sub/contents/{contentId}/chat`은 해당 콘텐츠의 현재 WatchingSession 참여자를, `/sub/conversations/{conversationId}/direct-messages`는 대화 참여자만 구독할 수 있습니다.
 - `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 만료 정책을 조정할 수 있습니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
 - 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
 
