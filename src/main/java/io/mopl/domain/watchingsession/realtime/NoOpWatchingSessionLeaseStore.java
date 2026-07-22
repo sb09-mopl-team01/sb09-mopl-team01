@@ -28,4 +28,28 @@ public class NoOpWatchingSessionLeaseStore implements WatchingSessionLeaseStore 
   public List<WatchingSessionSubscription> expireStaleLeases() {
     return List.of();
   }
+
+  @Override
+  public boolean claimRecovery(
+      WatchingSessionSubscription subscription,
+      String recoveryOwnerId
+  ) {
+    return true;
+  }
+
+  @Override
+  public boolean completeRecovery(
+      WatchingSessionSubscription subscription,
+      String recoveryOwnerId
+  ) {
+    return true;
+  }
+
+  @Override
+  public WatchingSessionLeaseRecoveryFailure recordRecoveryFailure(
+      WatchingSessionSubscription subscription,
+      String recoveryOwnerId
+  ) {
+    return WatchingSessionLeaseRecoveryFailure.notRecorded();
+  }
 }
