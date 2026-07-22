@@ -82,6 +82,39 @@ class ContentExternalSyncServiceTest {
   }
 
   @Test
+  void syncExternalContents_doesNotRestoreDeletedExternalContent() {
+    Instant deletedAt = Instant.parse("2026-07-15T00:00:00Z");
+    Instant previousSyncedAt = Instant.parse("2026-07-01T00:00:00Z");
+    ExternalContentClient client = () -> ExternalContentFetchResult.accepted(
+        List.of(candidate("tmdb-1", "Deleted Movie"))
+    );
+    Content deletedContent = Content.createExternal(
+        ContentType.MOVIE,
+        "Deleted Movie",
+        "Deleted description",
+        null,
+        ContentSource.TMDB,
+        "tmdb-1",
+        previousSyncedAt,
+        List.of("movie", "tmdb")
+    );
+    deletedContent.softDelete(deletedAt);
+    ContentExternalSyncService service = serviceWith(client);
+    given(contentRepository.findAllBySourceInAndTypeInAndExternalIdIn(
+        anyCollection(), anyCollection(), anyCollection()))
+        .willReturn(List.of(deletedContent));
+    given(contentRepository.saveAll(anyList())).willAnswer(invocation -> invocation.getArgument(0));
+
+    ExternalContentSyncResult result = service.syncExternalContents();
+
+    assertThat(result.createdCount()).isZero();
+    assertThat(result.skippedCount()).isEqualTo(1);
+    assertThat(deletedContent.getDeletedAt()).isEqualTo(deletedAt);
+    assertThat(deletedContent.getLastSyncedAt()).isEqualTo(previousSyncedAt);
+    verify(contentRepository).saveAll(List.of());
+  }
+
+  @Test
   void syncExternalContents_skipsInvalidItemAndContinues() {
     ExternalContentClient client = () -> ExternalContentFetchResult.accepted(List.of(
         candidate("tmdb-1", "New Movie"),
