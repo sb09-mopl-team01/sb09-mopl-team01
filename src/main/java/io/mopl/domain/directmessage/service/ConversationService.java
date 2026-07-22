@@ -21,6 +21,7 @@ import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.DateTimeException;
 import java.time.Instant;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -370,7 +371,7 @@ public class ConversationService {
     }
 
     try {
-      return Instant.parse(cursor);
+      return Instant.parse(cursor).truncatedTo(ChronoUnit.MICROS);
     } catch (DateTimeException e) {
       log.warn("Invalid direct message cursor format. cursor={}", cursor);
       throw new BaseException(ErrorCode.INVALID_INPUT);
