@@ -3,7 +3,7 @@ package io.mopl.infra.kafka;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import io.confluent.kafka.serializers.json.JsonSchemaAndValue;
+import io.confluent.kafka.schemaregistry.json.JsonSchemaUtils;
 import io.mopl.infra.outbox.OutboxEvent;
 import io.mopl.infra.outbox.OutboxProperties;
 import java.nio.charset.StandardCharsets;
@@ -39,7 +39,7 @@ public class KafkaIntegrationEventProducer {
     ProducerRecord<String, Object> record = new ProducerRecord<>(
         event.getTopic(),
         event.getEventKey(),
-        new JsonSchemaAndValue(
+        JsonSchemaUtils.envelope(
             integrationEventJsonSchema.getSchema(),
             objectMapper.valueToTree(IntegrationEventEnvelope.from(event, readPayload(event)))
         )
