@@ -2,6 +2,7 @@ package io.mopl.domain.playlist.entity;
 
 import io.mopl.domain.content.entity.Content;
 import io.mopl.global.entity.BaseEntity;
+import io.mopl.global.entity.BaseUpdatableEntity;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -29,7 +30,7 @@ import lombok.NoArgsConstructor;
     }
 )
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class PlaylistContent extends BaseEntity {
+public class PlaylistContent extends BaseUpdatableEntity {
 
   @ManyToOne(fetch = FetchType.LAZY)
   @JoinColumn(name = "playlist_id", nullable = false)
