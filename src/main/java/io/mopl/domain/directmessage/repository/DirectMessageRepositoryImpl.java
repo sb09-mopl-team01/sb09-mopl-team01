@@ -4,8 +4,10 @@ import static io.mopl.domain.directmessage.entity.QDirectMessage.directMessage;
 
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
+import com.querydsl.jpa.JPAExpressions;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.directmessage.entity.DirectMessage;
+import io.mopl.domain.directmessage.entity.QDirectMessage;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
 import java.util.List;
@@ -48,6 +50,37 @@ public class DirectMessageRepositoryImpl implements DirectMessageRepositoryCusto
         .fetchOne();
 
     return count == null ? 0 : count;
+  }
+
+  @Override
+  public List<DirectMessage> findLastestByConversationIds(List<UUID> conversationIds) {
+    if (conversationIds == null || conversationIds.isEmpty()) {
+      return List.of();
+    }
+
+    QDirectMessage newerDirectMessage = new QDirectMessage("newerDirectMessage");
+
+    return queryFactory
+        .selectFrom(directMessage)
+        .where(
+            directMessage.conversation.id.in(conversationIds),
+            JPAExpressions
+                .selectOne()
+                .from(newerDirectMessage)
+                .where(
+                    newerDirectMessage.conversation.id.eq(directMessage.conversation.id),
+                    newerDirectMessage.createdAt.gt(directMessage.createdAt)
+                        .or(newerDirectMessage.createdAt.eq(directMessage.createdAt)
+                            .and(newerDirectMessage.id.gt(directMessage.id)))
+                )
+                .notExists()
+        )
+        .orderBy(
+            directMessage.conversation.id.asc(),
+            directMessage.createdAt.desc(),
+            directMessage.id.desc()
+        )
+        .fetch();
   }
 
   private BooleanExpression cursorCondition(Instant cursor, UUID idAfter, SortDirection sortDirection) {

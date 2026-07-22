@@ -17,5 +17,7 @@ public interface DirectMessageRepositoryCustom {
       Pageable pageable
   );
 
+  List<DirectMessage> findLastestByConversationIds(List<UUID> conversationIds);
+
   long countByConversationId(UUID conversationId);
 }
