@@ -146,19 +146,22 @@ public class ContentService {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
-    Content content = getContentOrThrow(contentId);
-    String currentThumbnailUrl = content.getThumbnailUrl();
-    String currentThumbnailKey = content.getThumbnailKey();
     ContentThumbnailFile uploadedThumbnail = null;
+    ContentUpdateOutcome outcome;
 
     try {
       uploadedThumbnail = contentThumbnailService.uploadOptional(thumbnail);
-      String thumbnailUrl = uploadedThumbnail == null ? currentThumbnailUrl : uploadedThumbnail.url();
-      String thumbnailKey = uploadedThumbnail == null ? currentThumbnailKey : uploadedThumbnail.key();
-      boolean thumbnailChanged = uploadedThumbnail != null;
+      ContentThumbnailFile replacementThumbnail = uploadedThumbnail;
 
-      ContentDto contentDto = executeInTransaction(() -> {
+      outcome = executeInTransaction(() -> {
         Content targetContent = getContentOrThrow(contentId);
+        String previousThumbnailKey = targetContent.getThumbnailKey();
+        String thumbnailUrl = replacementThumbnail == null
+            ? targetContent.getThumbnailUrl()
+            : replacementThumbnail.url();
+        String thumbnailKey = replacementThumbnail == null
+            ? previousThumbnailKey
+            : replacementThumbnail.key();
         targetContent.updateManual(
             request.title(),
             request.description(),
@@ -167,14 +170,16 @@ public class ContentService {
             thumbnailKey
         );
         log.info("Content update completed. contentId={}", contentId);
-        return contentMapper.toDto(targetContent, contentStatsService.getStats(targetContent));
+        ContentDto contentDto = contentMapper.toDto(
+            targetContent,
+            contentStatsService.getStats(targetContent)
+        );
+        return new ContentUpdateOutcome(
+            contentDto,
+            previousThumbnailKey,
+            replacementThumbnail != null
+        );
       });
-
-      contentCacheService.evictAll(contentId);
-      if (thumbnailChanged) {
-        contentThumbnailService.delete(currentThumbnailKey);
-      }
-      return contentDto;
     } catch (IllegalArgumentException e) {
       deleteThumbnail(uploadedThumbnail);
       log.warn("Content update rejected. contentId={}", contentId);
@@ -184,6 +189,12 @@ public class ContentService {
       log.error("Content update failed. contentId={}", contentId, e);
       throw e;
     }
+
+    contentCacheService.evictAll(contentId);
+    if (outcome.thumbnailChanged()) {
+      contentThumbnailService.delete(outcome.previousThumbnailKey());
+    }
+    return outcome.contentDto();
   }
 
   public void deleteContent(UUID contentId) {
@@ -217,5 +228,12 @@ public class ContentService {
   private void executeWithoutResultInTransaction(Runnable action) {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     transactionTemplate.executeWithoutResult(status -> action.run());
+  }
+
+  private record ContentUpdateOutcome(
+      ContentDto contentDto,
+      String previousThumbnailKey,
+      boolean thumbnailChanged
+  ) {
   }
 }
