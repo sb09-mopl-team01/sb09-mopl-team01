@@ -50,7 +50,7 @@ public class BatchScheduler implements SchedulingConfigurer {
     RLock lock = redissonClient.getLock("lock:batch:" + jobName);
 
     try {
-      boolean isLocked = lock.tryLock(0, 30, TimeUnit.MINUTES);
+      boolean isLocked = lock.tryLock(0, -1, TimeUnit.SECONDS);
 
       if (isLocked) {
         log.info("Successfully acquired Redis lock. Executing batch job. jobName={}", jobName);
