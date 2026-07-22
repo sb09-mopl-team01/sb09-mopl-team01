@@ -20,13 +20,11 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.*;
-import org.springframework.security.config.annotation.web.configurers.HeadersConfigurer.FrameOptionsConfig;
 import org.springframework.security.config.annotation.web.configurers.oauth2.client.OAuth2LoginConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
@@ -35,10 +33,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.session.NullAuthenticatedSessionStrategy;
 import org.springframework.security.web.csrf.CsrfFilter;
-import org.springframework.security.web.csrf.CsrfTokenRepository;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+import org.springframework.security.config.annotation.web.configurers.*;
+
 
 @Configuration
 @EnableWebSecurity
@@ -75,26 +74,20 @@ public class SecurityConfig {
       CsrfCookieFilter csrfCookieFilter
   ) throws Exception {
     http
-        .cors(cors -> cors.configurationSource(corsConfigurationSource()))
-        .csrf(csrf -> configureCsrf(csrf, csrfTokenRepository))
-        .oauth2Login(oauth2LoginConfiguration())
+        .cors(this::configureCors)
+        .csrf(this::configureCsrf)
+        .oauth2Login(this::configureOAuth2Login)
         .httpBasic(this::configureHttpBasic)
-        .addFilterAfter(csrfCookieFilter, CsrfFilter.class)
         .formLogin(this::configureFormLogin)
         .logout(this::configureLogout)
         .sessionManagement(this::configureSessionManagement)
         .authorizeHttpRequests(this::configureAuthorizeRequests)
-        .headers(headers -> headers.frameOptions(FrameOptionsConfig::sameOrigin));
+        .headers(this::configureHeaders)
+        .addFilterAfter(csrfCookieFilter, CsrfFilter.class);
 
     this.configureCustomFilters(http, authenticationManager);
 
     return http.build();
-  }
-
-  private void configureCsrf(CsrfConfigurer<HttpSecurity> csrf, CsrfTokenRepository repository) {
-    csrf.csrfTokenRepository(repository)
-        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
-        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/ws/**", "/api/auth/sign-out");
   }
 
   @Bean
@@ -115,14 +108,24 @@ public class SecurityConfig {
     return source;
   }
 
-  private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
-    MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);
-    moplLoginFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
-    moplLoginFilter.setAuthenticationFailureHandler(loginFailureHandler);
+  private void configureCors(CorsConfigurer<HttpSecurity> cors) {
+    cors.configurationSource(corsConfigurationSource());
+  }
 
-    http
-        .addFilterAt(moplLoginFilter, UsernamePasswordAuthenticationFilter.class)
-        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
+  private void configureCsrf(CsrfConfigurer<HttpSecurity> csrf) {
+    csrf.csrfTokenRepository(csrfTokenRepository)
+        .csrfTokenRequestHandler(new SpaCsrfTokenRequestHandler())
+        .ignoringRequestMatchers("/h2-console/**", "/api/auth/refresh", "/ws/**", "/api/auth/sign-out");
+  }
+
+  private void configureOAuth2Login(OAuth2LoginConfigurer<HttpSecurity> oauth2) {
+    oauth2.userInfoEndpoint(userInfo -> userInfo.userService(moplOAuth2UserService))
+        .successHandler(oAuth2LoginSuccessHandler)
+        .failureHandler(oAuth2LoginFailureHandler);
+  }
+
+  private void configureHttpBasic(HttpBasicConfigurer<HttpSecurity> basic) {
+    basic.disable();
   }
 
   private void configureFormLogin(FormLoginConfigurer<HttpSecurity> login) {
@@ -136,13 +139,13 @@ public class SecurityConfig {
         .invalidateHttpSession(false);
   }
 
-  private void configureHttpBasic(HttpBasicConfigurer<HttpSecurity> basic) {
-    basic.disable();
-  }
-
   private void configureSessionManagement(SessionManagementConfigurer<HttpSecurity> session) {
     session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
-            .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy());
+        .sessionAuthenticationStrategy(new NullAuthenticatedSessionStrategy());
+  }
+
+  private void configureHeaders(HeadersConfigurer<HttpSecurity> headers) {
+    headers.frameOptions(HeadersConfigurer.FrameOptionsConfig::sameOrigin);
   }
 
   private void configureAuthorizeRequests(AuthorizeHttpRequestsConfigurer<HttpSecurity>.AuthorizationManagerRequestMatcherRegistry auth) {
@@ -158,17 +161,17 @@ public class SecurityConfig {
         .requestMatchers("/h2-console/**").permitAll()
         .requestMatchers("/ws/**").permitAll()
         .requestMatchers("/actuator/health", "/actuator/health/**").permitAll()
-        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus")
-        .hasRole("ADMIN")
+        .requestMatchers("/actuator/metrics", "/actuator/metrics/**", "/actuator/prometheus").hasRole("ADMIN")
         .anyRequest().authenticated();
   }
 
-  private Customizer<OAuth2LoginConfigurer<HttpSecurity>> oauth2LoginConfiguration() {
-    return oauth2 -> oauth2
-        .userInfoEndpoint(userInfo -> userInfo
-            .userService(moplOAuth2UserService)
-        )
-        .successHandler(oAuth2LoginSuccessHandler)
-        .failureHandler(oAuth2LoginFailureHandler);
+  private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
+    MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);
+    moplLoginFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
+    moplLoginFilter.setAuthenticationFailureHandler(loginFailureHandler);
+
+    http
+        .addFilterAt(moplLoginFilter, UsernamePasswordAuthenticationFilter.class)
+        .addFilterBefore(jwtAuthenticationFilter, UsernamePasswordAuthenticationFilter.class);
   }
 }

@@ -3,9 +3,11 @@ package io.mopl.global.security.oauth.service;
 import io.mopl.domain.user.entity.Role;
 import io.mopl.domain.user.entity.SocialAccount;
 import io.mopl.domain.user.entity.User;
+import io.mopl.domain.user.event.UserSyncedEvent;
 import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.user.service.SocialAccountService;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.oauth.GoogleOAuth2UserInfo;
 import io.mopl.global.security.oauth.KakaoOAuth2UserInfo;
@@ -31,6 +33,7 @@ public class MoplOAuth2UserService extends DefaultOAuth2UserService {
   private final SocialAccountService socialAccountService;
 
   private final UserRepository userRepository;
+  private final DomainEventPublisher eventPublisher;
 
   @Override
   @Transactional
@@ -77,7 +80,18 @@ public class MoplOAuth2UserService extends DefaultOAuth2UserService {
               .name(userName)
               .role(Role.USER)
               .build();
-          return userRepository.save(newUser);
+
+          User savedUser = userRepository.save(newUser);
+          eventPublisher.publish(new UserSyncedEvent(
+              savedUser.getId(),
+              savedUser.getName(),
+              savedUser.getEmail(),
+              savedUser.getRole().name(),
+              savedUser.isLocked(),
+              savedUser.getCreatedAt()
+          ));
+
+          return savedUser;
         });
 
     SocialAccount newSocialAccount = SocialAccount.builder()
