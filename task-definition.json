@@ -1,5 +1,5 @@
 {
-  "family": "mopl-backend-task",
+  "family": "mopl-app-task",
   "executionRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/ecsTaskExecutionRole",
   "networkMode": "awsvpc",
   "taskRoleArn": "arn:aws:iam::${AWS_ACCOUNT_ID}:role/mopl-ecs-task-role",
