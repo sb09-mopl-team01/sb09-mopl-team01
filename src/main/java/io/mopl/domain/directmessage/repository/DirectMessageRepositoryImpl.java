@@ -75,6 +75,11 @@ public class DirectMessageRepositoryImpl implements DirectMessageRepositoryCusto
                 )
                 .notExists()
         )
+        .orderBy(
+            directMessage.conversation.id.asc(),
+            directMessage.createdAt.desc(),
+            directMessage.id.desc()
+        )
         .fetch();
   }
 

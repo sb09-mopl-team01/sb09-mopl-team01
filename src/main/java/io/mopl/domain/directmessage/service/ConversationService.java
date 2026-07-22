@@ -437,7 +437,12 @@ public class ConversationService {
   private Map<UUID, DirectMessageDto> findLastestMessageDtos(List<Conversation> conversations) {
     List<UUID> conversationIds = conversations.stream()
         .map(Conversation::getId)
+        .distinct()
         .toList();
+    if (conversationIds.isEmpty()) {
+      return Map.of();
+    }
+
     List<DirectMessage> lastestMessages = directMessageRepository
         .findLastestByConversationIds(conversationIds);
 
@@ -445,8 +450,14 @@ public class ConversationService {
       return Map.of();
     }
 
+    Map<UUID, DirectMessage> lastestMessagesByConversationId = lastestMessages.stream()
+        .collect(Collectors.toMap(
+            directMessage -> directMessage.getConversation().getId(),
+            Function.identity(),
+            this::selectLastestMessage
+        ));
     Map<UUID, User> usersById = findMessageParticipants(lastestMessages);
-    return lastestMessages.stream()
+    return lastestMessagesByConversationId.values().stream()
         .collect(Collectors.toMap(
             directMessage -> directMessage.getConversation().getId(),
             directMessage -> directMessageMapper.toDto(
@@ -455,6 +466,17 @@ public class ConversationService {
                 getOtherUser(usersById, directMessage.getReceiverId())
             )
         ));
+  }
+
+  private DirectMessage selectLastestMessage(DirectMessage left, DirectMessage right) {
+    int createdAtComparison = left.getCreatedAt().compareTo(right.getCreatedAt());
+    if (createdAtComparison > 0) {
+      return left;
+    }
+    if (createdAtComparison < 0) {
+      return right;
+    }
+    return left.getId().compareTo(right.getId()) >= 0 ? left : right;
   }
 
   private DirectMessageDto findLastestMessageDto(Conversation conversation) {
