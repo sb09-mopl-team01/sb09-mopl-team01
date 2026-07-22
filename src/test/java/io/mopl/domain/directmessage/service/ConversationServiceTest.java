@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -269,6 +270,215 @@ class ConversationServiceTest {
 
     assertThat(result.data()).containsExactly(expected);
     assertThat(result.data().get(0).lastestMessage()).isEqualTo(lastestMessageDto);
+  }
+
+  @Test
+  void findConversationsKeepsLastestMessageNullWhenConversationHasNoMessage() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    ReflectionTestUtils.setField(conversation, "createdAt", Instant.now());
+    ConversationDto expected = createConversationDto(conversationId);
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findMyConversationsWithCursor(
+        requesterId,
+        null,
+        null,
+        null,
+        SortDirection.DESCENDING,
+        PageRequest.of(0, 2)
+    )).thenReturn(List.of(conversation));
+    when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
+    when(directMessageRepository.findLastestByConversationIds(List.of(conversationId)))
+        .thenReturn(List.of());
+    when(conversationMapper.toDto(conversation, withUser, null, false)).thenReturn(expected);
+    when(conversationRepository.countMyConversations(requesterId, null)).thenReturn(1L);
+
+    CursorResponse<ConversationDto> result = conversationService.findConversations(
+        requesterId,
+        null,
+        null,
+        null,
+        1,
+        SortDirection.DESCENDING,
+        "createdAt"
+    );
+
+    assertThat(result.data()).containsExactly(expected);
+    assertThat(result.data().get(0).lastestMessage()).isNull();
+  }
+
+  @Test
+  void findConversationsSelectsLastestMessageByIdDescWhenCreatedAtIsSame() {
+    Conversation conversation = Conversation.between(requesterId, withUserId);
+    UUID conversationId = UUID.randomUUID();
+    ReflectionTestUtils.setField(conversation, "id", conversationId);
+    ReflectionTestUtils.setField(conversation, "createdAt", Instant.now());
+    Instant sameCreatedAt = Instant.parse("2026-07-22T01:00:00Z");
+
+    DirectMessage lowerIdMessage = DirectMessage.create(conversation, withUserId, requesterId, "lower");
+    DirectMessage higherIdMessage = DirectMessage.create(conversation, withUserId, requesterId, "higher");
+    UUID lowerId = UUID.fromString("00000000-0000-0000-0000-000000000001");
+    UUID higherId = UUID.fromString("00000000-0000-0000-0000-000000000002");
+    ReflectionTestUtils.setField(lowerIdMessage, "id", lowerId);
+    ReflectionTestUtils.setField(higherIdMessage, "id", higherId);
+    ReflectionTestUtils.setField(lowerIdMessage, "createdAt", sameCreatedAt);
+    ReflectionTestUtils.setField(higherIdMessage, "createdAt", sameCreatedAt);
+
+    DirectMessageDto selectedDto = createDirectMessageDto(higherId, conversationId, sameCreatedAt);
+    ConversationDto expected = new ConversationDto(
+        conversationId,
+        UserSummary.builder()
+            .userId(withUserId)
+            .name(withUser.getName())
+            .profileImageUrl(withUser.getProfileImageUrl())
+            .build(),
+        selectedDto,
+        false
+    );
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findMyConversationsWithCursor(
+        requesterId,
+        null,
+        null,
+        null,
+        SortDirection.DESCENDING,
+        PageRequest.of(0, 2)
+    )).thenReturn(List.of(conversation));
+    when(userRepository.findAllById(List.of(withUserId))).thenReturn(List.of(withUser));
+    when(directMessageRepository.findLastestByConversationIds(List.of(conversationId)))
+        .thenReturn(List.of(lowerIdMessage, higherIdMessage));
+    when(userRepository.findAllById(List.of(withUserId, requesterId)))
+        .thenReturn(List.of(withUser, requester));
+    when(directMessageMapper.toDto(higherIdMessage, withUser, requester)).thenReturn(selectedDto);
+    when(conversationMapper.toDto(conversation, withUser, selectedDto, false)).thenReturn(expected);
+    when(conversationRepository.countMyConversations(requesterId, null)).thenReturn(1L);
+
+    CursorResponse<ConversationDto> result = conversationService.findConversations(
+        requesterId,
+        null,
+        null,
+        null,
+        1,
+        SortDirection.DESCENDING,
+        "createdAt"
+    );
+
+    assertThat(result.data()).containsExactly(expected);
+    assertThat(result.data().get(0).lastestMessage()).isEqualTo(selectedDto);
+    verify(directMessageMapper, never()).toDto(lowerIdMessage, withUser, requester);
+  }
+
+  @Test
+  void findConversationsMapsOneLastestMessagePerConversation() {
+    UUID thirdUserId = UUID.randomUUID();
+    User thirdUser = createUser(thirdUserId, "third");
+    Conversation firstConversation = Conversation.between(requesterId, withUserId);
+    Conversation secondConversation = Conversation.between(requesterId, thirdUserId);
+    UUID firstConversationId = UUID.randomUUID();
+    UUID secondConversationId = UUID.randomUUID();
+    Instant now = Instant.now();
+    ReflectionTestUtils.setField(firstConversation, "id", firstConversationId);
+    ReflectionTestUtils.setField(secondConversation, "id", secondConversationId);
+    ReflectionTestUtils.setField(firstConversation, "createdAt", now.minusSeconds(10));
+    ReflectionTestUtils.setField(secondConversation, "createdAt", now.minusSeconds(20));
+
+    DirectMessage firstLastestMessage = DirectMessage.create(
+        firstConversation,
+        withUserId,
+        requesterId,
+        "first"
+    );
+    DirectMessage secondLastestMessage = DirectMessage.create(
+        secondConversation,
+        thirdUserId,
+        requesterId,
+        "second"
+    );
+    UUID firstMessageId = UUID.randomUUID();
+    UUID secondMessageId = UUID.randomUUID();
+    ReflectionTestUtils.setField(firstLastestMessage, "id", firstMessageId);
+    ReflectionTestUtils.setField(secondLastestMessage, "id", secondMessageId);
+    ReflectionTestUtils.setField(firstLastestMessage, "createdAt", now);
+    ReflectionTestUtils.setField(secondLastestMessage, "createdAt", now.minusSeconds(5));
+
+    DirectMessageDto firstMessageDto = createDirectMessageDto(firstMessageId, firstConversationId, now);
+    DirectMessageDto secondMessageDto = new DirectMessageDto(
+        secondMessageId,
+        secondConversationId,
+        now.minusSeconds(5),
+        UserSummary.builder()
+            .userId(thirdUserId)
+            .name(thirdUser.getName())
+            .profileImageUrl(thirdUser.getProfileImageUrl())
+            .build(),
+        UserSummary.builder()
+            .userId(requesterId)
+            .name(requester.getName())
+            .profileImageUrl(requester.getProfileImageUrl())
+            .build(),
+        "second"
+    );
+    ConversationDto firstExpected = new ConversationDto(
+        firstConversationId,
+        UserSummary.builder()
+            .userId(withUserId)
+            .name(withUser.getName())
+            .profileImageUrl(withUser.getProfileImageUrl())
+            .build(),
+        firstMessageDto,
+        false
+    );
+    ConversationDto secondExpected = new ConversationDto(
+        secondConversationId,
+        UserSummary.builder()
+            .userId(thirdUserId)
+            .name(thirdUser.getName())
+            .profileImageUrl(thirdUser.getProfileImageUrl())
+            .build(),
+        secondMessageDto,
+        false
+    );
+
+    when(userRepository.findById(requesterId)).thenReturn(Optional.of(requester));
+    when(conversationRepository.findMyConversationsWithCursor(
+        requesterId,
+        null,
+        null,
+        null,
+        SortDirection.DESCENDING,
+        PageRequest.of(0, 3)
+    )).thenReturn(List.of(firstConversation, secondConversation));
+    when(userRepository.findAllById(List.of(withUserId, thirdUserId)))
+        .thenReturn(List.of(withUser, thirdUser));
+    when(directMessageRepository.findLastestByConversationIds(List.of(firstConversationId, secondConversationId)))
+        .thenReturn(List.of(firstLastestMessage, secondLastestMessage));
+    when(userRepository.findAllById(List.of(withUserId, requesterId, thirdUserId)))
+        .thenReturn(List.of(withUser, requester, thirdUser));
+    when(directMessageMapper.toDto(firstLastestMessage, withUser, requester)).thenReturn(firstMessageDto);
+    when(directMessageMapper.toDto(secondLastestMessage, thirdUser, requester)).thenReturn(secondMessageDto);
+    when(conversationMapper.toDto(firstConversation, withUser, firstMessageDto, false))
+        .thenReturn(firstExpected);
+    when(conversationMapper.toDto(secondConversation, thirdUser, secondMessageDto, false))
+        .thenReturn(secondExpected);
+    when(conversationRepository.countMyConversations(requesterId, null)).thenReturn(2L);
+
+    CursorResponse<ConversationDto> result = conversationService.findConversations(
+        requesterId,
+        null,
+        null,
+        null,
+        2,
+        SortDirection.DESCENDING,
+        "createdAt"
+    );
+
+    assertThat(result.data()).containsExactly(firstExpected, secondExpected);
+    assertThat(result.data())
+        .extracting(ConversationDto::lastestMessage)
+        .containsExactly(firstMessageDto, secondMessageDto);
   }
 
   @Test
