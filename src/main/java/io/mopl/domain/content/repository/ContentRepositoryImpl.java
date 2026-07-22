@@ -61,6 +61,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .select(content.id, content.createdAt, content.averageRating)
         .from(content)
         .where(
+            isActive(),
             eqType(typeEqual),
             containsKeyword(keywordLike),
             containsAnyTag(tagsIn),
@@ -94,6 +95,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .select(content.id.count())
         .from(content)
         .where(
+            isActive(),
             eqType(typeEqual),
             containsKeyword(keywordLike),
             containsAnyTag(tagsIn)
@@ -126,6 +128,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .from(content)
         .leftJoin(watchingSession).on(watchingSession.content.id.eq(content.id))
         .where(
+            isActive(),
             eqType(typeEqual),
             containsKeyword(keywordLike),
             containsAnyTag(tagsIn)
@@ -152,6 +155,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .select(content.id.count())
         .from(content)
         .where(
+            isActive(),
             eqType(typeEqual),
             containsKeyword(keywordLike),
             containsAnyTag(tagsIn)
@@ -182,6 +186,10 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
   private BooleanExpression eqType(ContentType typeEqual) {
     return typeEqual == null ? null : content.type.eq(typeEqual);
+  }
+
+  private BooleanExpression isActive() {
+    return content.deletedAt.isNull();
   }
 
   private BooleanExpression containsKeyword(String keywordLike) {
