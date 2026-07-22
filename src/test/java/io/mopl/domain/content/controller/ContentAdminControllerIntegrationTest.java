@@ -13,6 +13,7 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.repository.ContentRepository;
+import io.mopl.global.config.BaseIntegrationTest;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
@@ -47,7 +48,7 @@ import org.springframework.transaction.support.TransactionTemplate;
     "spring.data.redis.port=6379",
     "spring.data.redis.password="
 })
-class ContentAdminControllerIntegrationTest {
+class ContentAdminControllerIntegrationTest extends BaseIntegrationTest {
 
   private static final Path TEST_THUMBNAIL_PATH = Path.of("build/test-content-thumbnails");
 

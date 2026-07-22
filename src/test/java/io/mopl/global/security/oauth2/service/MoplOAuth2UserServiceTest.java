@@ -4,7 +4,6 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.doReturn;
-import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -15,6 +14,7 @@ import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.user.service.SocialAccountService;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.oauth.service.MoplOAuth2UserService;
 import java.util.Map;
@@ -45,6 +45,8 @@ class MoplOAuth2UserServiceTest {
   @Mock private SocialAccountService socialAccountService;
   @Mock private UserRepository userRepository;
 
+  @Mock private DomainEventPublisher eventPublisher;
+
   @Spy
   @InjectMocks
   private MoplOAuth2UserService moplOAuth2UserService;
@@ -61,7 +63,7 @@ class MoplOAuth2UserServiceTest {
   void setUp() {
     userId = UUID.randomUUID();
     mockUser = User.builder().email("test@gmail.com").name("Test").role(Role.USER).build();
-    ReflectionTestUtils.setField(mockUser, "id", userId); // 빌더가 닫혀있으므로 강제 주입
+    ReflectionTestUtils.setField(mockUser, "id", userId);
 
     attributes = Map.of("sub", "12345", "email", "test@gmail.com", "name", "Test");
   }
@@ -100,6 +102,7 @@ class MoplOAuth2UserServiceTest {
     assertThat(result).isInstanceOf(MoplUserDetails.class);
     assertThat(((MoplUserDetails) result).getUser()).isEqualTo(mockUser);
     verify(userRepository, never()).save(any());
+    verify(eventPublisher, never()).publish(any());
   }
 
   @Test
@@ -120,6 +123,7 @@ class MoplOAuth2UserServiceTest {
 
     verify(userRepository).save(any(User.class));
     verify(socialAccountRepository).save(any(SocialAccount.class));
+    verify(eventPublisher).publish(any());
   }
 
   @Test
