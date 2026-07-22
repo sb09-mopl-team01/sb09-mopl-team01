@@ -92,6 +92,9 @@ dependencies {
 
     // OpenSearch
     implementation 'org.opensearch.client:spring-data-opensearch-starter:1.7.0'
+    
+    // Redisson
+    implementation 'org.redisson:redisson-spring-boot-starter:3.27.0'
 }
 
 jacoco {
