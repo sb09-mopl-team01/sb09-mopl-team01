@@ -9,9 +9,11 @@ import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
+import io.mopl.domain.content.event.ContentSoftDeletedEvent;
 import io.mopl.domain.content.mapper.ContentMapper;
 import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.content.storage.ContentThumbnailFile;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
@@ -41,6 +43,7 @@ public class ContentService {
   private final ContentStatsService contentStatsService;
   private final ContentMapper contentMapper;
   private final ContentThumbnailService contentThumbnailService;
+  private final DomainEventPublisher eventPublisher;
   private final PlatformTransactionManager transactionManager;
   private final Clock clock;
 
@@ -201,6 +204,7 @@ public class ContentService {
     executeWithoutResultInTransaction(() -> {
       Content content = getContentOrThrow(contentId);
       content.softDelete(Instant.now(clock));
+      eventPublisher.publish(new ContentSoftDeletedEvent(contentId));
     });
     contentCacheService.evictAll(contentId);
     log.info("Content delete completed. contentId={}", contentId);
@@ -229,6 +233,7 @@ public class ContentService {
     TransactionTemplate transactionTemplate = new TransactionTemplate(transactionManager);
     transactionTemplate.executeWithoutResult(status -> action.run());
   }
+
   private record ContentUpdateOutcome(
       ContentDto contentDto,
       String previousThumbnailKey,

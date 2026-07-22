@@ -18,9 +18,11 @@ import io.mopl.domain.content.dto.request.ContentCreateRequest;
 import io.mopl.domain.content.dto.request.ContentUpdateRequest;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentType;
+import io.mopl.domain.content.event.ContentSoftDeletedEvent;
 import io.mopl.domain.content.mapper.ContentMapper;
 import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.content.storage.ContentThumbnailFile;
+import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -66,6 +68,9 @@ class ContentServiceTest {
   @Mock
   private ContentThumbnailService contentThumbnailService;
 
+  @Mock
+  private DomainEventPublisher eventPublisher;
+
   @BeforeEach
   void setUp() {
     contentService = new ContentService(
@@ -75,6 +80,7 @@ class ContentServiceTest {
         contentStatsService,
         contentMapper,
         contentThumbnailService,
+        eventPublisher,
         new ResourcelessTransactionManager(),
         Clock.fixed(FIXED_NOW, ZoneOffset.UTC)
     );
@@ -338,6 +344,7 @@ class ContentServiceTest {
 
     assertThat(content.getDeletedAt()).isEqualTo(FIXED_NOW);
     verify(contentRepository, never()).delete(any());
+    verify(eventPublisher).publish(new ContentSoftDeletedEvent(contentId));
     verify(contentCacheService).evictAll(contentId);
     verify(contentThumbnailService, never()).delete(any());
   }
