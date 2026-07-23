@@ -94,6 +94,7 @@ class ContentExternalSyncServiceIntegrationTest {
     ContentExternalSyncService service = new ContentExternalSyncService(
         List.of(client),
         failOnSecondLookup,
+        mock(ContentSearchIndexService.class),
         Clock.fixed(FIRST_SYNCED_AT, ZoneOffset.UTC),
         transactionManager
     );
