@@ -83,6 +83,8 @@ public class HttpCookieOAuth2AuthorizationRequestRepository implements Authoriza
         if (cookie.getName().equals(name)) {
           cookie.setValue("");
           cookie.setPath("/");
+          cookie.setHttpOnly(true);
+          cookie.setSecure(true);
           cookie.setMaxAge(0);
           response.addCookie(cookie);
         }
