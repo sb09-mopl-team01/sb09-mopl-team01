@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 
 @Entity
 @Table(
-    name = "review",
+    name = "reviews",
     uniqueConstraints = {
         @UniqueConstraint(
             name = "uk_review_author_content",
