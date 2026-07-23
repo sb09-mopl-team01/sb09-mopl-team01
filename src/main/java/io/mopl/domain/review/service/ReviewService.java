@@ -72,7 +72,7 @@ public class ReviewService {
   @Transactional
   public ReviewDto updateReview(UUID userId, UUID reviewId, ReviewUpdateRequest request) {
     log.info("리뷰 수정 시도: reviewId={}, userId={}", reviewId, userId);
-    Review review = reviewRepository.findById(reviewId)
+    Review review = reviewRepository.findActiveById(reviewId)
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     if (!review.getAuthor().getId().equals(userId)) {
@@ -106,7 +106,7 @@ public class ReviewService {
     log.info("리뷰 목록 조회 완료: 조회된 건수={}, hasNext={}", reviews.size(), hasNext);
     String nextCursor = hasNext ? calculateNextCursor(reviews.get(reviews.size() - 1), sortBy) : null;
     UUID nextIdAfter = hasNext ? reviews.get(reviews.size() - 1).getId() : null;
-    long totalCount = reviewRepository.countByContentId(contentId);
+    long totalCount = reviewRepository.countVisibleByContentId(contentId);
 
     return new CursorResponse<>(
         reviewDtos,
@@ -129,7 +129,7 @@ public class ReviewService {
   @Transactional
   public void deleteReview(UUID userId, UUID reviewId) {
     log.info("리뷰 삭제 시도: reviewId={}, userId={}", reviewId, userId);
-    Review review = reviewRepository.findById(reviewId)
+    Review review = reviewRepository.findActiveById(reviewId)
         .orElseThrow(() -> new BaseException(ErrorCode.INVALID_INPUT));
 
     if (!review.getAuthor().getId().equals(userId)) {

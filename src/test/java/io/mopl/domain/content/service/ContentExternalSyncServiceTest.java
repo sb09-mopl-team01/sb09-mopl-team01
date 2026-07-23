@@ -39,6 +39,9 @@ class ContentExternalSyncServiceTest {
   @Mock
   private ContentRepository contentRepository;
 
+  @Mock
+  private ContentSearchIndexService contentSearchIndexService;
+
   @Test
   void syncExternalContents_createsNewContentAndSkipsDuplicatedContent() {
     ExternalContentClient client = () -> ExternalContentFetchResult.accepted(List.of(
@@ -68,6 +71,7 @@ class ContentExternalSyncServiceTest {
     assertThat(result.filteredCount()).isZero();
     assertThat(result.createdCount()).isEqualTo(1);
     assertThat(result.skippedCount()).isEqualTo(1);
+    verify(contentSearchIndexService).indexAll(anyCollection());
     assertThat(result.failedCount()).isZero();
     assertThat(result.syncedAt()).isEqualTo(FIXED_NOW);
     assertThat(existingContent.getLastSyncedAt()).isEqualTo(FIXED_NOW);
@@ -338,6 +342,7 @@ class ContentExternalSyncServiceTest {
     return new ContentExternalSyncService(
         clients,
         contentRepository,
+        contentSearchIndexService,
         Clock.fixed(FIXED_NOW, ZoneOffset.UTC),
         new ResourcelessTransactionManager()
     );

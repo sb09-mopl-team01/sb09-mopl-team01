@@ -275,6 +275,14 @@ public class Content extends BaseUpdatableEntity {
     return deletedAt != null;
   }
 
+  public void clearThumbnailAfterRetention() {
+    if (!isDeleted()) {
+      throw new IllegalStateException("삭제되지 않은 콘텐츠의 썸네일은 정리할 수 없습니다.");
+    }
+    this.thumbnailUrl = null;
+    this.thumbnailKey = null;
+  }
+
   private void ensureActive() {
     if (isDeleted()) {
       throw new IllegalStateException("삭제된 콘텐츠는 변경할 수 없습니다.");
