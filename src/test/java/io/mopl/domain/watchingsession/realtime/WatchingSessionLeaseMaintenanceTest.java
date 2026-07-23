@@ -18,11 +18,14 @@ class WatchingSessionLeaseMaintenanceTest {
   private final WatchingSessionLeaseStore leaseStore = mock(WatchingSessionLeaseStore.class);
   private final WatchingSessionNodeId nodeId = new WatchingSessionNodeId("node-a", "");
   private final WatchingSessionService watchingSessionService = mock(WatchingSessionService.class);
+  private final WatchingSessionLeaseRecoveryCoordinator recoveryCoordinator =
+      mock(WatchingSessionLeaseRecoveryCoordinator.class);
   private final WatchingSessionLeaseMaintenance maintenance = new WatchingSessionLeaseMaintenance(
       subscriptionRegistry,
       leaseStore,
       nodeId,
-      watchingSessionService
+      watchingSessionService,
+      recoveryCoordinator
   );
 
   @Test
@@ -32,8 +35,7 @@ class WatchingSessionLeaseMaintenanceTest {
 
     maintenance.maintainLeases();
 
-    verify(watchingSessionService).endWatchingIfPresent(
-        subscription.watcherId(), subscription.contentId());
+    verify(recoveryCoordinator).recover(subscription);
   }
 
   @Test
