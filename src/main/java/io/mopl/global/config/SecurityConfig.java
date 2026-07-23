@@ -16,9 +16,11 @@ import io.mopl.global.security.oauth.service.MoplOAuth2UserService;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -54,7 +56,9 @@ public class SecurityConfig {
   private final MoplOAuth2UserService moplOAuth2UserService;
   private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
   private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
-  private final RedisOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
+  @Lazy
+  @Autowired
+  private RedisOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
   @Value("${mopl.cors.allowed-origins}")
   private List<String> allowedOrigins;
