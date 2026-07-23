@@ -14,6 +14,8 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.batch.core.JobExecution;
 import org.springframework.batch.core.StepExecution;
 import org.springframework.batch.core.explore.JobExplorer;
@@ -22,7 +24,7 @@ import org.springframework.batch.core.scope.context.StepContext;
 import org.springframework.batch.item.ExecutionContext;
 import org.springframework.batch.repeat.RepeatStatus;
 
-@ExtendWith(MockitoExtension.class)
+@ExtendWith({MockitoExtension.class, OutputCaptureExtension.class})
 class ContentExternalSyncTaskletTest {
 
   @Mock
@@ -35,7 +37,7 @@ class ContentExternalSyncTaskletTest {
   private ContentExternalSyncMetrics contentExternalSyncMetrics;
 
   @Test
-  void execute_runsSyncServiceAndStoresResult() throws Exception {
+  void execute_runsSyncServiceAndStoresResult(CapturedOutput output) throws Exception {
     Instant syncedAt = Instant.parse("2026-07-06T00:00:00Z");
     given(contentExternalSyncService.syncExternalContents())
         .willReturn(new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, syncedAt));
@@ -59,6 +61,12 @@ class ContentExternalSyncTaskletTest {
     verify(contentExternalSyncMetrics).record(
         new ExternalContentSyncResult(8, 6, 1, 2, 3, 2, syncedAt)
     );
+    assertThat(output)
+        .contains("Content externalSync started.")
+        .contains("Content externalSync completed.")
+        .contains("fetchedCount=8")
+        .contains("createdCount=2")
+        .contains("failedCount=2");
   }
 
   @Test
@@ -85,7 +93,7 @@ class ContentExternalSyncTaskletTest {
   }
 
   @Test
-  void execute_propagatesSyncFailure() {
+  void execute_propagatesSyncFailure(CapturedOutput output) {
     RuntimeException failure = new RuntimeException("external sync failed");
     given(contentExternalSyncService.syncExternalContents()).willThrow(failure);
     ContentExternalSyncTasklet tasklet = tasklet();
@@ -93,6 +101,10 @@ class ContentExternalSyncTaskletTest {
     assertThatThrownBy(() -> tasklet.execute(null, chunkContext(new ExecutionContext())))
         .isSameAs(failure);
     verify(contentExternalSyncMetrics, never()).record(org.mockito.ArgumentMatchers.any());
+    assertThat(output)
+        .contains("Content externalSync failed.")
+        .contains("errorType=RuntimeException")
+        .contains("message=external sync failed");
   }
 
   @Test

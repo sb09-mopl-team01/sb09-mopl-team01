@@ -3,6 +3,7 @@ package io.mopl.domain.content.controller;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -162,6 +163,54 @@ class ContentAdminControllerIntegrationTest extends BaseIntegrationTest {
       assertThat(deletedContent.getDeletedAt()).isNotNull();
       assertThat(deletedContent.getThumbnailKey()).isNotBlank().endsWith(".png");
     });
+  }
+
+  @Test
+  @WithMockUser
+  @DisplayName("콘텐츠 조회 API는 Swagger 조회 계약에 맞는 응답을 반환한다")
+  void findContentContract() throws Exception {
+    Content content = contentRepository.saveAndFlush(Content.createManual(
+        ContentType.MOVIE,
+        "조회 제목",
+        "조회 설명",
+        null,
+        Set.of("영화")
+    ));
+
+    mockMvc.perform(get("/api/contents/{contentId}", content.getId()))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.id").value(content.getId().toString()))
+        .andExpect(jsonPath("$.type").value("movie"))
+        .andExpect(jsonPath("$.title").value("조회 제목"))
+        .andExpect(jsonPath("$.averageRating").value(0.0))
+        .andExpect(jsonPath("$.reviewCount").value(0))
+        .andExpect(jsonPath("$.watcherCount").value(0));
+
+    mockMvc.perform(get("/api/contents")
+            .param("typeEqual", "movie")
+            .param("keywordLike", "조회")
+            .param("tagsIn", "영화")
+            .param("limit", "10")
+            .param("sortBy", "createdAt")
+            .param("sortDirection", "DESCENDING"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.data[0].id").value(content.getId().toString()))
+        .andExpect(jsonPath("$.totalCount").value(1))
+        .andExpect(jsonPath("$.hasNext").value(false))
+        .andExpect(jsonPath("$.sortBy").value("createdAt"))
+        .andExpect(jsonPath("$.sortDirection").value("DESCENDING"));
+  }
+
+  @Test
+  @WithMockUser
+  @DisplayName("콘텐츠 조회 API는 잘못된 조회 조건에 400을 반환한다")
+  void rejectInvalidContentQueryContract() throws Exception {
+    mockMvc.perform(get("/api/contents")
+            .param("typeEqual", "invalid")
+            .param("limit", "10")
+            .param("sortBy", "createdAt")
+            .param("sortDirection", "DESCENDING"))
+        .andExpect(status().isBadRequest());
   }
 
   private MockMultipartFile jsonPart(String name, Object value) throws Exception {
