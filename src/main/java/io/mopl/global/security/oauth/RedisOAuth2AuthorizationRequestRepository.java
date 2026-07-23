@@ -66,16 +66,16 @@ public class RedisOAuth2AuthorizationRequestRepository implements AuthorizationR
   @Override
   public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
       HttpServletResponse response) {
+    try {
+      return getCookie(request, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME)
+          .map(Cookie::getValue)
+          .map(id -> redisTemplate.opsForValue().getAndDelete(REDIS_KEY_PREFIX + id))
+          .map(serialized -> deserialize(serialized, OAuth2AuthorizationRequest.class))
+          .orElse(null);
 
-    OAuth2AuthorizationRequest authRequest = this.loadAuthorizationRequest(request);
-
-    getCookie(request, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME)
-        .map(Cookie::getValue)
-        .ifPresent(id -> redisTemplate.delete(REDIS_KEY_PREFIX + id));
-
-    removeAuthorizationRequestCookies(request, response);
-
-    return authRequest;
+    } finally {
+      removeAuthorizationRequestCookies(request, response);
+    }
   }
 
   public void removeAuthorizationRequestCookies(HttpServletRequest request, HttpServletResponse response) {
