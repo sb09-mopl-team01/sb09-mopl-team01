@@ -8,6 +8,8 @@ import java.util.UUID;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
 import org.springframework.batch.core.BatchStatus;
 import org.springframework.batch.core.Job;
 import org.springframework.batch.core.JobExecution;
@@ -31,13 +33,40 @@ public class BatchScheduler implements SchedulingConfigurer {
   private final JobLauncher jobLauncher;
   private final MeterRegistry meterRegistry;
 
+  private final RedissonClient redissonClient;
+
   @Override
   public void configureTasks(ScheduledTaskRegistrar taskRegistrar) {
     for (BatchTask task : batchTaskList) {
       taskRegistrar.addTriggerTask(
-          () -> executeAsSpringBatchJob(task),
+          () -> executeWithRedisLock(task),
           new CronTrigger(task.getCron(), ZoneId.of("Asia/Seoul"))
       );
+    }
+  }
+
+  private void executeWithRedisLock(BatchTask task) {
+    String jobName = task.getJobName();
+    RLock lock = redissonClient.getLock("lock:batch:" + jobName);
+
+    try {
+      boolean isLocked = lock.tryLock(0, -1, TimeUnit.SECONDS);
+
+      if (isLocked) {
+        log.info("Successfully acquired Redis lock. Executing batch job. jobName={}", jobName);
+        try {
+          executeAsSpringBatchJob(task);
+        } finally {
+          if (lock.isHeldByCurrentThread()) {
+            lock.unlock();
+          }
+        }
+      } else {
+        log.info("Batch job is already running on another instance. Skipping. jobName={}", jobName);
+      }
+    } catch (InterruptedException e) {
+      Thread.currentThread().interrupt();
+      log.error("Interrupted while acquiring Redis lock. jobName={}", jobName, e);
     }
   }
 
