@@ -24,7 +24,6 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 import java.util.UUID;
@@ -437,18 +436,29 @@ public class ConversationService {
   }
 
   private Map<UUID, DirectMessageDto> findLastestMessageDtos(List<Conversation> conversations) {
-    List<DirectMessage> lastestMessages = conversations.stream()
-        .map(conversation -> directMessageRepository
-            .findFirstByConversationIdOrderByCreatedAtDescIdDesc(conversation.getId()))
-        .flatMap(Optional::stream)
+    List<UUID> conversationIds = conversations.stream()
+        .map(Conversation::getId)
+        .distinct()
         .toList();
+    if (conversationIds.isEmpty()) {
+      return Map.of();
+    }
+
+    List<DirectMessage> lastestMessages = directMessageRepository
+        .findLastestByConversationIds(conversationIds);
 
     if (lastestMessages.isEmpty()) {
       return Map.of();
     }
 
+    Map<UUID, DirectMessage> lastestMessagesByConversationId = lastestMessages.stream()
+        .collect(Collectors.toMap(
+            directMessage -> directMessage.getConversation().getId(),
+            Function.identity(),
+            this::selectLastestMessage
+        ));
     Map<UUID, User> usersById = findMessageParticipants(lastestMessages);
-    return lastestMessages.stream()
+    return lastestMessagesByConversationId.values().stream()
         .collect(Collectors.toMap(
             directMessage -> directMessage.getConversation().getId(),
             directMessage -> directMessageMapper.toDto(
@@ -457,6 +467,17 @@ public class ConversationService {
                 getOtherUser(usersById, directMessage.getReceiverId())
             )
         ));
+  }
+
+  private DirectMessage selectLastestMessage(DirectMessage left, DirectMessage right) {
+    int createdAtComparison = left.getCreatedAt().compareTo(right.getCreatedAt());
+    if (createdAtComparison > 0) {
+      return left;
+    }
+    if (createdAtComparison < 0) {
+      return right;
+    }
+    return left.getId().compareTo(right.getId()) >= 0 ? left : right;
   }
 
   private DirectMessageDto findLastestMessageDto(Conversation conversation) {

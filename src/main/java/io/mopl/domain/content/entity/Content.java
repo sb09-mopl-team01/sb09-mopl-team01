@@ -65,6 +65,9 @@ public class Content extends BaseUpdatableEntity {
   @Column(name = "last_synced_at")
   private Instant lastSyncedAt;
 
+  @Column(name = "deleted_at")
+  private Instant deletedAt;
+
   @Column(name = "average_rating", nullable = false)
   private double averageRating = 0.0;
 
@@ -149,6 +152,7 @@ public class Content extends BaseUpdatableEntity {
   }
 
   public void markSyncedAt(Instant syncedAt) {
+    ensureActive();
     if (!source.isExternal()) {
       throw new IllegalStateException("수동 등록 콘텐츠는 동기화 시각을 갱신할 수 없습니다.");
     }
@@ -171,6 +175,7 @@ public class Content extends BaseUpdatableEntity {
       String thumbnailUrl,
       String thumbnailKey
   ) {
+    ensureActive();
     if (title != null) {
       this.title = requireText(title, "콘텐츠 제목은 필수입니다.");
     }
@@ -236,10 +241,12 @@ public class Content extends BaseUpdatableEntity {
   }
 
   public void updateAverageRating(double newAverage) {
+    ensureActive();
     this.averageRating = newAverage;
   }
 
   public void updateReviewStats(double averageRating, int reviewCount) {
+    ensureActive();
     if (reviewCount < 0) {
       throw new IllegalArgumentException("리뷰 수는 음수일 수 없습니다.");
     }
@@ -249,10 +256,28 @@ public class Content extends BaseUpdatableEntity {
 
   // 리뷰 수 증감
   public void increaseReviewCount() {
+    ensureActive();
     this.reviewCount++;
   }
 
   public void decreaseReviewCount() {
+    ensureActive();
     if (this.reviewCount > 0) this.reviewCount--;
+  }
+
+  public void softDelete(Instant deletedAt) {
+    if (this.deletedAt == null) {
+      this.deletedAt = Objects.requireNonNull(deletedAt, "삭제 시각은 필수입니다.");
+    }
+  }
+
+  public boolean isDeleted() {
+    return deletedAt != null;
+  }
+
+  private void ensureActive() {
+    if (isDeleted()) {
+      throw new IllegalStateException("삭제된 콘텐츠는 변경할 수 없습니다.");
+    }
   }
 }

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.BDDMockito.given;
 
+import io.mopl.global.config.BaseIntegrationTest;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
@@ -11,7 +12,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.batch.core.Job;
 
 @ExtendWith(MockitoExtension.class)
-class LogArchiveBackupBatchTaskTest {
+class LogArchiveBackupBatchTaskTest extends BaseIntegrationTest {
 
   @Mock
   private Job logArchiveBackupJob;

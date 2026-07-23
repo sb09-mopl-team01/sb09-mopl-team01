@@ -12,16 +12,6 @@ import org.mapstruct.Mapper;
 @Mapper(componentModel = "spring")
 public interface ContentMapper {
 
-  default Content toEntity(ContentCreateRequest request, String thumbnailUrl) {
-    return Content.createManual(
-        request.type(),
-        request.title(),
-        request.description(),
-        thumbnailUrl,
-        request.tags()
-    );
-  }
-
   default Content toEntity(ContentCreateRequest request, ContentThumbnailFile thumbnailFile) {
     return Content.createManual(
         request.type(),

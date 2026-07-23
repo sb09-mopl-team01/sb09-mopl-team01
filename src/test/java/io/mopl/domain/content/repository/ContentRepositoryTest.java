@@ -495,6 +495,37 @@ class ContentRepositoryTest {
     assertThat(result.sortBy()).isEqualTo("watcherCount");
   }
 
+  @Test
+  @DisplayName("삭제된 콘텐츠는 일반 조회와 목록에서 제외하고 외부 식별 조회에는 유지한다")
+  void excludeSoftDeletedContentFromPublicQueries() {
+    Content content = contentRepository.saveAndFlush(Content.createExternal(
+        ContentType.MOVIE,
+        "삭제된 영화",
+        "소프트 삭제 조회 정책을 검증하는 영화",
+        null,
+        ContentSource.TMDB,
+        "deleted-1",
+        Instant.parse("2026-07-19T00:00:00Z"),
+        List.of("영화")
+    ));
+    content.softDelete(Instant.parse("2026-07-20T00:00:00Z"));
+    contentRepository.flush();
+    entityManager.clear();
+
+    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+        null, null, null, null, null, 10, "createdAt", SortDirection.DESCENDING
+    );
+
+    assertThat(contentRepository.findById(content.getId())).isEmpty();
+    assertThat(contentRepository.findAllByIdWithTags(List.of(content.getId()))).isEmpty();
+    assertThat(result.data()).doesNotContain(content.getId());
+    assertThat(contentRepository.findBySourceAndTypeAndExternalId(
+        ContentSource.TMDB,
+        ContentType.MOVIE,
+        "deleted-1"
+    )).isPresent().get().extracting(Content::isDeleted).isEqualTo(true);
+  }
+
   private WatchingSession saveSession(User watcher, Content content) {
     WatchingSession session = WatchingSession.start(watcher, content);
     return entityManager.persistFlushFind(session);
