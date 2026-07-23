@@ -24,7 +24,7 @@ public class CookieProvider {
         .secure(true) // https 적용 시 수정 필요
         .path(ACCESS_TOKEN_COOKIE_PATH)
         .maxAge(ACCESS_TOKEN_MAX_AGE)
-        .sameSite("None")
+        .sameSite("Lax")
         .build();
   }
 
@@ -34,7 +34,7 @@ public class CookieProvider {
         .secure(true) // https 적용 시 수정 필요
         .path(REFRESH_TOKEN_COOKIE_PATH)
         .maxAge(REFRESH_TOKEN_MAX_AGE)
-        .sameSite("None")
+        .sameSite("Lax")
         .build();
   }
 
