@@ -1,8 +1,5 @@
 package io.mopl.global.config;
 
-import org.redisson.Redisson;
-import org.redisson.api.RedissonClient;
-import org.redisson.config.Config;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -24,7 +21,7 @@ public class RedisConfig {
   @Value("${spring.data.redis.port}")
   private int port;
 
-  @Value("${spring.data.redis.password:}")
+  @Value("${spring.data.redis.password}")
   private String password;
 
   @Value("${spring.data.redis.ssl.enabled:false}")
@@ -53,20 +50,5 @@ public class RedisConfig {
     template.setValueSerializer(new GenericJackson2JsonRedisSerializer());
 
     return template;
-  }
-
-  @Bean(destroyMethod = "shutdown")
-  public RedissonClient redissonClient() {
-    Config config = new Config();
-    String scheme = sslEnabled ? "rediss://" : "redis://";
-
-    var serverConfig = config.useSingleServer()
-        .setAddress(scheme + host + ":" + port);
-
-    if (StringUtils.hasText(password)) {
-      serverConfig.setPassword(password);
-    }
-
-    return Redisson.create(config);
   }
 }
