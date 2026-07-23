@@ -16,6 +16,7 @@ import io.mopl.domain.follow.event.FollowCreatedEvent;
 import io.mopl.domain.follow.repository.FollowRepository;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.global.cache.CacheKey;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -28,6 +29,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.cache.Cache;
+import org.springframework.cache.CacheManager;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -44,6 +47,12 @@ class FollowServiceTest {
 
   @Mock
   private DomainEventPublisher eventPublisher;
+
+  @Mock
+  private CacheManager cacheManager;
+
+  @Mock
+  private Cache cache;
 
   private UUID followerId;
   private UUID followeeId;
@@ -68,6 +77,7 @@ class FollowServiceTest {
     given(userRepository.findById(followeeId)).willReturn(Optional.of(followee));
     given(followRepository.existsByFollowerAndFollowee(follower, followee)).willReturn(false);
     given(followRepository.save(any(Follow.class))).willReturn(savedFollow);
+    given(cacheManager.getCache(CacheKey.FOLLOW)).willReturn(cache);
 
     FollowDto result = followService.follow(followerId, new FollowCreateRequest(followeeId));
 
@@ -85,6 +95,8 @@ class FollowServiceTest {
           && followCreatedEvent.followeeId().equals(followeeId)
           && followCreatedEvent.occurredAt() != null;
     }));
+    verify(cache).evict("count:" + followeeId);
+    verify(cache).evict("relation:" + followerId + ":" + followeeId);
   }
 
   @Test
@@ -129,6 +141,7 @@ class FollowServiceTest {
     ReflectionTestUtils.setField(follow, "id", followId);
     given(userRepository.findById(followerId)).willReturn(Optional.of(follower));
     given(followRepository.findById(followId)).willReturn(Optional.of(follow));
+    given(cacheManager.getCache(CacheKey.FOLLOW)).willReturn(cache);
 
     followService.unfollow(followerId, followId);
 
@@ -142,6 +155,8 @@ class FollowServiceTest {
           && followCancelledEvent.followeeId().equals(followeeId)
           && followCancelledEvent.occurredAt() != null;
     }));
+    verify(cache).evict("count:" + followeeId);
+    verify(cache).evict("relation:" + followerId + ":" + followeeId);
   }
 
   @Test

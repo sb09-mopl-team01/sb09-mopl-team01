@@ -5,6 +5,7 @@ import io.mopl.domain.content.storage.ContentThumbnailStorage;
 import java.util.Locale;
 import java.util.Set;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -13,6 +14,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Service
 @ConditionalOnBean(ContentThumbnailStorage.class)
 @RequiredArgsConstructor
+@Slf4j
 public class ContentThumbnailService {
 
   private static final Set<String> ALLOWED_CONTENT_TYPES = Set.of(
@@ -41,7 +43,12 @@ public class ContentThumbnailService {
     if (thumbnailKey == null || thumbnailKey.isBlank()) {
       return;
     }
-    contentThumbnailStorage.delete(thumbnailKey);
+    try {
+      contentThumbnailStorage.delete(thumbnailKey);
+    } catch (RuntimeException e) {
+      log.warn("Content thumbnail delete failed. thumbnailKey={}, errorType={}",
+          thumbnailKey, e.getClass().getSimpleName(), e);
+    }
   }
 
   private void validateThumbnail(MultipartFile thumbnail, boolean required) {

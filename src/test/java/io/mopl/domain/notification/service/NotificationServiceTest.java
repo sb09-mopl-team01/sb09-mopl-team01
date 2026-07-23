@@ -13,6 +13,7 @@ import io.mopl.domain.notification.entity.NotificationLevel;
 import io.mopl.domain.notification.event.NotificationCreatedEvent;
 import io.mopl.domain.notification.event.NotificationReadEvent;
 import io.mopl.domain.notification.repository.NotificationRepository;
+import io.mopl.global.config.BaseIntegrationTest;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -30,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @SpringBootTest
 @ActiveProfiles("test")
 @Transactional
-class NotificationServiceTest {
+class NotificationServiceTest extends BaseIntegrationTest {
 
   @Autowired
   private NotificationService notificationService;

@@ -18,6 +18,7 @@ public class WatchingSessionLeaseMaintenance {
   private final WatchingSessionLeaseStore leaseStore;
   private final WatchingSessionNodeId nodeId;
   private final WatchingSessionService watchingSessionService;
+  private final WatchingSessionLeaseRecoveryCoordinator recoveryCoordinator;
 
   @Scheduled(fixedDelayString = "${mopl.watching-session.redis.lease-maintenance-delay-millis:30000}")
   public void maintainLeases() {
@@ -36,13 +37,6 @@ public class WatchingSessionLeaseMaintenance {
       }
     });
 
-    leaseStore.expireStaleLeases().forEach(subscription -> {
-      try {
-        watchingSessionService.endWatchingIfPresent(subscription.watcherId(), subscription.contentId());
-      } catch (RuntimeException e) {
-        log.warn("Failed to end expired watching session. watcherId={}, contentId={}",
-            subscription.watcherId(), subscription.contentId(), e);
-      }
-    });
+    leaseStore.expireStaleLeases().forEach(recoveryCoordinator::recover);
   }
 }

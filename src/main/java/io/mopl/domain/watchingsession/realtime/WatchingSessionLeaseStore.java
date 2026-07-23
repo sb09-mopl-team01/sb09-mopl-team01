@@ -15,4 +15,13 @@ public interface WatchingSessionLeaseStore {
   boolean refresh(WatchingSessionSubscription subscription, String nodeId);
 
   List<WatchingSessionSubscription> expireStaleLeases();
+
+  boolean claimRecovery(WatchingSessionSubscription subscription, String recoveryOwnerId);
+
+  boolean completeRecovery(WatchingSessionSubscription subscription, String recoveryOwnerId);
+
+  WatchingSessionLeaseRecoveryFailure recordRecoveryFailure(
+      WatchingSessionSubscription subscription,
+      String recoveryOwnerId
+  );
 }
