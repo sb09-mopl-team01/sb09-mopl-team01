@@ -4,14 +4,12 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
-import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationFailureHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
-@Slf4j
 @Component
 public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHandler {
 
@@ -22,12 +20,12 @@ public class OAuth2LoginFailureHandler extends SimpleUrlAuthenticationFailureHan
   public void onAuthenticationFailure(HttpServletRequest request, HttpServletResponse response,
       AuthenticationException exception) throws IOException, ServletException {
 
-    log.error("OAuth2 Login Authentication Failure", exception);
-    log.error("Failure Message: {}", exception.getMessage());
-
     String errorCode = "oauth_failed";
+    String errorMessage = "user_not_exists";
 
-    String errorMessage = exception.getMessage() != null ? exception.getMessage() : "unknown_error";
+    if (exception.getMessage() != null && exception.getMessage().equals("user_not_exists")) {
+      errorMessage = "user_not_exists";
+    }
 
     String redirectUrl = UriComponentsBuilder.fromUriString(frontendBaseUrl)
         .path("/#/sign-in")
