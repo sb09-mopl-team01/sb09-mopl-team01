@@ -1,6 +1,5 @@
 package io.mopl.domain.directmessage.controller;
 
-import io.mopl.domain.directmessage.dto.DirectMessageDto;
 import io.mopl.domain.directmessage.dto.DirectMessageSendRequest;
 import io.mopl.domain.directmessage.service.ConversationService;
 import io.mopl.global.exception.BaseException;
@@ -11,7 +10,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
@@ -19,10 +17,7 @@ import org.springframework.stereotype.Controller;
 @RequiredArgsConstructor
 public class DirectMessageWebSocketController {
 
-  private static final String DIRECT_MESSAGE_TOPIC = "/sub/conversations/%s/direct-messages";
-
   private final ConversationService conversationService;
-  private final SimpMessagingTemplate messagingTemplate;
 
   @MessageMapping("/conversations/{conversationId}/direct-messages")
   public void sendDirectMessage(
@@ -35,12 +30,11 @@ public class DirectMessageWebSocketController {
       throw new BaseException(ErrorCode.INVALID_INPUT);
     }
 
-    DirectMessageDto message = conversationService.sendDirectMessage(
+    conversationService.sendDirectMessage(
         senderId,
         conversationId,
         request
     );
-    messagingTemplate.convertAndSend(topic(conversationId), message);
   }
 
   private UUID resolveSenderId(Principal principal) {
@@ -55,7 +49,4 @@ public class DirectMessageWebSocketController {
     throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
   }
 
-  private String topic(UUID conversationId) {
-    return DIRECT_MESSAGE_TOPIC.formatted(conversationId);
-  }
 }
