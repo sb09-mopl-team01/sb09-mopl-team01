@@ -10,7 +10,6 @@ import org.springframework.data.elasticsearch.repository.config.EnableElasticsea
 
 import java.time.Duration;
 
-//@Profile("prod")
 @Configuration
 @EnableElasticsearchRepositories(basePackages = {
     "io.mopl.domain.user.repository.search"
@@ -20,24 +19,15 @@ public class OpenSearchConfig extends AbstractOpenSearchConfiguration {
   @Value("${spring.opensearch.uris}")
   private String opensearchUri;
 
-  @Value("${spring.opensearch.username}")
-  private String username;
-
-  @Value("${spring.opensearch.password}")
-  private String password;
-
   @Override
   public RestHighLevelClient opensearchClient() {
     String hostAndPort = opensearchUri.replace("https://", "").replace("http://", "");
 
-    var builder = ClientConfiguration.builder().connectedTo(hostAndPort);
+    var builder = ClientConfiguration.builder()
+        .connectedTo(hostAndPort);
 
     if (opensearchUri.startsWith("https")) {
       builder.usingSsl();
-    }
-
-    if (username != null && !username.isBlank()) {
-      builder.withBasicAuth(username, password);
     }
 
     ClientConfiguration clientConfiguration = builder

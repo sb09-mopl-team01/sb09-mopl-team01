@@ -108,8 +108,6 @@ spring:
 
   opensearch:
     uris: ${OPENSEARCH_URI:http://localhost:9200}
-    username: ${OPENSEARCH_USERNAME:""}
-    password: ${OPENSEARCH_PASSWORD:""}
 
 logging:
   file:
