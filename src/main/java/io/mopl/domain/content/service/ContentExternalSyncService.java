@@ -19,6 +19,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
@@ -34,6 +35,7 @@ public class ContentExternalSyncService {
 
   private final List<ExternalContentClient> externalContentClients;
   private final ContentRepository contentRepository;
+  private final ContentSearchIndexService contentSearchIndexService;
   private final Clock clock;
   private final PlatformTransactionManager transactionManager;
 
@@ -55,6 +57,7 @@ public class ContentExternalSyncService {
       if (chunkResult == null) {
         throw new IllegalStateException("외부 콘텐츠 청크 동기화 결과가 비어 있습니다.");
       }
+      contentSearchIndexService.indexAll(chunkResult.createdContentIds());
       createdCount += chunkResult.createdCount();
       skippedCount += chunkResult.skippedCount();
     }
@@ -186,7 +189,11 @@ public class ContentExternalSyncService {
           savedContent.getExternalId()
       );
     }
-    return new SyncChunkResult(savedContents.size(), skippedCount);
+    return new SyncChunkResult(
+        savedContents.size(),
+        skippedCount,
+        savedContents.stream().map(Content::getId).toList()
+    );
   }
 
   private Content toContent(ExternalContentCandidate candidate, Instant syncedAt) {
@@ -262,7 +269,11 @@ public class ContentExternalSyncService {
   ) {
   }
 
-  private record SyncChunkResult(int createdCount, int skippedCount) {
+  private record SyncChunkResult(
+      int createdCount,
+      int skippedCount,
+      List<UUID> createdContentIds
+  ) {
   }
 
   private record ExternalContentKey(ContentSource source, ContentType type, String externalId) {

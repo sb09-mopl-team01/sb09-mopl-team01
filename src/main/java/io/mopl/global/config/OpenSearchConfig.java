@@ -13,7 +13,8 @@ import java.time.Duration;
 //@Profile("prod")
 @Configuration
 @EnableElasticsearchRepositories(basePackages = {
-    "io.mopl.domain.user.repository.search"
+    "io.mopl.domain.user.repository.search",
+    "io.mopl.domain.content.repository.search"
 })
 public class OpenSearchConfig extends AbstractOpenSearchConfiguration {
 

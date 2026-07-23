@@ -1,6 +1,7 @@
 package io.mopl.domain.content.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.Mockito.mock;
 
 import io.mopl.domain.content.dto.ExternalContentSyncResult;
 import io.mopl.domain.content.entity.Content;
@@ -93,6 +94,7 @@ class ContentExternalSyncServiceIntegrationTest {
     ContentExternalSyncService service = new ContentExternalSyncService(
         List.of(client),
         failOnSecondLookup,
+        mock(ContentSearchIndexService.class),
         Clock.fixed(FIRST_SYNCED_AT, ZoneOffset.UTC),
         transactionManager
     );
@@ -159,6 +161,7 @@ class ContentExternalSyncServiceIntegrationTest {
     return new ContentExternalSyncService(
         List.of(client),
         contentRepository,
+        mock(ContentSearchIndexService.class),
         Clock.fixed(syncedAt, ZoneOffset.UTC),
         transactionManager
     );

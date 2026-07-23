@@ -14,6 +14,7 @@ import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.domain.content.repository.ContentRepository;
+import io.mopl.domain.content.repository.search.ContentSearchRepository;
 import io.mopl.global.config.BaseIntegrationTest;
 import jakarta.persistence.EntityManager;
 import java.nio.charset.StandardCharsets;
@@ -33,6 +34,7 @@ import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
@@ -53,6 +55,9 @@ import org.springframework.transaction.support.TransactionTemplate;
 class ContentAdminControllerIntegrationTest extends BaseIntegrationTest {
 
   private static final Path TEST_THUMBNAIL_PATH = Path.of("build/test-content-thumbnails");
+
+  @MockitoBean
+  private ContentSearchRepository contentSearchRepository;
 
   @Autowired
   private MockMvc mockMvc;
