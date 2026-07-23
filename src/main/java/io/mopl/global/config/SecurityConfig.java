@@ -9,15 +9,18 @@ import io.mopl.global.security.handler.MoplLogoutHandler;
 import io.mopl.global.security.handler.MoplLogoutSuccessHandler;
 import io.mopl.global.security.handler.SpaCsrfTokenRequestHandler;
 import io.mopl.global.security.jwt.JwtAuthenticationFilter;
+import io.mopl.global.security.oauth.RedisOAuth2AuthorizationRequestRepository;
 import io.mopl.global.security.oauth.handler.OAuth2LoginFailureHandler;
 import io.mopl.global.security.oauth.handler.OAuth2LoginSuccessHandler;
 import io.mopl.global.security.oauth.service.MoplOAuth2UserService;
 import jakarta.servlet.DispatcherType;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Lazy;
 import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
@@ -36,7 +39,6 @@ import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
-import org.springframework.security.config.annotation.web.configurers.*;
 
 
 @Configuration
@@ -54,6 +56,9 @@ public class SecurityConfig {
   private final MoplOAuth2UserService moplOAuth2UserService;
   private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
   private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+  @Lazy
+  @Autowired
+  private RedisOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
 
   @Value("${mopl.cors.allowed-origins}")
   private List<String> allowedOrigins;
@@ -119,7 +124,11 @@ public class SecurityConfig {
   }
 
   private void configureOAuth2Login(OAuth2LoginConfigurer<HttpSecurity> oauth2) {
-    oauth2.userInfoEndpoint(userInfo -> userInfo.userService(moplOAuth2UserService))
+    oauth2
+        .authorizationEndpoint(endpoint -> endpoint
+            .authorizationRequestRepository(cookieAuthorizationRequestRepository)
+        )
+        .userInfoEndpoint(userInfo -> userInfo.userService(moplOAuth2UserService))
         .successHandler(oAuth2LoginSuccessHandler)
         .failureHandler(oAuth2LoginFailureHandler);
   }

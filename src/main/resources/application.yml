@@ -109,6 +109,12 @@ spring:
   opensearch:
     uris: ${OPENSEARCH_URI:http://localhost:9200}
 
+  cache:
+    type: redis
+    cache-names:
+      - user
+      - follow
+
 logging:
   file:
     name: ${LOG_FILE_NAME:logs/mopl.log}
