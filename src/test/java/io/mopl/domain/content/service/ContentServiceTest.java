@@ -70,6 +70,8 @@ class ContentServiceTest {
 
   @Mock
   private DomainEventPublisher eventPublisher;
+
+  @Mock
   private ContentSearchQueryService contentSearchQueryService;
 
   @Mock
