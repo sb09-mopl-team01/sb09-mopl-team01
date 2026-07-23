@@ -44,6 +44,8 @@ public class ContentService {
   private final ContentMapper contentMapper;
   private final ContentThumbnailService contentThumbnailService;
   private final DomainEventPublisher eventPublisher;
+  private final ContentSearchQueryService contentSearchQueryService;
+  private final ContentSearchIndexService contentSearchIndexService;
   private final PlatformTransactionManager transactionManager;
   private final Clock clock;
 
@@ -53,12 +55,14 @@ public class ContentService {
       uploadedThumbnail = contentThumbnailService.uploadRequired(thumbnail);
       ContentThumbnailFile thumbnailFile = uploadedThumbnail;
 
-      return executeInTransaction(() -> {
+      ContentDto createdContent = executeInTransaction(() -> {
         Content content = contentMapper.toEntity(request, thumbnailFile);
         Content savedContent = contentRepository.save(content);
         log.info("Content create completed. contentId={}", savedContent.getId());
         return contentMapper.toDto(savedContent, contentStatsService.getStats(savedContent));
       });
+      contentSearchIndexService.index(createdContent.id());
+      return createdContent;
     } catch (IllegalArgumentException e) {
       deleteThumbnail(uploadedThumbnail);
       log.warn("Content create rejected. title={}", request == null ? null : request.title());
@@ -92,16 +96,26 @@ public class ContentService {
       String sortBy,
       SortDirection sortDirection
   ) {
-    CursorResponse<UUID> contentIds = contentRepository.findContentIdsByCursor(
-        typeEqual,
-        keywordLike,
-        tagsIn,
-        cursor,
-        idAfter,
-        limit,
-        sortBy,
-        sortDirection
-    );
+    CursorResponse<UUID> contentIds = contentSearchQueryService.search(
+            typeEqual,
+            keywordLike,
+            tagsIn,
+            cursor,
+            idAfter,
+            limit,
+            sortBy,
+            sortDirection
+        )
+        .orElseGet(() -> contentRepository.findContentIdsByCursor(
+            typeEqual,
+            keywordLike,
+            tagsIn,
+            cursor,
+            idAfter,
+            limit,
+            sortBy,
+            sortDirection
+        ));
 
     Map<UUID, ContentCacheSnapshot> cachedByContentId = contentCacheService.findAll(contentIds.data());
     List<UUID> missingContentIds = contentIds.data().stream()
@@ -194,6 +208,7 @@ public class ContentService {
     }
 
     contentCacheService.evictAll(contentId);
+    contentSearchIndexService.index(contentId);
     if (outcome.thumbnailChanged()) {
       contentThumbnailService.delete(outcome.previousThumbnailKey());
     }
@@ -207,6 +222,7 @@ public class ContentService {
       eventPublisher.publish(new ContentSoftDeletedEvent(contentId));
     });
     contentCacheService.evictAll(contentId);
+    contentSearchIndexService.delete(contentId);
     log.info("Content delete completed. contentId={}", contentId);
   }
 

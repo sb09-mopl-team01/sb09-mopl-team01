@@ -37,7 +37,7 @@ public class PlaylistRepositoryImpl implements PlaylistRepositoryCustom {
 
     return query
         .where(
-            containsKeyword(keyword),
+            keywordLike(keyword),
             eqOwnerId(ownerId),
             cursorCondition(cursor, idAfter, sortDirection, sortBy)
         )
