@@ -45,7 +45,11 @@ public class HttpCookieOAuth2AuthorizationRequestRepository implements Authoriza
   @Override
   public OAuth2AuthorizationRequest removeAuthorizationRequest(HttpServletRequest request,
       HttpServletResponse response) {
-    return this.loadAuthorizationRequest(request);
+    OAuth2AuthorizationRequest authRequest = this.loadAuthorizationRequest(request);
+
+    removeAuthorizationRequestCookies(request, response);
+
+    return authRequest;
   }
 
   public void removeAuthorizationRequestCookies(HttpServletRequest request, HttpServletResponse response) {
@@ -91,6 +95,10 @@ public class HttpCookieOAuth2AuthorizationRequestRepository implements Authoriza
   }
 
   private <T> T deserialize(Cookie cookie, Class<T> cls) {
-    return cls.cast(SerializationUtils.deserialize(Base64.getUrlDecoder().decode(cookie.getValue())));
+    try {
+      return cls.cast(SerializationUtils.deserialize(Base64.getUrlDecoder().decode(cookie.getValue())));
+    } catch (Exception e) {
+      return null;
+    }
   }
 }
