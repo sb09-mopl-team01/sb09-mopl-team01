@@ -111,6 +111,12 @@ spring:
     username: ${OPENSEARCH_USERNAME:""}
     password: ${OPENSEARCH_PASSWORD:""}
 
+  cache:
+    type: redis
+    cache-names:
+      - user
+      - follow
+
 logging:
   file:
     name: ${LOG_FILE_NAME:logs/mopl.log}
