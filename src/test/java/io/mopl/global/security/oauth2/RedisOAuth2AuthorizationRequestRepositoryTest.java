@@ -75,7 +75,6 @@ class RedisOAuth2AuthorizationRequestRepositoryTest {
   @Test
   @DisplayName("쿠키의 ID를 통해 Redis에서 인증 요청 데이터를 정상적으로 복원한다")
   void loadAuthorizationRequest() {
-    // given
     String testId = "test-uuid-1234";
     request.setCookies(new Cookie(RedisOAuth2AuthorizationRequestRepository.OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME, testId));
 
@@ -107,14 +106,15 @@ class RedisOAuth2AuthorizationRequestRepositoryTest {
         .authorizationUri("https://test.com/auth")
         .build();
     String serializedData = Base64.getUrlEncoder().encodeToString(SerializationUtils.serialize(mockAuthRequest));
-    when(valueOperations.get("oauth2_auth_request:" + testId)).thenReturn(serializedData);
+
+    when(valueOperations.getAndDelete("oauth2_auth_request:" + testId)).thenReturn(serializedData);
 
     OAuth2AuthorizationRequest removedRequest = repository.removeAuthorizationRequest(request, response);
 
     assertThat(removedRequest).isNotNull();
     assertThat(removedRequest.getState()).isEqualTo("test-state");
 
-    verify(redisTemplate).delete("oauth2_auth_request:" + testId);
+    verify(valueOperations).getAndDelete("oauth2_auth_request:" + testId);
 
     Cookie deletedCookie = response.getCookie(RedisOAuth2AuthorizationRequestRepository.OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
     assertThat(deletedCookie).isNotNull();
