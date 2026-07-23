@@ -30,6 +30,7 @@ public class ReviewRepositoryImpl implements ReviewRepositoryCustom {
     return queryFactory
         .selectFrom(review)
         .where(
+            review.content.deletedAt.isNull(),
             contentIdEq(contentId),
             cursorCondition(cursor, idAfter, sortBy, sortDirection)
         )

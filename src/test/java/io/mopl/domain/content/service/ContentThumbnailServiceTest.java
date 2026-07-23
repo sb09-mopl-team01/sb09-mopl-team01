@@ -1,6 +1,7 @@
 package io.mopl.domain.content.service;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -48,5 +49,14 @@ class ContentThumbnailServiceTest {
         .doesNotThrowAnyException();
 
     verify(contentThumbnailStorage).delete("thumbnail.jpg");
+  }
+
+  @Test
+  void deleteOrThrowPropagatesStorageDeletionFailureForBatchRetry() {
+    IllegalStateException failure = new IllegalStateException("storage failed");
+    doThrow(failure).when(contentThumbnailStorage).delete("thumbnail.jpg");
+
+    assertThatThrownBy(() -> contentThumbnailService.deleteOrThrow("thumbnail.jpg"))
+        .isSameAs(failure);
   }
 }
