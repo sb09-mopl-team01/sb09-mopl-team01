@@ -35,25 +35,30 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
 
     if (emailLike != null && !emailLike.isBlank()) {
       BoolQueryBuilder searchCriteria = QueryBuilders.boolQuery()
-          .should(QueryBuilders.wildcardQuery("email.keyword", "*" + emailLike + "*").caseInsensitive(true))
-          .should(QueryBuilders.wildcardQuery("name.keyword", "*" + emailLike + "*").caseInsensitive(true))
-          .should(QueryBuilders.wildcardQuery("initials", "*" + emailLike + "*").caseInsensitive(true));
-
+          .should(QueryBuilders.wildcardQuery("email.keyword", "*" + emailLike.trim() + "*").caseInsensitive(true))
+          .should(QueryBuilders.wildcardQuery("name.keyword", "*" + emailLike.trim() + "*").caseInsensitive(true))
+          .should(QueryBuilders.wildcardQuery("initials", "*" + emailLike.trim() + "*").caseInsensitive(true));
       boolQuery.must(searchCriteria);
     }
 
     if (roleEqual != null && !roleEqual.isBlank()) {
-      boolQuery.must(QueryBuilders.termQuery("role", roleEqual.toUpperCase()));
+      boolQuery.must(QueryBuilders.termQuery("role", roleEqual.trim()).caseInsensitive(true));
     }
     if (isLocked != null) {
       boolQuery.must(QueryBuilders.termQuery("isLocked", isLocked));
     }
 
-    SortOrder order = (sortDirection == SortDirection.ASCENDING)
-        ? SortOrder.ASC
-        : SortOrder.DESC;
+    if (boolQuery.must().isEmpty() && boolQuery.filter().isEmpty() && boolQuery.should().isEmpty()) {
+      boolQuery.must(QueryBuilders.matchAllQuery());
+    }
 
-    String sortField = getSortField(sortBy);
+    String actualSortBy = (sortBy == null || sortBy.isBlank()) ? "name" : sortBy.trim();
+    String sortField = getSortField(actualSortBy);
+
+    SortOrder order = SortOrder.DESC;
+    if (sortDirection != null && sortDirection.name().toUpperCase().contains("ASC")) {
+      order = SortOrder.ASC;
+    }
 
     NativeSearchQuery searchQuery = new NativeSearchQueryBuilder()
         .withQuery(boolQuery)
