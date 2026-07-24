@@ -21,7 +21,7 @@ public class DirectMessageWebSocketEventHandler {
   private final ConversationService conversationService;
   private final SimpMessagingTemplate messagingTemplate;
 
-  @Async
+  @Async("directMessageRealtimeExecutor")
   @TransactionalEventListener(phase = TransactionPhase.AFTER_COMMIT)
   public void handleDirectMessageSent(DirectMessageSentEvent event) {
     try {
