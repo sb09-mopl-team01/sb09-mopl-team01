@@ -7,6 +7,8 @@ import static org.mockito.Mockito.when;
 
 import io.mopl.domain.contentroomchat.dto.ContentChatDto;
 import io.mopl.domain.contentroomchat.dto.ContentChatSendRequest;
+import io.mopl.domain.contentroomchat.realtime.ContentRoomChatRealtimeEvent;
+import io.mopl.domain.contentroomchat.realtime.ContentRoomChatRealtimePublisher;
 import io.mopl.domain.contentroomchat.service.ContentRoomChatService;
 import io.mopl.domain.user.dto.response.UserSummary;
 import io.mopl.domain.user.entity.User;
@@ -17,16 +19,15 @@ import java.security.Principal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.test.util.ReflectionTestUtils;
 
 class ContentRoomChatWebSocketControllerTest {
 
   private final ContentRoomChatService contentRoomChatService = mock(ContentRoomChatService.class);
-  private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+  private final ContentRoomChatRealtimePublisher realtimePublisher = mock(ContentRoomChatRealtimePublisher.class);
   private final ContentRoomChatWebSocketController controller =
-      new ContentRoomChatWebSocketController(contentRoomChatService, messagingTemplate);
+      new ContentRoomChatWebSocketController(contentRoomChatService, realtimePublisher);
 
   private UUID senderId;
   private UUID contentId;
@@ -51,7 +52,7 @@ class ContentRoomChatWebSocketControllerTest {
   }
 
   @Test
-  void sendMessageBroadcastsContentChatDtoToContentChatTopic() {
+  void sendMessagePublishesContentChatDtoToRealtimeRelay() {
     ContentChatSendRequest request = new ContentChatSendRequest("hello");
     ContentChatDto response = new ContentChatDto(
         UserSummary.builder()
@@ -68,10 +69,7 @@ class ContentRoomChatWebSocketControllerTest {
     controller.sendMessage(contentId, request, principal);
 
     verify(contentRoomChatService).createChatMessage(senderId, contentId, "hello");
-    verify(messagingTemplate).convertAndSend(
-        "/sub/contents/%s/chat".formatted(contentId),
-        response
-    );
+    verify(realtimePublisher).publish(new ContentRoomChatRealtimeEvent(contentId, response));
   }
 
   @Test
