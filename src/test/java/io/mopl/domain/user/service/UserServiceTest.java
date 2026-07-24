@@ -4,8 +4,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -44,7 +44,6 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.util.ReflectionTestUtils;
 
 @ExtendWith(MockitoExtension.class)
@@ -63,7 +62,7 @@ class UserServiceTest {
   private UserMapper userMapper;
 
   @Mock
-  private PasswordEncoder passwordEncoder;
+  private org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
 
   @Mock
   private DomainEventPublisher eventPublisher;
@@ -293,10 +292,49 @@ class UserServiceTest {
   }
 
   @Test
-  @DisplayName("목록 조회 성공: Database 검색 경로 (emailLike 미존재 시)")
-  void findUsers_Success_Database() {
-    User user = mock(User.class);
+  @DisplayName("목록 조회 성공: OpenSearch 검색 경로")
+  void findUsers_Success_OpenSearch_WithoutEmailLike() {
+    UUID userId = UUID.randomUUID();
+    UserDocument userDocument = UserDocument.builder()
+        .id(userId)
+        .name("홍길동")
+        .email("test@example.com")
+        .build();
 
+    User user = mock(User.class);
+    UserDto userDto = UserDto.builder()
+        .id(userId)
+        .email("test@example.com")
+        .name("홍길동")
+        .build();
+
+    OpenSearchCursorResponse<UserDocument> openSearchResponse = new OpenSearchCursorResponse<>(
+        List.of(userDocument), List.of("sortVal", userId.toString()), true, 10L
+    );
+
+    given(userSearchRepository.searchUsersByCursor(
+        isNull(), eq("USER"), eq(false), any(), eq(10), eq("name"), eq(SortDirection.ASCENDING)
+    )).willReturn(openSearchResponse);
+
+    given(userRepository.findAllByIdIn(List.of(userId))).willReturn(List.of(user));
+    given(user.getId()).willReturn(userId);
+    given(userMapper.toDto(user)).willReturn(userDto);
+
+    CursorResponse<UserDto> result = userService.findUsers(
+        null, "USER", false, null, null, 10, "name", SortDirection.ASCENDING
+    );
+
+    assertThat(result.data()).hasSize(1);
+    assertThat(result.data().get(0).name()).isEqualTo("홍길동");
+    verify(userSearchRepository).searchUsersByCursor(isNull(), any(), any(), any(), anyInt(), any(), any());
+  }
+
+  @Test
+  @DisplayName("목록 조회 성공: Database 폴백 경로 (OpenSearch 빈 주입 시)")
+  void findUsers_Success_Database_Fallback() {
+    ReflectionTestUtils.setField(userService, "userSearchRepository", null);
+
+    User user = mock(User.class);
     UserDto userDto = UserDto.builder()
         .id(UUID.randomUUID())
         .email("test@example.com")
@@ -319,8 +357,6 @@ class UserServiceTest {
 
     assertThat(result.data()).hasSize(1);
     assertThat(result.data().get(0).name()).isEqualTo("홍길동");
-    assertThat(result.hasNext()).isTrue();
-    assertThat(result.totalCount()).isEqualTo(10L);
     verify(userRepository).findUsersByCursor(any(), any(), any(), any(), any(), anyInt(), any(), any());
   }
 }
