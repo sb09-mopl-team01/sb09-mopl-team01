@@ -4,6 +4,7 @@ import io.mopl.domain.auth.repository.RefreshTokenRepository;
 import io.mopl.domain.auth.service.TempPasswordService;
 import io.mopl.domain.user.document.UserDocument;
 import io.mopl.domain.user.repository.search.UserSearchRepository;
+import io.mopl.global.util.InitialUtils;
 import java.time.Duration;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -75,7 +76,8 @@ public class UserEventHandler {
     try {
       UserDocument document = UserDocument.builder() 
           .id(event.userId()) 
-          .name(event.name()) 
+          .name(event.name())
+          .initials(InitialUtils.extractInitial(event.name()))
           .email(event.email()) 
           .role(event.role()) 
           .isLocked(event.isLocked()) 
