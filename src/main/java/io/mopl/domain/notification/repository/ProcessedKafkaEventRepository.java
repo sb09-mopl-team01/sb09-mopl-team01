@@ -1,7 +1,8 @@
 package io.mopl.domain.notification.repository;
 
-import java.time.Instant;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.UUID;
 import javax.sql.DataSource;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -36,10 +37,11 @@ public class ProcessedKafkaEventRepository {
    */
   public boolean registerIfAbsent(String eventKey, Instant processedAt) {
     UUID id = UUID.randomUUID();
+    Timestamp jdbcProcessedAt = Timestamp.from(processedAt);
     if (h2) {
-      return jdbcTemplate.update(H2_INSERT_IF_ABSENT, id, eventKey, processedAt, eventKey) == 1;
+      return jdbcTemplate.update(H2_INSERT_IF_ABSENT, id, eventKey, jdbcProcessedAt, eventKey) == 1;
     }
-    return jdbcTemplate.update(INSERT_IF_ABSENT, id, eventKey, processedAt) == 1;
+    return jdbcTemplate.update(INSERT_IF_ABSENT, id, eventKey, jdbcProcessedAt) == 1;
   }
 
   private boolean isH2(DataSource dataSource) {

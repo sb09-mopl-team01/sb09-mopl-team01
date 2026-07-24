@@ -1,4 +1,4 @@
-package io.mopl.domain.user.repository.search;
+package io.mopl.domain.user.repository;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -8,6 +8,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
 
 import io.mopl.domain.user.document.UserDocument;
+import io.mopl.domain.user.repository.search.UserSearchRepositoryCustomImpl;
 import io.mopl.global.response.OpenSearchCursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.util.List;
@@ -23,7 +24,8 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+
+import org.springframework.data.elasticsearch.core.query.Query;
 
 @ExtendWith(MockitoExtension.class)
 class UserSearchRepositoryCustomImplTest {
@@ -50,9 +52,9 @@ class UserSearchRepositoryCustomImplTest {
     given(searchHitsMock.stream()).willReturn(Stream.of(searchHitMock));
     given(searchHitsMock.getSearchHits()).willReturn(List.of(searchHitMock));
 
-    given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.search(any(Query.class), eq(UserDocument.class)))
         .willReturn(searchHitsMock);
-    given(elasticsearchOperations.count(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.count(any(Query.class), eq(UserDocument.class)))
         .willReturn(1L);
 
     OpenSearchCursorResponse<UserDocument> response = userSearchRepositoryCustomImpl.searchUsersByCursor(
@@ -64,7 +66,7 @@ class UserSearchRepositoryCustomImplTest {
     assertThat(response.hasNext()).isFalse();
     assertThat(response.totalCount()).isEqualTo(1L);
 
-    ArgumentCaptor<CriteriaQuery> queryCaptor = ArgumentCaptor.forClass(CriteriaQuery.class);
+    ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
     verify(elasticsearchOperations).search(queryCaptor.capture(), eq(UserDocument.class));
     assertThat(queryCaptor.getValue().getMaxResults()).isEqualTo(limit + 1);
   }
@@ -87,9 +89,9 @@ class UserSearchRepositoryCustomImplTest {
     given(searchHitsMock.stream()).willReturn(Stream.of(searchHitMock1, searchHitMock2));
     given(searchHitsMock.getSearchHits()).willReturn(List.of(searchHitMock1, searchHitMock2));
 
-    given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.search(any(Query.class), eq(UserDocument.class)))
         .willReturn(searchHitsMock);
-    given(elasticsearchOperations.count(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.count(any(Query.class), eq(UserDocument.class)))
         .willReturn(2L);
 
     OpenSearchCursorResponse<UserDocument> response = userSearchRepositoryCustomImpl.searchUsersByCursor(
@@ -103,7 +105,7 @@ class UserSearchRepositoryCustomImplTest {
   }
 
   @Test
-  @DisplayName("lastSortValues가 존재하면 CriteriaQuery에 searchAfter가 정상적으로 적용된다")
+  @DisplayName("lastSortValues가 존재하면 Query에 searchAfter가 정상적으로 적용된다")
   void searchUsersByCursor_WithLastSortValues_AppliesSearchAfter() {
     int limit = 10;
     List<Object> lastSortValues = List.of("1700000000000", "some-uuid");
@@ -111,16 +113,16 @@ class UserSearchRepositoryCustomImplTest {
     SearchHits<UserDocument> searchHitsMock = mock(SearchHits.class);
     given(searchHitsMock.stream()).willReturn(Stream.empty());
 
-    given(elasticsearchOperations.search(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.search(any(Query.class), eq(UserDocument.class)))
         .willReturn(searchHitsMock);
-    given(elasticsearchOperations.count(any(CriteriaQuery.class), eq(UserDocument.class)))
+    given(elasticsearchOperations.count(any(Query.class), eq(UserDocument.class)))
         .willReturn(0L);
 
     userSearchRepositoryCustomImpl.searchUsersByCursor(
         null, null, null, lastSortValues, limit, "name", SortDirection.ASCENDING
     );
 
-    ArgumentCaptor<CriteriaQuery> queryCaptor = ArgumentCaptor.forClass(CriteriaQuery.class);
+    ArgumentCaptor<Query> queryCaptor = ArgumentCaptor.forClass(Query.class);
     verify(elasticsearchOperations).search(queryCaptor.capture(), eq(UserDocument.class));
 
     assertThat(queryCaptor.getValue().getSearchAfter()).isEqualTo(lastSortValues);
