@@ -171,7 +171,7 @@ public class UserService {
     log.info("User Multiple Read Started. emailLike={}, roleEqual={}, isLocked={}, cursor={}, idAfter={}, limit={}, sortBy={}, sortDirection={}",
         emailLike, roleEqual, isLocked, cursor, idAfter, limit, sortBy, sortDirection);
 
-    if (shouldUseOpenSearch(emailLike)) {
+    if (shouldUseOpenSearch()) {
       return searchUsersViaOpenSearch(emailLike, roleEqual, isLocked, cursor, limit, sortBy, sortDirection);
     }
 
@@ -186,8 +186,8 @@ public class UserService {
         });
   }
 
-  private boolean shouldUseOpenSearch(String emailLike) {
-    return (emailLike != null && !emailLike.isBlank()) && (userSearchRepository != null);
+  private boolean shouldUseOpenSearch() {
+    return userSearchRepository != null;
   }
 
   private CursorResponse<UserDto> searchUsersViaOpenSearch(
