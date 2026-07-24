@@ -36,6 +36,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.test.util.ReflectionTestUtils;
+import java.time.Instant;
 
 @ExtendWith(MockitoExtension.class)
 class ReviewServiceTest {
@@ -173,5 +174,94 @@ class ReviewServiceTest {
 
     verify(reviewRepository).delete(review);
     verify(eventPublisher).publishEvent(new ReviewStatsChangedEvent(contentId));
+  }
+
+  @Test
+  @DisplayName("리뷰 수정 실패: 작성자가 아닌 유저의 요청")
+  void updateReview_Fail_Unauthorized() {
+    UUID userId = UUID.randomUUID();
+    UUID authorId = UUID.randomUUID();
+    UUID reviewId = UUID.randomUUID();
+
+    ReviewUpdateRequest request = new ReviewUpdateRequest();
+
+    User author = mock(User.class);
+    given(author.getId()).willReturn(authorId);
+
+    Review review = mock(Review.class);
+    given(review.getAuthor()).willReturn(author);
+    given(reviewRepository.findActiveById(reviewId)).willReturn(Optional.of(review));
+
+    BaseException ex = assertThrows(BaseException.class,
+        () -> reviewService.updateReview(userId, reviewId, request));
+
+    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  @DisplayName("리뷰 삭제 실패: 작성자가 아닌 유저의 요청")
+  void deleteReview_Fail_Unauthorized() {
+    UUID userId = UUID.randomUUID();
+    UUID authorId = UUID.randomUUID();
+    UUID reviewId = UUID.randomUUID();
+
+    User author = mock(User.class);
+    given(author.getId()).willReturn(authorId);
+
+    Review review = mock(Review.class);
+    given(review.getAuthor()).willReturn(author);
+    given(reviewRepository.findActiveById(reviewId)).willReturn(Optional.of(review));
+
+    BaseException ex = assertThrows(BaseException.class,
+        () -> reviewService.deleteReview(userId, reviewId));
+
+    assertThat(ex.getErrorCode()).isEqualTo(ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  @DisplayName("리뷰 목록 조회 성공: 다음 페이지가 존재할 때")
+  void findReviews_Success_HasNext_SortByRating() {
+    UUID contentId = UUID.randomUUID();
+    int limit = 1;
+
+    Review mockReview = mock(Review.class);
+    given(mockReview.getId()).willReturn(UUID.randomUUID());
+    given(mockReview.getRating()).willReturn(4.5);
+
+    given(reviewRepository.findReviewsByCursor(
+        any(UUID.class), any(), any(), anyInt(), anyString(), anyString()))
+        .willReturn(List.of(mockReview));
+    given(reviewRepository.countVisibleByContentId(contentId)).willReturn(10L);
+
+    CursorResponse<ReviewDto> response = reviewService.findReviews(
+        contentId, null, null, limit, "DESCENDING", "rating"
+    );
+
+    assertThat(response.hasNext()).isTrue();
+    assertThat(response.nextCursor()).isEqualTo("4.5");
+  }
+
+  @Test
+  @DisplayName("리뷰 목록 조회 성공: 다음 페이지가 존재할 때")
+  void findReviews_Success_HasNext_SortByCreatedAt() {
+    UUID contentId = UUID.randomUUID();
+    int limit = 1;
+    Instant now = Instant.now();
+
+    Review mockReview = mock(Review.class);
+    given(mockReview.getId()).willReturn(UUID.randomUUID());
+    given(mockReview.getCreatedAt()).willReturn(now);
+
+    given(reviewRepository.findReviewsByCursor(
+        any(UUID.class), any(), any(), anyInt(), anyString(), anyString()))
+        .willReturn(List.of(mockReview));
+    given(reviewRepository.countVisibleByContentId(contentId)).willReturn(10L);
+
+    CursorResponse<ReviewDto> response = reviewService.findReviews(
+        contentId, null, null, limit, "DESCENDING", "createdAt"
+    );
+
+    assertThat(response.hasNext()).isTrue();
+    assertThat(response.nextCursor()).isEqualTo(now.toString());
   }
 }

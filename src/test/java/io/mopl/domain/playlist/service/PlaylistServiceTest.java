@@ -254,4 +254,200 @@ class PlaylistServiceTest {
           && contentAddedEvent.occurredAt() != null;
     }));
   }
+
+  @Test
+  @DisplayName("플레이리스트 삭제 성공")
+  void deletePlaylist_Success() {
+    UUID userId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    User owner = User.builder().name("Owner").build();
+    ReflectionTestUtils.setField(owner, "id", userId);
+    Playlist playlist = Playlist.create(owner, "Title", "Desc");
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+
+    playlistService.deletePlaylist(userId, playlistId);
+
+    verify(playlistContentRepository).deleteAllByPlaylistId(playlistId);
+    verify(playlistSubscriptionRepository).deleteAllByPlaylistId(playlistId);
+    verify(playlistRepository).delete(playlist);
+  }
+
+  @Test
+  @DisplayName("플레이리스트 구독 취소 성공")
+  void unsubscribePlaylist_Success() {
+    UUID subscriberId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    User owner = User.builder().name("Owner").build();
+    ReflectionTestUtils.setField(owner, "id", UUID.randomUUID());
+    User subscriber = User.builder().name("Subscriber").build();
+    ReflectionTestUtils.setField(subscriber, "id", subscriberId);
+
+    Playlist playlist = Playlist.create(owner, "Title", "Desc");
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+
+    PlaylistSubscription subscription = new PlaylistSubscription(playlist, subscriber);
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+    given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
+    given(playlistSubscriptionRepository.findByPlaylistAndUser(playlist, subscriber))
+        .willReturn(Optional.of(subscription));
+
+    playlistService.unsubscribePlaylist(subscriberId, playlistId);
+
+    verify(playlistSubscriptionRepository).delete(subscription);
+    verify(playlistRepository).decreaseSubscriberCount(playlistId);
+  }
+
+  @Test
+  @DisplayName("구독하지 않은 플레이리스트 구독 취소 시도 시 INVALID_INPUT 예외 발생")
+  void unsubscribePlaylist_NotSubscribed_Fail() {
+    UUID subscriberId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    User subscriber = User.builder().name("Subscriber").build();
+    ReflectionTestUtils.setField(subscriber, "id", subscriberId);
+    Playlist playlist = Playlist.create(User.builder().build(), "Title", "Desc");
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+    given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
+    given(playlistSubscriptionRepository.findByPlaylistAndUser(playlist, subscriber))
+        .willReturn(Optional.empty());
+
+    assertThatThrownBy(() -> playlistService.unsubscribePlaylist(subscriberId, playlistId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.INVALID_INPUT);
+  }
+
+  @Test
+  @DisplayName("플레이리스트에 이미 존재하는 콘텐츠 추가 시도 시 DUPLICATE_RESOURCE 예외 발생")
+  void addContentToPlaylist_Duplicate_Fail() {
+    UUID ownerId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    User owner = User.builder().name("Owner").build();
+    ReflectionTestUtils.setField(owner, "id", ownerId);
+    Playlist playlist = Playlist.create(owner, "Title", "Desc");
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+    Content content = Content.createManual(io.mopl.domain.content.entity.ContentType.MOVIE, "Title", "Desc", "url", java.util.Set.of("테스트태그"));
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+    given(playlistContentRepository.existsByPlaylistAndContent(playlist, content)).willReturn(true);
+
+    assertThatThrownBy(() -> playlistService.addContentToPlaylist(ownerId, playlistId, contentId))
+        .isInstanceOf(BaseException.class)
+        .hasFieldOrPropertyWithValue("errorCode", ErrorCode.DUPLICATE_RESOURCE);
+  }
+
+  @Test
+  @DisplayName("플레이리스트에서 콘텐츠 삭제 성공")
+  void removeContentFromPlaylist_Success() {
+    UUID ownerId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    User owner = User.builder().name("Owner").build();
+    ReflectionTestUtils.setField(owner, "id", ownerId);
+    Playlist playlist = Playlist.create(owner, "Title", "Desc");
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+    Content content = Content.createManual(io.mopl.domain.content.entity.ContentType.MOVIE, "Title", "Desc", "url", java.util.Set.of("테스트태그"));
+
+    PlaylistContent playlistContent = new PlaylistContent(playlist, content);
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+    given(contentRepository.findById(contentId)).willReturn(Optional.of(content));
+    given(playlistContentRepository.findByPlaylistAndContent(playlist, content))
+        .willReturn(Optional.of(playlistContent));
+
+    playlistService.removeContentFromPlaylist(ownerId, playlistId, contentId);
+
+    verify(playlistContentRepository).delete(playlistContent);
+  }
+
+  @Test
+  @DisplayName("플레이리스트 수정 성공")
+  void updatePlaylist_Success() {
+    UUID ownerId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    User owner = User.builder().name("Owner").build();
+    ReflectionTestUtils.setField(owner, "id", ownerId);
+    Playlist playlist = Playlist.create(owner, "Old Title", "Old Desc");
+    ReflectionTestUtils.setField(playlist, "id", playlistId);
+
+    io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest request =
+        new io.mopl.domain.playlist.dto.request.PlaylistUpdateRequest("New Title", "New Desc");
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+
+    playlistService.updatePlaylist(ownerId, playlistId, request);
+
+  }
+
+  @Test
+  @DisplayName("플레이리스트 단건 조회 성공")
+  void findPlaylist_Success() {
+    UUID userId = UUID.randomUUID();
+    UUID playlistId = UUID.randomUUID();
+
+    Playlist playlist = Playlist.create(User.builder().build(), "Title", "Desc");
+
+    given(playlistRepository.findById(playlistId)).willReturn(Optional.of(playlist));
+    given(playlistSubscriptionRepository.existsByPlaylistIdAndUserId(playlistId, userId)).willReturn(true);
+
+    playlistService.findPlaylist(userId, playlistId);
+
+    verify(playlistMapper).toDto(playlist, true);
+  }
+
+  @Test
+  @DisplayName("플레이리스트 다건 조회")
+  void findPlaylists_HasNext_SortBySubscribeCount() {
+    UUID userId = UUID.randomUUID();
+    int limit = 1;
+
+    Playlist playlist1 = Playlist.create(User.builder().build(), "Title1", "Desc1");
+    ReflectionTestUtils.setField(playlist1, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(playlist1, "subscriberCount", 100L);
+
+    Playlist playlist2 = Playlist.create(User.builder().build(), "Title2", "Desc2");
+
+    given(playlistRepository.findPlaylistsByCursor(any(), any(), any(), any(), any(), any(Integer.class), any(), any()))
+        .willReturn(new java.util.ArrayList<>(List.of(playlist1, playlist2)));
+    given(playlistRepository.countPlaylists(any(), any(), any())).willReturn(2L);
+
+    io.mopl.global.response.CursorResponse<io.mopl.domain.playlist.dto.PlaylistDto> response =
+        playlistService.findPlaylists(null, null, null, null, null, null, limit, "DESCENDING", "subscribeCount");
+
+    org.assertj.core.api.Assertions.assertThat(response.hasNext()).isTrue();
+    org.assertj.core.api.Assertions.assertThat(response.nextCursor()).isEqualTo("100");
+  }
+
+  @Test
+  @DisplayName("플레이리스트 다건 조회")
+  void findPlaylists_HasNext_SortByUpdatedAt() {
+    int limit = 1;
+    java.time.Instant now = java.time.Instant.now();
+
+    Playlist playlist1 = Playlist.create(User.builder().build(), "Title1", "Desc1");
+    ReflectionTestUtils.setField(playlist1, "id", UUID.randomUUID());
+    ReflectionTestUtils.setField(playlist1, "updatedAt", now);
+
+    Playlist playlist2 = Playlist.create(User.builder().build(), "Title2", "Desc2");
+
+    given(playlistRepository.findPlaylistsByCursor(any(), any(), any(), any(), any(), any(Integer.class), any(), any()))
+        .willReturn(new java.util.ArrayList<>(List.of(playlist1, playlist2)));
+    given(playlistRepository.countPlaylists(any(), any(), any())).willReturn(2L);
+
+    io.mopl.global.response.CursorResponse<io.mopl.domain.playlist.dto.PlaylistDto> response =
+        playlistService.findPlaylists(UUID.randomUUID(), null, null, null, null, null, limit, "DESCENDING", "updatedAt");
+
+    org.assertj.core.api.Assertions.assertThat(response.hasNext()).isTrue();
+    org.assertj.core.api.Assertions.assertThat(response.nextCursor()).isEqualTo(now.toString());
+  }
 }
