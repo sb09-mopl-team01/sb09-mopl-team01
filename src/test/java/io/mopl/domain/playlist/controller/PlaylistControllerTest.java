@@ -126,7 +126,7 @@ class PlaylistControllerTest {
   }
 
   @Test
-  @DisplayName("POST /api/playlists/{id}/subscribe - 구독 성공")
+  @DisplayName("구독 성공")
   void subscribe() {
     UUID playlistId = UUID.randomUUID();
 
@@ -134,5 +134,40 @@ class PlaylistControllerTest {
 
     assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
     verify(playlistService).subscribePlaylist(userId, playlistId);
+  }
+
+  @Test
+  @DisplayName("구독 취소 성공")
+  void unsubscribePlaylist() {
+    UUID playlistId = UUID.randomUUID();
+
+    ResponseEntity<Void> response = playlistController.unsubscribePlaylist(mockUserDetails, playlistId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    verify(playlistService).unsubscribePlaylist(userId, playlistId);
+  }
+
+  @Test
+  @DisplayName("콘텐츠 추가 성공")
+  void addContentToPlaylist() {
+    UUID playlistId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    ResponseEntity<Void> response = playlistController.addContentToPlaylist(mockUserDetails, playlistId, contentId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    verify(playlistService).addContentToPlaylist(userId, playlistId, contentId);
+  }
+
+  @Test
+  @DisplayName("콘텐츠 삭제 성공")
+  void removeContentFromPlaylist() {
+    UUID playlistId = UUID.randomUUID();
+    UUID contentId = UUID.randomUUID();
+
+    ResponseEntity<Void> response = playlistController.removeContentFromPlaylist(mockUserDetails, playlistId, contentId);
+
+    assertThat(response.getStatusCode()).isEqualTo(HttpStatus.NO_CONTENT);
+    verify(playlistService).removeContentFromPlaylist(userId, playlistId, contentId);
   }
 }
