@@ -9,7 +9,9 @@ import lombok.RequiredArgsConstructor;
 
 import org.opensearch.index.query.BoolQueryBuilder;
 import org.opensearch.index.query.QueryBuilders;
-import org.springframework.data.domain.Sort;
+import org.opensearch.search.sort.SortBuilders;
+import org.opensearch.search.sort.SortOrder;
+
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
@@ -34,7 +36,8 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
     if (emailLike != null && !emailLike.isBlank()) {
       BoolQueryBuilder searchCriteria = QueryBuilders.boolQuery()
           .should(QueryBuilders.wildcardQuery("email.keyword", "*" + emailLike + "*").caseInsensitive(true))
-          .should(QueryBuilders.wildcardQuery("name.keyword", "*" + emailLike + "*").caseInsensitive(true));
+          .should(QueryBuilders.wildcardQuery("name.keyword", "*" + emailLike + "*").caseInsensitive(true))
+          .should(QueryBuilders.wildcardQuery("initials", "*" + emailLike + "*").caseInsensitive(true));
 
       boolQuery.must(searchCriteria);
     }
@@ -46,15 +49,16 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
       boolQuery.must(QueryBuilders.termQuery("isLocked", isLocked));
     }
 
-    Sort.Direction direction = (sortDirection == SortDirection.ASCENDING)
-        ? Sort.Direction.ASC
-        : Sort.Direction.DESC;
+    SortOrder order = (sortDirection == SortDirection.ASCENDING)
+        ? SortOrder.ASC
+        : SortOrder.DESC;
 
     String sortField = getSortField(sortBy);
 
     NativeSearchQuery searchQuery = new NativeSearchQueryBuilder()
         .withQuery(boolQuery)
-        .withSort(Sort.by(direction, sortField).and(Sort.by(Sort.Direction.ASC, "id")))
+        .withSort(SortBuilders.fieldSort(sortField).order(order))
+        .withSort(SortBuilders.fieldSort("id").order(SortOrder.ASC))
         .withMaxResults(limit + 1)
         .build();
 
