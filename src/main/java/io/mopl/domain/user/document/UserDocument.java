@@ -28,6 +28,9 @@ public class UserDocument {
   )
   private String name;
 
+  @Field(type = FieldType.Keyword)
+  private String initials;
+
   @MultiField(
       mainField = @Field(type = FieldType.Text, analyzer = "standard"),
       otherFields = {
