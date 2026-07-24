@@ -43,3 +43,10 @@ management:
           include: livenessState,ping
         readiness:
           include: readinessState,db
+
+mopl:
+  content-room-chat:
+    realtime:
+      redis:
+        enabled: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_ENABLED:true}
+        channel: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_CHANNEL:content-room-chat:realtime}

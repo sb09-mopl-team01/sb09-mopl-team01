@@ -186,6 +186,11 @@ mopl:
       group-id: ${NOTIFICATION_KAFKA_GROUP_ID:mopl-notification}
       max-retries: ${NOTIFICATION_KAFKA_MAX_RETRIES:3}
       retry-backoff: ${NOTIFICATION_KAFKA_RETRY_BACKOFF:PT1S}
+  content-room-chat:
+    realtime:
+      redis:
+        enabled: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_ENABLED:false}
+        channel: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_CHANNEL:content-room-chat:realtime}
   watching-session:
     redis:
       enabled: ${WATCHING_SESSION_REDIS_ENABLED:false}
