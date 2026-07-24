@@ -2,6 +2,8 @@ package io.mopl.domain.contentroomchat.controller;
 
 import io.mopl.domain.contentroomchat.dto.ContentChatDto;
 import io.mopl.domain.contentroomchat.dto.ContentChatSendRequest;
+import io.mopl.domain.contentroomchat.realtime.ContentRoomChatRealtimeEvent;
+import io.mopl.domain.contentroomchat.realtime.ContentRoomChatRealtimePublisher;
 import io.mopl.domain.contentroomchat.service.ContentRoomChatService;
 import io.mopl.global.exception.BaseException;
 import io.mopl.global.exception.ErrorCode;
@@ -11,7 +13,6 @@ import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.security.core.Authentication;
 import org.springframework.stereotype.Controller;
 
@@ -19,10 +20,8 @@ import org.springframework.stereotype.Controller;
 @RequiredArgsConstructor
 public class ContentRoomChatWebSocketController {
 
-  private static final String CONTENT_ROOM_CHAT_TOPIC = "/sub/contents/%s/chat";
-
   private final ContentRoomChatService contentRoomChatService;
-  private final SimpMessagingTemplate messagingTemplate;
+  private final ContentRoomChatRealtimePublisher realtimePublisher;
 
   @MessageMapping("/contents/{contentId}/chat")
   public void sendMessage(
@@ -40,7 +39,7 @@ public class ContentRoomChatWebSocketController {
         contentId,
         request.content()
     );
-    messagingTemplate.convertAndSend(topic(contentId), message);
+    realtimePublisher.publish(new ContentRoomChatRealtimeEvent(contentId, message));
   }
 
   private UUID resolveSenderId(Principal principal) {
@@ -53,9 +52,5 @@ public class ContentRoomChatWebSocketController {
     }
 
     throw new BaseException(ErrorCode.AUTHENTICATION_REQUIRED);
-  }
-
-  private String topic(UUID contentId) {
-    return CONTENT_ROOM_CHAT_TOPIC.formatted(contentId);
   }
 }
