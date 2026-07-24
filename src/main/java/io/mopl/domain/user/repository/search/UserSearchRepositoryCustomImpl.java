@@ -6,12 +6,15 @@ import io.mopl.global.response.SortDirection;
 import java.util.List;
 import java.util.stream.Collectors;
 import lombok.RequiredArgsConstructor;
+
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.QueryBuilders;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
+import org.opensearch.data.client.orhlc.NativeSearchQuery;
+import org.opensearch.data.client.orhlc.NativeSearchQueryBuilder;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -26,19 +29,22 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
       List<Object> lastSortValues, int limit,
       String sortBy, SortDirection sortDirection) {
 
-    Criteria criteria = new Criteria();
+    BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
 
     if (emailLike != null && !emailLike.isBlank()) {
-      criteria = criteria.and("email").contains(emailLike);
-    }
-    if (roleEqual != null && !roleEqual.isBlank()) {
-      criteria = criteria.and("role").is(roleEqual.toUpperCase());
-    }
-    if (isLocked != null) {
-      criteria = criteria.and("isLocked").is(isLocked);
+      BoolQueryBuilder searchCriteria = QueryBuilders.boolQuery()
+          .should(QueryBuilders.wildcardQuery("email.keyword", "*" + emailLike + "*").caseInsensitive(true))
+          .should(QueryBuilders.wildcardQuery("name.keyword", "*" + emailLike + "*").caseInsensitive(true));
+
+      boolQuery.must(searchCriteria);
     }
 
-    CriteriaQuery criteriaQuery = new CriteriaQuery(criteria);
+    if (roleEqual != null && !roleEqual.isBlank()) {
+      boolQuery.must(QueryBuilders.termQuery("role", roleEqual.toUpperCase()));
+    }
+    if (isLocked != null) {
+      boolQuery.must(QueryBuilders.termQuery("isLocked", isLocked));
+    }
 
     Sort.Direction direction = (sortDirection == SortDirection.ASCENDING)
         ? Sort.Direction.ASC
@@ -46,15 +52,17 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
 
     String sortField = getSortField(sortBy);
 
-    criteriaQuery.addSort(Sort.by(direction, sortField).and(Sort.by(Sort.Direction.ASC, "id")));
-
-    criteriaQuery.setMaxResults(limit + 1);
+    NativeSearchQuery searchQuery = new NativeSearchQueryBuilder()
+        .withQuery(boolQuery)
+        .withSort(Sort.by(direction, sortField).and(Sort.by(Sort.Direction.ASC, "id")))
+        .withMaxResults(limit + 1)
+        .build();
 
     if (lastSortValues != null && !lastSortValues.isEmpty()) {
-      criteriaQuery.setSearchAfter(lastSortValues);
+      searchQuery.setSearchAfter(lastSortValues);
     }
 
-    SearchHits<UserDocument> searchHits = elasticsearchOperations.search(criteriaQuery, UserDocument.class);
+    SearchHits<UserDocument> searchHits = elasticsearchOperations.search(searchQuery, UserDocument.class);
     List<UserDocument> contents = searchHits.stream()
         .map(SearchHit::getContent)
         .collect(Collectors.toList());
@@ -70,7 +78,7 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
       nextSortValues = lastHit.getSortValues();
     }
 
-    long totalCount = elasticsearchOperations.count(criteriaQuery, UserDocument.class);
+    long totalCount = elasticsearchOperations.count(searchQuery, UserDocument.class);
 
     return new OpenSearchCursorResponse<>(
         contents, nextSortValues, hasNext, totalCount
@@ -78,7 +86,7 @@ public class UserSearchRepositoryCustomImpl implements UserSearchRepositoryCusto
   }
 
   private String getSortField(String sortBy) {
-    if ("name".equalsIgnoreCase(sortBy)) return "name";
+    if ("name".equalsIgnoreCase(sortBy)) return "name.keyword";
     if ("email".equalsIgnoreCase(sortBy)) return "email.keyword";
     if ("isLocked".equalsIgnoreCase(sortBy)) return "isLocked";
     if ("role".equalsIgnoreCase(sortBy)) return "role";

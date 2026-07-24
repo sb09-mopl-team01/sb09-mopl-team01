@@ -20,7 +20,12 @@ public class UserDocument {
   @Field(type = FieldType.Keyword)
   private UUID id;
 
-  @Field(type = FieldType.Keyword)
+  @MultiField(
+      mainField = @Field(type = FieldType.Text, analyzer = "standard"),
+      otherFields = {
+          @InnerField(suffix = "keyword", type = FieldType.Keyword)
+      }
+  )
   private String name;
 
   @MultiField(
