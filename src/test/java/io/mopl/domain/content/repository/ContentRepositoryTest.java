@@ -18,6 +18,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 import org.springframework.boot.test.autoconfigure.orm.jpa.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.test.context.ActiveProfiles;
 
 @DataJpaTest
@@ -524,6 +525,54 @@ class ContentRepositoryTest {
         ContentType.MOVIE,
         "deleted-1"
     )).isPresent().get().extracting(Content::isDeleted).isEqualTo(true);
+  }
+
+  @Test
+  @DisplayName("보존 기간이 지난 삭제 콘텐츠 중 소유 썸네일이 있는 항목만 정리 대상으로 조회한다")
+  void findThumbnailCleanupCandidates() {
+    Instant cutoff = Instant.parse("2026-04-23T00:00:00Z");
+    Content expired = contentRepository.save(Content.createManual(
+        ContentType.MOVIE,
+        "정리 대상",
+        "보존 기간이 지난 콘텐츠",
+        "/content-thumbnails/expired.jpg",
+        "expired.jpg",
+        List.of("영화")
+    ));
+    expired.softDelete(cutoff.minusSeconds(1));
+    Content recent = contentRepository.save(Content.createManual(
+        ContentType.MOVIE,
+        "보존 대상",
+        "보존 기간이 지나지 않은 콘텐츠",
+        "/content-thumbnails/recent.jpg",
+        "recent.jpg",
+        List.of("영화")
+    ));
+    recent.softDelete(cutoff.plusSeconds(1));
+    Content external = contentRepository.save(Content.createExternal(
+        ContentType.MOVIE,
+        "외부 이미지",
+        "소유 썸네일 키가 없는 콘텐츠",
+        "https://image.example.com/external.jpg",
+        ContentSource.TMDB,
+        "external-thumbnail",
+        Instant.parse("2026-01-01T00:00:00Z"),
+        List.of("영화")
+    ));
+    external.softDelete(cutoff.minusSeconds(1));
+    contentRepository.flush();
+    entityManager.clear();
+
+    var result = contentRepository.findThumbnailCleanupCandidates(
+        cutoff,
+        PageRequest.of(0, 10)
+    );
+
+    assertThat(result.getContent()).singleElement().satisfies(candidate -> {
+      assertThat(candidate.contentId()).isEqualTo(expired.getId());
+      assertThat(candidate.thumbnailKey()).isEqualTo("expired.jpg");
+    });
+    assertThat(contentRepository.findByIdIncludingDeleted(expired.getId())).isPresent();
   }
 
   private WatchingSession saveSession(User watcher, Content content) {

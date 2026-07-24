@@ -76,7 +76,7 @@ spring:
     redis:
       host: ${REDIS_HOST:localhost}
       port: ${REDIS_PORT:6379}
-      password: ${REDIS_PASSWORD:}
+      password: ""
       ssl:
         enabled: ${REDIS_SSL_ENABLED:false}
       connect-timeout: ${REDIS_CONNECT_TIMEOUT:2s}
@@ -243,6 +243,11 @@ mopl:
     batch:
       external-sync:
         cron: ${CONTENT_EXTERNAL_SYNC_CRON:0 0 3 * * *}
+      thumbnail-cleanup:
+        enabled: ${CONTENT_THUMBNAIL_CLEANUP_ENABLED:true}
+        cron: ${CONTENT_THUMBNAIL_CLEANUP_CRON:0 30 4 * * *}
+        retention-days: ${CONTENT_THUMBNAIL_RETENTION_DAYS:90}
+        chunk-size: ${CONTENT_THUMBNAIL_CLEANUP_CHUNK_SIZE:100}
 
   cors:
     allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:3000,http://127.0.0.1:3000}

@@ -125,7 +125,7 @@ class ReviewServiceTest {
     Review review = mock(Review.class);
     given(review.getAuthor()).willReturn(user);
     given(review.getContent()).willReturn(content);
-    given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+    given(reviewRepository.findActiveById(reviewId)).willReturn(Optional.of(review));
     given(reviewMapper.toDto(review)).willReturn(mock(ReviewDto.class));
 
     reviewService.updateReview(userId, reviewId, request);
@@ -143,7 +143,7 @@ class ReviewServiceTest {
         any(UUID.class), any(), any(), anyInt(), anyString(), anyString()))
         .willReturn(List.of(mock(Review.class)));
 
-    given(reviewRepository.countByContentId(contentId)).willReturn(1L);
+    given(reviewRepository.countVisibleByContentId(contentId)).willReturn(1L);
 
     CursorResponse<ReviewDto> response = reviewService.findReviews(
         contentId, null, null, 10, "ASCENDING", "createdAt"
@@ -167,7 +167,7 @@ class ReviewServiceTest {
     Review review = mock(Review.class);
     given(review.getAuthor()).willReturn(user);
     given(review.getContent()).willReturn(content);
-    given(reviewRepository.findById(reviewId)).willReturn(Optional.of(review));
+    given(reviewRepository.findActiveById(reviewId)).willReturn(Optional.of(review));
 
     reviewService.deleteReview(userId, reviewId);
 
