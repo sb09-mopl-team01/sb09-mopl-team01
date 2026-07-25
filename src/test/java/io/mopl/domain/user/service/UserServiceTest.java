@@ -26,6 +26,7 @@ import io.mopl.domain.user.event.UserUnlockedEvent;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.user.repository.search.UserSearchRepository;
 import io.mopl.global.event.DomainEventPublisher;
@@ -66,6 +67,9 @@ class UserServiceTest {
 
   @Mock
   private DomainEventPublisher eventPublisher;
+
+  @Mock
+  private SocialAccountRepository socialAccountRepository;
 
   @BeforeEach
   void setUp() {
@@ -202,6 +206,7 @@ class UserServiceTest {
     User user = mock(User.class);
 
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(socialAccountRepository.existsByUser(user)).willReturn(false);
     given(passwordEncoder.encode(request.password())).willReturn("new_encoded_password");
     given(user.getId()).willReturn(userId);
 

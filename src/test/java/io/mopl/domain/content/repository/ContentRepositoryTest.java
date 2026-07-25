@@ -6,8 +6,6 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
-import io.mopl.domain.user.entity.User;
-import io.mopl.domain.watchingsession.entity.WatchingSession;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
@@ -459,41 +457,60 @@ class ContentRepositoryTest {
   }
 
   @Test
-  @DisplayName("watcherCount 정렬은 현재 시청 세션 수 기준으로 동작한다")
-  void findContentsByWatcherCountSort() {
-    Content firstContent = contentRepository.saveAndFlush(Content.createManual(
+  @DisplayName("인기순은 리뷰 수가 많고 같은 리뷰 수에서는 평점이 높은 순으로 정렬한다")
+  void findContentsByReviewCountAndRatingSort() {
+    Content mostReviewed = Content.createManual(
         ContentType.MOVIE,
-        "첫 번째 영화",
-        "watcherCount 임시 정렬 확인용 영화",
+        "리뷰 최다 영화",
+        "리뷰 수 우선 정렬 확인용 영화",
         null,
         List.of("영화")
-    ));
-    Content secondContent = contentRepository.saveAndFlush(Content.createManual(
+    );
+    mostReviewed.updateReviewStats(2.0, 7);
+    Content higherRated = Content.createManual(
         ContentType.MOVIE,
-        "두 번째 영화",
-        "watcherCount 임시 정렬 확인용 영화",
+        "동률 고평점 영화",
+        "평점 차순 정렬 확인용 영화",
         null,
         List.of("영화")
-    ));
-    saveSession(saveUser("첫 번째 시청자"), firstContent);
-    saveSession(saveUser("두 번째 시청자"), firstContent);
-    saveSession(saveUser("세 번째 시청자"), secondContent);
+    );
+    higherRated.updateReviewStats(4.8, 5);
+    Content lowerRated = Content.createManual(
+        ContentType.MOVIE,
+        "동률 저평점 영화",
+        "평점 차순 정렬 확인용 영화",
+        null,
+        List.of("영화")
+    );
+    lowerRated.updateReviewStats(3.0, 5);
+    contentRepository.saveAllAndFlush(List.of(mostReviewed, higherRated, lowerRated));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
         null,
         null,
-        1,
-        "watcherCount",
+        2,
+        "reviewCount",
+        SortDirection.DESCENDING
+    );
+    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+        null,
+        null,
+        null,
+        firstPage.nextCursor(),
+        firstPage.nextIdAfter(),
+        2,
+        "reviewCount",
         SortDirection.DESCENDING
     );
 
-    assertThat(result.data()).containsExactly(firstContent.getId());
-    assertThat(result.nextCursor()).isEqualTo("2");
-    assertThat(result.sortBy()).isEqualTo("watcherCount");
+    assertThat(firstPage.data()).containsExactly(mostReviewed.getId(), higherRated.getId());
+    assertThat(firstPage.nextCursor()).isEqualTo("5|4.8");
+    assertThat(firstPage.sortBy()).isEqualTo("reviewCount");
+    assertThat(secondPage.data()).containsExactly(lowerRated.getId());
   }
 
   @Test
@@ -575,17 +592,4 @@ class ContentRepositoryTest {
     assertThat(contentRepository.findByIdIncludingDeleted(expired.getId())).isPresent();
   }
 
-  private WatchingSession saveSession(User watcher, Content content) {
-    WatchingSession session = WatchingSession.start(watcher, content);
-    return entityManager.persistFlushFind(session);
-  }
-
-  private User saveUser(String name) {
-    User user = User.builder()
-        .email(name + "@example.com")
-        .passwordHash("hash")
-        .name(name)
-        .build();
-    return entityManager.persistFlushFind(user);
-  }
 }

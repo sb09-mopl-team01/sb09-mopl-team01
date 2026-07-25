@@ -36,7 +36,8 @@ class ContentSearchQueryServiceTest {
   void usesOpenSearchForSupportedKeywordQuery() {
     UUID contentId = UUID.randomUUID();
     CursorResponse<UUID> expected = new CursorResponse<>(
-        List.of(contentId), null, null, false, 1L, "createdAt", SortDirection.DESCENDING
+        List.of(contentId), null, null, false, 1L,
+        "createdAt", SortDirection.DESCENDING
     );
     given(contentSearchRepository.searchContentIdsByCursor(
         ContentType.MOVIE, "한국", List.of("드라마"), null, null, 10,
@@ -52,19 +53,16 @@ class ContentSearchQueryServiceTest {
   }
 
   @Test
-  void fallsBackToDatabaseForUnsupportedKeywordAndWatcherCountQueries() {
+  void fallsBackToDatabaseForUnsupportedKeywords() {
     assertThat(contentSearchQueryService.search(
         null, " ", null, null, null, 10, "createdAt", SortDirection.DESCENDING
     )).isEmpty();
     assertThat(contentSearchQueryService.search(
-        null, "한", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+        null, "a", null, null, null, 10, "createdAt", SortDirection.DESCENDING
     )).isEmpty();
     assertThat(contentSearchQueryService.search(
-        null, "스무글자를초과하는검색어는데이터베이스조회로안전하게대체한다", null,
+        null, "너무길어서초과하는검색어인데데이터베이스쪽으로안전하게대체한다", null,
         null, null, 10, "createdAt", SortDirection.DESCENDING
-    )).isEmpty();
-    assertThat(contentSearchQueryService.search(
-        null, "한국", null, null, null, 10, "watcherCount", SortDirection.DESCENDING
     )).isEmpty();
 
     verify(contentSearchRepository, never()).searchContentIdsByCursor(
@@ -73,13 +71,35 @@ class ContentSearchQueryServiceTest {
   }
 
   @Test
+  void usesOpenSearchForInitialKeywordAndReviewCountSort() {
+    UUID contentId = UUID.randomUUID();
+    CursorResponse<UUID> expected = new CursorResponse<>(
+        List.of(contentId), "3|4.5", contentId, false, 1L,
+        "reviewCount", SortDirection.DESCENDING
+    );
+    given(contentSearchRepository.searchContentIdsByCursor(
+        null, "ㄱ", null, null, null, 10,
+        "reviewCount", SortDirection.DESCENDING
+    )).willReturn(expected);
+
+    Optional<CursorResponse<UUID>> result = contentSearchQueryService.search(
+        null, "ㄱ", null, null, null, 10,
+        "reviewCount", SortDirection.DESCENDING
+    );
+
+    assertThat(result).contains(expected);
+  }
+
+  @Test
   void fallsBackToDatabaseWhenOpenSearchFails() {
     given(contentSearchRepository.searchContentIdsByCursor(
-        null, "검색어", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+        null, "검색어", null, null, null, 10,
+        "createdAt", SortDirection.DESCENDING
     )).willThrow(new RuntimeException("opensearch unavailable"));
 
     Optional<CursorResponse<UUID>> result = contentSearchQueryService.search(
-        null, "검색어", null, null, null, 10, "createdAt", SortDirection.DESCENDING
+        null, "검색어", null, null, null, 10,
+        "createdAt", SortDirection.DESCENDING
     );
 
     assertThat(result).isEmpty();

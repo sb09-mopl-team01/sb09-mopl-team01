@@ -139,7 +139,7 @@ class ContentControllerTest {
   }
 
   @Test
-  @DisplayName("GET /api/contents - rate와 watcherCount 정렬 요청을 허용한다")
+  @DisplayName("GET /api/contents - reviewCount 정렬 요청을 허용한다")
   void allowStatsSortBy() {
     CursorResponse<ContentDto> expectedResponse = new CursorResponse<>(
         List.of(),
@@ -147,7 +147,7 @@ class ContentControllerTest {
         null,
         false,
         0L,
-        "rate",
+        "reviewCount",
         SortDirection.DESCENDING
     );
     given(contentService.findContents(
@@ -157,7 +157,7 @@ class ContentControllerTest {
         eq(null),
         eq(null),
         eq(10),
-        eq("rate"),
+        eq("reviewCount"),
         eq(SortDirection.DESCENDING)
     )).willReturn(expectedResponse);
 
@@ -168,7 +168,7 @@ class ContentControllerTest {
         null,
         null,
         10,
-        "rate",
+        "reviewCount",
         SortDirection.DESCENDING
     );
 
