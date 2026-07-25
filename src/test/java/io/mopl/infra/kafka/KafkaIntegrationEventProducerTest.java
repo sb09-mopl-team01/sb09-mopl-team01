@@ -1,6 +1,7 @@
 package io.mopl.infra.kafka;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatIllegalStateException;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.verify;
@@ -19,6 +20,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ExecutionException;
 import org.apache.kafka.clients.producer.ProducerRecord;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -82,6 +84,45 @@ class KafkaIntegrationEventProducerTest {
     );
 
     assertThat(serialized).isNotEmpty();
+  }
+
+  @Test
+  @DisplayName("유효하지 않은 Outbox payload는 Kafka 발행 전에 실패시킨다")
+  void rejectsInvalidOutboxPayloadBeforePublishing() {
+    KafkaIntegrationEventProducer producer = new KafkaIntegrationEventProducer(
+        kafkaTemplate,
+        OBJECT_MAPPER,
+        outboxProperties(),
+        new IntegrationEventJsonSchema(OBJECT_MAPPER)
+    );
+    OutboxEvent event = OutboxEvent.create(
+        new IntegrationEvent(
+            "notification", UUID.randomUUID().toString(), "NotificationRequestedEvent", 1,
+            "Notification", UUID.randomUUID(), OBJECT_MAPPER.createObjectNode()
+        ),
+        "not-json",
+        Instant.now()
+    );
+
+    assertThatIllegalStateException().isThrownBy(() -> producer.publish(event))
+        .withMessageContaining("Outbox payload is not valid JSON");
+  }
+
+  @Test
+  @DisplayName("Kafka ACK 실패는 Relay가 재시도할 수 있도록 예외로 전파한다")
+  void propagatesKafkaAcknowledgementFailure() {
+    given(kafkaTemplate.send(any(ProducerRecord.class)))
+        .willReturn(CompletableFuture.failedFuture(new IllegalStateException("broker unavailable")));
+    KafkaIntegrationEventProducer producer = new KafkaIntegrationEventProducer(
+        kafkaTemplate,
+        OBJECT_MAPPER,
+        outboxProperties(),
+        new IntegrationEventJsonSchema(OBJECT_MAPPER)
+    );
+
+    assertThatIllegalStateException().isThrownBy(() -> producer.publish(outboxEvent()))
+        .withMessageContaining("Kafka publish failed")
+        .withCauseInstanceOf(ExecutionException.class);
   }
 
   private OutboxEvent outboxEvent() {
