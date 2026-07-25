@@ -67,6 +67,18 @@ class RedisNotificationListenerBoundaryTest {
     )).doesNotThrowAnyException();
   }
 
+  @Test
+  void ignoresEmptyAndIncompleteRedisMessages() throws Exception {
+    firstInstanceListener.onMessage(null, null);
+    firstInstanceListener.onMessage(new DefaultMessage(
+        "notification:realtime".getBytes(StandardCharsets.UTF_8),
+        new byte[0]
+    ), null);
+    firstInstanceListener.onMessage(message("{}"), null);
+
+    verifyNoInteractions(firstInstanceSseService);
+  }
+
   private DefaultMessage message(String payload) {
     return new DefaultMessage(
         "notification:realtime".getBytes(StandardCharsets.UTF_8),
