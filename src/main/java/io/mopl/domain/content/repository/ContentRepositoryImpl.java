@@ -24,7 +24,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
 
   private static final String SORT_BY_CREATED_AT = "createdAt";
   private static final String SORT_BY_RATE = "rate";
-  private static final String SORT_BY_REVIEW_COUNT = "reviewCount";
+  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
   private static final String POPULARITY_CURSOR_DELIMITER = "\\|";
   private static final int MIN_INDEXABLE_TRIGRAM_LENGTH = 3;
 
@@ -104,7 +104,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       return SORT_BY_CREATED_AT;
     }
     if (SORT_BY_CREATED_AT.equals(sortBy) || SORT_BY_RATE.equals(sortBy)
-        || SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+        || SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       return sortBy;
     }
     throw new IllegalArgumentException("Unsupported content sortBy: " + sortBy);
@@ -171,7 +171,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     if (SORT_BY_RATE.equals(sortBy)) {
       return rateCursorCondition(cursor, idAfter, sortDirection);
     }
-    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       return popularityCursorCondition(cursor, idAfter, sortDirection);
     }
     return createdAtCursorCondition(cursor, idAfter, sortDirection);
@@ -228,7 +228,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   ) {
     String[] cursorParts = cursor.split(POPULARITY_CURSOR_DELIMITER, -1);
     if (cursorParts.length != 2) {
-      throw new IllegalArgumentException("Invalid reviewCount cursor: " + cursor);
+      throw new IllegalArgumentException("Invalid watcherCount cursor: " + cursor);
     }
 
     int cursorReviewCount = Integer.parseInt(cursorParts[0]);
@@ -265,7 +265,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       SortDirection sortDirection
   ) {
     OrderSpecifier<UUID> idOrder = createIdOrderSpecifier(sortDirection);
-    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       if (sortDirection == SortDirection.ASCENDING) {
         return new OrderSpecifier<?>[]{
             content.reviewCount.asc(),
@@ -302,7 +302,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   private String nextCursor(Tuple row, String sortBy) {
-    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       return row.get(content.reviewCount) + "|" + row.get(content.averageRating);
     }
     if (SORT_BY_RATE.equals(sortBy)) {

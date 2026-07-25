@@ -493,7 +493,7 @@ class ContentRepositoryTest {
         null,
         null,
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
     CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
@@ -503,13 +503,13 @@ class ContentRepositoryTest {
         firstPage.nextCursor(),
         firstPage.nextIdAfter(),
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
 
     assertThat(firstPage.data()).containsExactly(mostReviewed.getId(), higherRated.getId());
     assertThat(firstPage.nextCursor()).isEqualTo("5|4.8");
-    assertThat(firstPage.sortBy()).isEqualTo("reviewCount");
+    assertThat(firstPage.sortBy()).isEqualTo("watcherCount");
     assertThat(secondPage.data()).containsExactly(lowerRated.getId());
   }
 
