@@ -10,12 +10,15 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
+import org.opensearch.data.client.orhlc.NativeSearchQuery;
+import org.opensearch.data.client.orhlc.NativeSearchQueryBuilder;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.sort.SortBuilders;
+import org.opensearch.search.sort.SortOrder;
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -24,6 +27,8 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
 
   private static final String SORT_BY_CREATED_AT = "createdAt";
   private static final String SORT_BY_RATE = "rate";
+  private static final String SORT_BY_REVIEW_COUNT = "reviewCount";
+  private static final String POPULARITY_CURSOR_DELIMITER = "\\|";
 
   private final ElasticsearchOperations elasticsearchOperations;
 
@@ -42,22 +47,21 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     SortDirection resolvedDirection = sortDirection == null
         ? SortDirection.DESCENDING
         : sortDirection;
-    Criteria criteria = createCriteria(typeEqual, keywordLike, tagsIn);
-    CriteriaQuery query = new CriteriaQuery(criteria);
-    Sort.Direction direction = resolvedDirection == SortDirection.ASCENDING
-        ? Sort.Direction.ASC
-        : Sort.Direction.DESC;
-    String sortField = sortField(resolvedSortBy);
-
-    query.addSort(Sort.by(direction, sortField).and(Sort.by(direction, "id")));
-    query.setMaxResults(limit + 1);
+    SortOrder order = resolvedDirection == SortDirection.ASCENDING
+        ? SortOrder.ASC
+        : SortOrder.DESC;
+    BoolQueryBuilder boolQuery = createQuery(typeEqual, keywordLike, tagsIn);
+    NativeSearchQueryBuilder queryBuilder = new NativeSearchQueryBuilder()
+        .withQuery(boolQuery);
+    addSorts(queryBuilder, resolvedSortBy, order);
+    NativeSearchQuery searchQuery = queryBuilder.withMaxResults(limit + 1).build();
     List<Object> searchAfter = searchAfter(cursor, idAfter, resolvedSortBy);
     if (!searchAfter.isEmpty()) {
-      query.setSearchAfter(searchAfter);
+      searchQuery.setSearchAfter(searchAfter);
     }
 
     SearchHits<ContentDocument> searchHits = elasticsearchOperations.search(
-        query,
+        searchQuery,
         ContentDocument.class
     );
     List<ContentDocument> documents = new ArrayList<>(searchHits.stream()
@@ -76,7 +80,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     UUID nextIdAfter = lastDocument != null ? lastDocument.getId() : null;
     List<UUID> contentIds = documents.stream().map(ContentDocument::getId).toList();
     long totalCount = elasticsearchOperations.count(
-        new CriteriaQuery(createCriteria(typeEqual, keywordLike, tagsIn)),
+        new NativeSearchQueryBuilder().withQuery(boolQuery).build(),
         ContentDocument.class
     );
 
@@ -91,24 +95,29 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     );
   }
 
-  private Criteria createCriteria(
+  private BoolQueryBuilder createQuery(
       ContentType typeEqual,
       String keywordLike,
       Collection<String> tagsIn
   ) {
     String keyword = keywordLike.trim();
-    Criteria keywordCriteria = Criteria.or()
-        .subCriteria(Criteria.where("title").matches(keyword))
-        .subCriteria(Criteria.where("description").matches(keyword));
-    Criteria criteria = Criteria.and().subCriteria(keywordCriteria);
+    BoolQueryBuilder keywordQuery = QueryBuilders.boolQuery()
+        .should(QueryBuilders.matchQuery("title", keyword))
+        .should(QueryBuilders.matchQuery("description", keyword))
+        .minimumShouldMatch(1);
+    if (isInitialKeyword(keyword)) {
+      keywordQuery.should(QueryBuilders.wildcardQuery("initials", "*" + keyword + "*"));
+    }
+
+    BoolQueryBuilder query = QueryBuilders.boolQuery().must(keywordQuery);
 
     if (typeEqual != null) {
-      criteria.subCriteria(Criteria.where("type").is(typeEqual.getValue()));
+      query.filter(QueryBuilders.termQuery("type", typeEqual.getValue()));
     }
     if (tagsIn != null && !tagsIn.isEmpty()) {
-      criteria.subCriteria(Criteria.where("tags").in(tagsIn));
+      query.filter(QueryBuilders.termsQuery("tags", tagsIn));
     }
-    return criteria;
+    return query;
   }
 
   private List<Object> searchAfter(String cursor, UUID idAfter, String sortBy) {
@@ -116,9 +125,22 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
       return List.of();
     }
 
-    Object primarySortValue = SORT_BY_RATE.equals(sortBy)
-        ? Double.parseDouble(cursor)
-        : Instant.parse(cursor).toEpochMilli();
+    Object primarySortValue;
+    if (SORT_BY_RATE.equals(sortBy)) {
+      primarySortValue = Double.parseDouble(cursor);
+    } else if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+      String[] cursorParts = cursor.split(POPULARITY_CURSOR_DELIMITER, -1);
+      if (cursorParts.length != 2) {
+        throw new IllegalArgumentException("Invalid reviewCount cursor: " + cursor);
+      }
+      return List.of(
+          Integer.parseInt(cursorParts[0]),
+          Double.parseDouble(cursorParts[1]),
+          idAfter.toString()
+      );
+    } else {
+      primarySortValue = Instant.parse(cursor).toEpochMilli();
+    }
     return List.of(primarySortValue, idAfter.toString());
   }
 
@@ -126,19 +148,43 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     if (sortBy == null || sortBy.isBlank()) {
       return SORT_BY_CREATED_AT;
     }
-    if (SORT_BY_CREATED_AT.equals(sortBy) || SORT_BY_RATE.equals(sortBy)) {
+    if (SORT_BY_CREATED_AT.equals(sortBy)
+        || SORT_BY_RATE.equals(sortBy)
+        || SORT_BY_REVIEW_COUNT.equals(sortBy)) {
       return sortBy;
     }
     throw new IllegalArgumentException("Unsupported OpenSearch content sortBy: " + sortBy);
   }
 
-  private String sortField(String sortBy) {
-    return SORT_BY_RATE.equals(sortBy) ? "averageRating" : "createdAt";
+  private void addSorts(
+      NativeSearchQueryBuilder queryBuilder,
+      String sortBy,
+      SortOrder order
+  ) {
+    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+      queryBuilder
+          .withSort(SortBuilders.fieldSort("reviewCount").order(order))
+          .withSort(SortBuilders.fieldSort("averageRating").order(order))
+          .withSort(SortBuilders.fieldSort("id").order(order));
+      return;
+    }
+    String sortField = SORT_BY_RATE.equals(sortBy) ? "averageRating" : "createdAt";
+    queryBuilder
+        .withSort(SortBuilders.fieldSort(sortField).order(order))
+        .withSort(SortBuilders.fieldSort("id").order(order));
   }
 
   private String cursorValue(ContentDocument document, String sortBy) {
-    return SORT_BY_RATE.equals(sortBy)
-        ? String.valueOf(document.getAverageRating())
-        : document.getCreatedAt().toString();
+    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+      return document.getReviewCount() + "|" + document.getAverageRating();
+    }
+    if (SORT_BY_RATE.equals(sortBy)) {
+      return String.valueOf(document.getAverageRating());
+    }
+    return document.getCreatedAt().toString();
+  }
+
+  private boolean isInitialKeyword(String keyword) {
+    return keyword.matches("^[ㄱ-ㅎ]+$");
   }
 }

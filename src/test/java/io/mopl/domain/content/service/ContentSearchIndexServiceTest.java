@@ -2,6 +2,7 @@ package io.mopl.domain.content.service;
 
 import static org.assertj.core.api.Assertions.assertThatCode;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
@@ -46,11 +47,15 @@ class ContentSearchIndexServiceTest {
         ContentType.MOVIE, "한국 영화", "설명", null, Set.of("드라마")
     );
     ReflectionTestUtils.setField(content, "id", contentId);
+    content.updateReviewStats(4.5, 7);
     given(contentRepository.findAllByIdWithTags(List.of(contentId))).willReturn(List.of(content));
 
     contentSearchIndexService.index(contentId);
 
-    verify(contentSearchRepository).saveAll(any());
+    verify(contentSearchRepository).saveAll(argThat(documents -> {
+      io.mopl.domain.content.document.ContentDocument document = documents.iterator().next();
+      return document.getReviewCount() == 7 && document.getAverageRating() == 4.5;
+    }));
   }
 
   @Test
