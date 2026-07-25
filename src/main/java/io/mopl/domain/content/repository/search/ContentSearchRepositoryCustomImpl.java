@@ -10,12 +10,16 @@ import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
-import org.springframework.data.domain.Sort;
+import org.opensearch.index.query.BoolQueryBuilder;
+import org.opensearch.index.query.QueryBuilders;
+import org.opensearch.search.sort.SortBuilders;
+import org.opensearch.search.sort.SortOrder;
+import org.opensearch.data.client.orhlc.NativeSearchQuery;
+import org.opensearch.data.client.orhlc.NativeSearchQueryBuilder;
+
 import org.springframework.data.elasticsearch.core.ElasticsearchOperations;
 import org.springframework.data.elasticsearch.core.SearchHit;
 import org.springframework.data.elasticsearch.core.SearchHits;
-import org.springframework.data.elasticsearch.core.query.Criteria;
-import org.springframework.data.elasticsearch.core.query.CriteriaQuery;
 import org.springframework.stereotype.Repository;
 
 @Repository
@@ -24,6 +28,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
 
   private static final String SORT_BY_CREATED_AT = "createdAt";
   private static final String SORT_BY_RATE = "rate";
+  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
 
   private final ElasticsearchOperations elasticsearchOperations;
 
@@ -39,25 +44,49 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
       SortDirection sortDirection
   ) {
     String resolvedSortBy = resolveSortBy(sortBy);
-    SortDirection resolvedDirection = sortDirection == null
-        ? SortDirection.DESCENDING
-        : sortDirection;
-    Criteria criteria = createCriteria(typeEqual, keywordLike, tagsIn);
-    CriteriaQuery query = new CriteriaQuery(criteria);
-    Sort.Direction direction = resolvedDirection == SortDirection.ASCENDING
-        ? Sort.Direction.ASC
-        : Sort.Direction.DESC;
+    SortOrder order = (sortDirection == null || sortDirection == SortDirection.DESCENDING)
+        ? SortOrder.DESC
+        : SortOrder.ASC;
+
+    BoolQueryBuilder boolQuery = QueryBuilders.boolQuery();
+
+    if (keywordLike != null && !keywordLike.isBlank()) {
+      String keyword = keywordLike.trim();
+      BoolQueryBuilder keywordCriteria = QueryBuilders.boolQuery()
+          .should(QueryBuilders.matchQuery("title", keyword))
+          .should(QueryBuilders.matchQuery("description", keyword))
+          .should(QueryBuilders.wildcardQuery("initials", "*" + keyword + "*"));
+
+      boolQuery.must(keywordCriteria);
+    }
+
+    if (typeEqual != null) {
+      boolQuery.must(QueryBuilders.termQuery("type", typeEqual.getValue()));
+    }
+    if (tagsIn != null && !tagsIn.isEmpty()) {
+      boolQuery.must(QueryBuilders.termsQuery("tags", tagsIn));
+    }
+
+    if (boolQuery.must().isEmpty() && boolQuery.filter().isEmpty() && boolQuery.should().isEmpty()) {
+      boolQuery.must(QueryBuilders.matchAllQuery());
+    }
+
     String sortField = sortField(resolvedSortBy);
 
-    query.addSort(Sort.by(direction, sortField).and(Sort.by(direction, "id")));
-    query.setMaxResults(limit + 1);
+    NativeSearchQuery searchQuery = new NativeSearchQueryBuilder()
+        .withQuery(boolQuery)
+        .withSort(SortBuilders.fieldSort(sortField).order(order))
+        .withSort(SortBuilders.fieldSort("id").order(SortOrder.ASC))
+        .withMaxResults(limit + 1)
+        .build();
+
     List<Object> searchAfter = searchAfter(cursor, idAfter, resolvedSortBy);
     if (!searchAfter.isEmpty()) {
-      query.setSearchAfter(searchAfter);
+      searchQuery.setSearchAfter(searchAfter);
     }
 
     SearchHits<ContentDocument> searchHits = elasticsearchOperations.search(
-        query,
+        searchQuery,
         ContentDocument.class
     );
     List<ContentDocument> documents = new ArrayList<>(searchHits.stream()
@@ -75,10 +104,8 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
         : null;
     UUID nextIdAfter = lastDocument != null ? lastDocument.getId() : null;
     List<UUID> contentIds = documents.stream().map(ContentDocument::getId).toList();
-    long totalCount = elasticsearchOperations.count(
-        new CriteriaQuery(createCriteria(typeEqual, keywordLike, tagsIn)),
-        ContentDocument.class
-    );
+
+    long totalCount = elasticsearchOperations.count(searchQuery, ContentDocument.class);
 
     return new CursorResponse<>(
         contentIds,
@@ -87,28 +114,8 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
         hasNext,
         totalCount,
         resolvedSortBy,
-        resolvedDirection
+        (order == SortOrder.ASC) ? SortDirection.ASCENDING : SortDirection.DESCENDING
     );
-  }
-
-  private Criteria createCriteria(
-      ContentType typeEqual,
-      String keywordLike,
-      Collection<String> tagsIn
-  ) {
-    String keyword = keywordLike.trim();
-    Criteria keywordCriteria = Criteria.or()
-        .subCriteria(Criteria.where("title").matches(keyword))
-        .subCriteria(Criteria.where("description").matches(keyword));
-    Criteria criteria = Criteria.and().subCriteria(keywordCriteria);
-
-    if (typeEqual != null) {
-      criteria.subCriteria(Criteria.where("type").is(typeEqual.getValue()));
-    }
-    if (tagsIn != null && !tagsIn.isEmpty()) {
-      criteria.subCriteria(Criteria.where("tags").in(tagsIn));
-    }
-    return criteria;
   }
 
   private List<Object> searchAfter(String cursor, UUID idAfter, String sortBy) {
@@ -128,6 +135,9 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     }
     if (SORT_BY_CREATED_AT.equals(sortBy) || SORT_BY_RATE.equals(sortBy)) {
       return sortBy;
+    }
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+      return SORT_BY_CREATED_AT;
     }
     throw new IllegalArgumentException("Unsupported OpenSearch content sortBy: " + sortBy);
   }

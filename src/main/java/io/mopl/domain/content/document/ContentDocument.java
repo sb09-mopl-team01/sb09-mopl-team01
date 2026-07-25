@@ -1,6 +1,7 @@
 package io.mopl.domain.content.document;
 
 import io.mopl.domain.content.entity.Content;
+import io.mopl.global.util.InitialUtils;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -18,7 +19,7 @@ import org.springframework.data.elasticsearch.annotations.Setting;
 
 @Getter
 @Builder
-@Document(indexName = "contents", createIndex = false)
+@Document(indexName = "contents")
 @Setting(settingPath = "/opensearch/content-index-settings.json")
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @AllArgsConstructor(access = AccessLevel.PRIVATE)
@@ -43,6 +44,9 @@ public class ContentDocument {
   private String description;
 
   @Field(type = FieldType.Keyword)
+  private String initials;
+
+  @Field(type = FieldType.Keyword)
   private String type;
 
   @Field(type = FieldType.Keyword)
@@ -59,6 +63,7 @@ public class ContentDocument {
     return ContentDocument.builder()
         .id(content.getId())
         .title(content.getTitle())
+        .initials(InitialUtils.extractInitial(content.getTitle()))
         .description(content.getDescription())
         .type(content.getType().getValue())
         .tags(new LinkedHashSet<>(content.getTags()))

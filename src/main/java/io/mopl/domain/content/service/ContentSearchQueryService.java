@@ -67,11 +67,14 @@ public class ContentSearchQueryService {
     }
     String keyword = keywordLike.trim();
     int keywordLength = keyword.codePointCount(0, keyword.length());
-    if (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
-        || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH) {
+    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[ㄱ-ㅎ]$");
+
+    if (!isSingleInitial && (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
+        || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH)) {
       return false;
     }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy) && (keywordLike == null || keywordLike.isBlank())) {
       return false;
     }
     return cursor == null || cursor.isBlank() || idAfter != null;
