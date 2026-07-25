@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ContentSearchQueryService {
 
-  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
   private static final int MIN_OPENSEARCH_KEYWORD_LENGTH = 2;
   private static final int MAX_OPENSEARCH_KEYWORD_LENGTH = 20;
 
@@ -67,11 +66,9 @@ public class ContentSearchQueryService {
     }
     String keyword = keywordLike.trim();
     int keywordLength = keyword.codePointCount(0, keyword.length());
-    if (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
-        || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH) {
-      return false;
-    }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
+    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[ㄱ-ㅎ]$");
+    if (!isSingleInitial && (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
+        || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH)) {
       return false;
     }
     return cursor == null || cursor.isBlank() || idAfter != null;
