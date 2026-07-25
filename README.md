@@ -181,11 +181,13 @@ chmod +x gradlew
 ```bash
 chmod +x gradlew
 ./gradlew test
+./gradlew jacocoTestCoverageVerification
 ```
 
 테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
 인메모리 H2 데이터베이스를 사용합니다. 테스트 프로필은 Flyway와 Kafka 자동 구성을 비활성화하므로 외부 PostgreSQL, Kafka, Schema Registry 연결이 필요하지 않습니다.
 `test.ignoreFailures=false`이므로 어떤 테스트라도 실패하면 Gradle과 CI가 실패합니다. 이번 Outbox 검증에는 LOCAL 알림 회귀, 원본 트랜잭션 롤백 시 Outbox 미적재, 동일 이벤트 중복 적재 방지가 포함됩니다.
+JaCoCo는 DTO·Entity·Exception·Mapper를 제외한 라인 커버리지 80% 이상을 품질 게이트로 검증합니다. Redis Pub/Sub, Kafka Outbox ACK 실패, SSE 알림 전송·하트비트 경로는 외부 인프라 없이 단위 테스트로 검증합니다.
 
 
 ## 문서

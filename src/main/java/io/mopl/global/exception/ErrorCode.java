@@ -23,6 +23,7 @@ public enum ErrorCode {
   PROFILE_IMAGE_UPLOAD_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500_1", "프로필 이미지 저장에 실패했습니다."),
   PROFILE_IMAGE_DELETE_FAIL(HttpStatus.INTERNAL_SERVER_ERROR, "USER_IMAGE_500_2", "프로필 이미지 삭제에 실패했습니다."),
   PROFILE_IMAGE_INVALID(HttpStatus.BAD_REQUEST, "USER_IMAGE_400", "올바르지 않은 이미지 형식입니다."),
+  SOCIAL_USER_CANNOT_RESET_PASSWORD(HttpStatus.BAD_REQUEST, "USER_400", "소셜 계정 연동된 사용자입니다. 소셜 로그인을 이용해주세요."),
 
   // Auth
   AUTHENTICATION_REQUIRED(HttpStatus.UNAUTHORIZED, "AUTH_401", "인증 정보가 필요합니다"),
@@ -31,6 +32,7 @@ public enum ErrorCode {
   INVALID_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_1", "유효하지 않은 리프레시 토큰입니다"),
   EXPIRED_OR_MANIPULATED_REFRESH_TOKEN(HttpStatus.UNAUTHORIZED, "AUTH_401_2", "만료되었거나 조작된 리프레시 토큰입니다"),
   ACCOUNT_LOCKED(HttpStatus.UNAUTHORIZED,"AUTH_ACOUNT_403_2", "계정이 잠금 상태입니다."),
+  SOCIAL_USER_MUST_USE_OAUTH(HttpStatus.BAD_REQUEST, "AUTH_ACOUNT_400", "소셜 계정 연동된 사용자입니다. 소셜 로그인을 이용해주세요."),
 
   // Direct Message
   SELF_CONVERSATION_NOT_ALLOWED(HttpStatus.BAD_REQUEST, "DM_400", "자기 자신과는 대화를 생성할 수 없습니다"),

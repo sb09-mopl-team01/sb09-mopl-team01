@@ -101,6 +101,19 @@ jacoco {
     toolVersion = '0.8.13'
 }
 
+def jacocoExclusions = [
+        "**/dto/**",
+        "**/entity/**",
+        "**/exception/**",
+        "**/mapper/**"
+]
+
+def filteredJacocoClassDirectories = { directories ->
+    files(directories.files.collect {
+        fileTree(dir: it, exclude: jacocoExclusions)
+    })
+}
+
 test {
     ignoreFailures = false
     useJUnitPlatform()
@@ -119,13 +132,26 @@ jacocoTestReport {
     }
 
     afterEvaluate {
-        classDirectories.setFrom(files(classDirectories.files.collect {
-            fileTree(dir: it, exclude: [
-                    "**/dto/**",
-                    "**/entity/**",
-                    "**/exception/**",
-                    "**/mapper/**"
-            ])
-        }))
+        classDirectories.setFrom(filteredJacocoClassDirectories(classDirectories))
     }
 }
+
+jacocoTestCoverageVerification {
+    dependsOn jacocoTestReport
+
+    afterEvaluate {
+        classDirectories.setFrom(filteredJacocoClassDirectories(classDirectories))
+    }
+
+    violationRules {
+        rule {
+            limit {
+                counter = 'LINE'
+                value = 'COVEREDRATIO'
+                minimum = 0.80
+            }
+        }
+    }
+}
+
+check.dependsOn jacocoTestCoverageVerification
