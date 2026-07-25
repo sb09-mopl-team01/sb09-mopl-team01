@@ -14,6 +14,7 @@ import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.security.MoplUserDetails;
 import io.mopl.global.security.MoplUserDetailsService;
 import io.mopl.global.security.jwt.JwtProvider;
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
@@ -42,6 +43,7 @@ class AuthServiceTest {
   @Mock private TempPasswordService tempPasswordService;
   @Mock private DomainEventPublisher eventPublisher;
   @Mock private PasswordEncoder passwordEncoder;
+  @Mock private SocialAccountRepository socialAccountRepository;
 
   @Test
   @DisplayName("refreshTokens - 성공")
@@ -113,6 +115,7 @@ class AuthServiceTest {
     when(user.getId()).thenReturn(userId);
 
     when(userRepository.findByEmail(email)).thenReturn(Optional.of(user));
+    when(socialAccountRepository.existsByUser(user)).thenReturn(false);
     when(tempPasswordService.generateRandomPassword()).thenReturn(tempPw);
     when(passwordEncoder.encode(tempPw)).thenReturn(encodedPw);
 
