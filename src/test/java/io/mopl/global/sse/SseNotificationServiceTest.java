@@ -40,4 +40,28 @@ class SseNotificationServiceTest {
 
     assertThat(sseNotificationService.countByReceiverId(receiverId)).isZero();
   }
+
+  @Test
+  @DisplayName("마지막 이벤트 ID가 있어도 SSE 연결을 생성한다")
+  void subscribesWithLastEventId() {
+    UUID receiverId = UUID.randomUUID();
+
+    sseNotificationService.subscribe(receiverId, UUID.randomUUID());
+
+    assertThat(sseNotificationService.countByReceiverId(receiverId)).isOne();
+  }
+
+  @Test
+  @DisplayName("연결된 수신자에게 알림과 하트비트를 전송하고 연결이 없는 수신자는 무시한다")
+  void sendsNotificationAndHeartbeatOnlyToExistingConnections() {
+    UUID receiverId = UUID.randomUUID();
+    sseNotificationService.subscribe(receiverId, null);
+
+    sseNotificationService.sendNotification(receiverId, UUID.randomUUID(), "새 알림");
+    sseNotificationService.sendNotification(UUID.randomUUID(), UUID.randomUUID(), "무시되는 알림");
+    sseNotificationService.sendHeartbeat();
+    sseNotificationService.closeByReceiverId(UUID.randomUUID());
+
+    assertThat(sseNotificationService.countByReceiverId(receiverId)).isOne();
+  }
 }
