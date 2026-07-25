@@ -13,10 +13,13 @@ import io.mopl.domain.user.event.UserUnlockedEvent;
 import io.mopl.domain.user.exception.DuplicateUserEmailException;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.domain.user.repository.search.UserSearchRepository;
 import io.mopl.global.cache.CacheKey;
 import io.mopl.global.event.DomainEventPublisher;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.OpenSearchCursorResponse;
 import io.mopl.global.response.SortDirection;
@@ -46,6 +49,7 @@ public class UserService {
   private final UserMapper userMapper;
   private final PasswordEncoder passwordEncoder;
   private final DomainEventPublisher eventPublisher;
+  private final SocialAccountRepository socialAccountRepository;
 
   @Autowired(required = false)
   private UserSearchRepository userSearchRepository;
@@ -131,6 +135,9 @@ public class UserService {
   @Transactional
   public void changePassword(UUID userId, ChangePasswordRequest request) {
     User user = getUserById(userId);
+    if (socialAccountRepository.existsByUser(user)) {
+      throw new BaseException(ErrorCode.SOCIAL_USER_CANNOT_RESET_PASSWORD);
+    }
     String newPasswordHash = passwordEncoder.encode(request.password());
 
     user.changePassword(newPasswordHash);

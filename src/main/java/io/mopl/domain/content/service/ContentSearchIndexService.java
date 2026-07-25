@@ -1,7 +1,6 @@
 package io.mopl.domain.content.service;
 
 import io.mopl.domain.content.document.ContentDocument;
-import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.repository.ContentRepository;
 import io.mopl.domain.content.repository.search.ContentSearchRepository;
 import java.util.Collection;
@@ -61,4 +60,5 @@ public class ContentSearchIndexService {
       );
     }
   }
+
 }

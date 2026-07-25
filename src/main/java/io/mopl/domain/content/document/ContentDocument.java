@@ -1,6 +1,7 @@
 package io.mopl.domain.content.document;
 
 import io.mopl.domain.content.entity.Content;
+import io.mopl.global.util.InitialUtils;
 import java.time.Instant;
 import java.util.LinkedHashSet;
 import java.util.Set;
@@ -43,6 +44,9 @@ public class ContentDocument {
   private String description;
 
   @Field(type = FieldType.Keyword)
+  private String initials;
+
+  @Field(type = FieldType.Keyword)
   private String type;
 
   @Field(type = FieldType.Keyword)
@@ -55,15 +59,24 @@ public class ContentDocument {
   @Field(type = FieldType.Double)
   private double averageRating;
 
+  @Field(type = FieldType.Integer)
+  private int reviewCount;
+
   public static ContentDocument from(Content content) {
     return ContentDocument.builder()
         .id(content.getId())
         .title(content.getTitle())
         .description(content.getDescription())
+        .initials(extractKoreanInitials(content.getTitle()))
         .type(content.getType().getValue())
         .tags(new LinkedHashSet<>(content.getTags()))
         .createdAt(content.getCreatedAt())
         .averageRating(content.getAverageRating())
+        .reviewCount(content.getReviewCount())
         .build();
+  }
+
+  private static String extractKoreanInitials(String title) {
+    return InitialUtils.extractInitial(title).replaceAll("[^ㄱ-ㅎ]", "");
   }
 }

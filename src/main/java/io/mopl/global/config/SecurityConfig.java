@@ -1,5 +1,6 @@
 package io.mopl.global.config;
 
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.global.security.csrf.CsrfCookieFilter;
 import io.mopl.global.security.csrf.StatelessCsrfTokenRepository;
 import io.mopl.global.security.filter.MoplLoginFilter;
@@ -56,6 +57,7 @@ public class SecurityConfig {
   private final MoplOAuth2UserService moplOAuth2UserService;
   private final OAuth2LoginSuccessHandler oAuth2LoginSuccessHandler;
   private final OAuth2LoginFailureHandler oAuth2LoginFailureHandler;
+  private final SocialAccountRepository socialAccountRepository;
   @Lazy
   @Autowired
   private RedisOAuth2AuthorizationRequestRepository cookieAuthorizationRequestRepository;
@@ -175,7 +177,7 @@ public class SecurityConfig {
   }
 
   private void configureCustomFilters(HttpSecurity http, AuthenticationManager authenticationManager) throws Exception {
-    MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager);
+    MoplLoginFilter moplLoginFilter = new MoplLoginFilter(authenticationManager, socialAccountRepository);
     moplLoginFilter.setAuthenticationSuccessHandler(loginSuccessHandler);
     moplLoginFilter.setAuthenticationFailureHandler(loginFailureHandler);
 

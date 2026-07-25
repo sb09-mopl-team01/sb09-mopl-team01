@@ -13,6 +13,7 @@ import io.mopl.global.security.oauth.GoogleOAuth2UserInfo;
 import io.mopl.global.security.oauth.KakaoOAuth2UserInfo;
 import io.mopl.global.security.oauth.OAuth2UserInfo;
 import java.util.Map;
+import java.util.Optional;
 import java.util.UUID;
 import lombok.RequiredArgsConstructor;
 import org.springframework.security.core.Authentication;
@@ -67,32 +68,36 @@ public class MoplOAuth2UserService extends DefaultOAuth2UserService {
   }
 
   private SocialAccount registerNewUser(OAuth2UserInfo oAuth2UserInfo) {
-    User user = userRepository.findByEmail(oAuth2UserInfo.getEmail())
-        .orElseGet(() -> {
-          String userName = oAuth2UserInfo.getName();
-          if (userName == null || userName.isBlank()) {
-            userName = "User_" + UUID.randomUUID().toString().substring(0, 6);
-          }
+    Optional<User> optionalUser = userRepository.findByEmail(oAuth2UserInfo.getEmail());
 
-          User newUser = User.builder()
-              .email(oAuth2UserInfo.getEmail())
-              .passwordHash("SOCIAL_LOGIN")
-              .name(userName)
-              .role(Role.USER)
-              .build();
+    User user;
+    if (optionalUser.isPresent()) {
+      user = optionalUser.get();
+      if (!"SOCIAL_LOGIN".equals(user.getPasswordHash())) {
+        throw new OAuth2AuthenticationException(
+            new OAuth2Error("LOCAL_ACCOUNT_ALREADY_EXISTS"),
+            "이미 일반 회원가입으로 등록된 이메일입니다. 이메일/비밀번호로 로그인해 주세요."
+        );
+      }
+    } else {
+      String userName = oAuth2UserInfo.getName();
+      if (userName == null || userName.isBlank()) {
+        userName = "User_" + UUID.randomUUID().toString().substring(0, 6);
+      }
 
-          User savedUser = userRepository.save(newUser);
-          eventPublisher.publish(new UserSyncedEvent(
-              savedUser.getId(),
-              savedUser.getName(),
-              savedUser.getEmail(),
-              savedUser.getRole().name(),
-              savedUser.isLocked(),
-              savedUser.getCreatedAt()
-          ));
+      User newUser = User.builder()
+          .email(oAuth2UserInfo.getEmail())
+          .passwordHash("SOCIAL_LOGIN")
+          .name(userName)
+          .role(Role.USER)
+          .build();
 
-          return savedUser;
-        });
+      user = userRepository.save(newUser);
+      eventPublisher.publish(new UserSyncedEvent(
+          user.getId(), user.getName(), user.getEmail(),
+          user.getRole().name(), user.isLocked(), user.getCreatedAt()
+      ));
+    }
 
     SocialAccount newSocialAccount = SocialAccount.builder()
         .user(user)

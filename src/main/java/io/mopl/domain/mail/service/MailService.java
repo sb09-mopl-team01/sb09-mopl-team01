@@ -1,6 +1,10 @@
 package io.mopl.domain.mail.service;
 
 import io.mopl.domain.mail.exception.MailSendFailException;
+import io.mopl.domain.user.repository.SocialAccountRepository;
+import io.mopl.domain.user.repository.search.UserSearchRepository;
+import io.mopl.global.exception.BaseException;
+import io.mopl.global.exception.ErrorCode;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.mail.SimpleMailMessage;
@@ -20,10 +24,15 @@ public class MailService {
 
   private final JavaMailSender emailSender;
   private final UserRepository userRepository;
+  private final SocialAccountRepository socialAccountRepository;
 
   public void sendTempPasswordEmail(UUID userId, String tempPassword) {
     User user = userRepository.findById(userId)
         .orElseThrow(UserNotFoundException::new);
+
+    if (socialAccountRepository.existsByUser(user)) {
+      throw new BaseException(ErrorCode.SOCIAL_USER_CANNOT_RESET_PASSWORD);
+    }
 
     String toEmail = user.getEmail();
 
