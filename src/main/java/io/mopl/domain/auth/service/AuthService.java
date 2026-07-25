@@ -7,6 +7,7 @@ import io.mopl.domain.user.dto.data.UserDto;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.mapper.UserMapper;
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import io.mopl.domain.user.repository.UserRepository;
 import io.mopl.global.event.DomainEventPublisher;
 import io.mopl.global.exception.BaseException;
@@ -33,6 +34,7 @@ public class AuthService {
   private final TempPasswordService tempPasswordService;
   private final PasswordEncoder passwordEncoder;
   private final DomainEventPublisher eventPublisher;
+  private final SocialAccountRepository socialAccountRepository;
 
   public TokenRefreshResult refreshTokens(String currentRefreshToken) {
     log.debug("Auth Token-Refresh Started.");
@@ -73,6 +75,11 @@ public class AuthService {
 
   public void resetPassword(String email) {
     User user = userRepository.findByEmail(email).orElseThrow(UserNotFoundException::new);
+
+    if (socialAccountRepository.existsByUser(user)) {
+      throw new BaseException(ErrorCode.SOCIAL_USER_CANNOT_RESET_PASSWORD);
+    }
+
     UUID userId = user.getId();
 
     String tempPassword = tempPasswordService.generateRandomPassword();

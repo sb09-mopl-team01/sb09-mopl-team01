@@ -12,6 +12,7 @@ import io.mopl.domain.mail.exception.MailSendFailException;
 import io.mopl.domain.user.entity.User;
 import io.mopl.domain.user.exception.UserNotFoundException;
 import io.mopl.domain.user.repository.UserRepository;
+import io.mopl.domain.user.repository.SocialAccountRepository;
 import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
@@ -37,6 +38,9 @@ class MailServiceTest {
   @Mock
   private UserRepository userRepository;
 
+  @Mock
+  private SocialAccountRepository socialAccountRepository;
+
   @Test
   @DisplayName("임시 비밀번호 이메일 전송 성공")
   void sendTempPasswordEmail_Success() {
@@ -47,6 +51,7 @@ class MailServiceTest {
     User user = mock(User.class);
     given(user.getEmail()).willReturn(toEmail);
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(socialAccountRepository.existsByUser(user)).willReturn(false);
 
     mailService.sendTempPasswordEmail(userId, tempPassword);
 
@@ -71,6 +76,7 @@ class MailServiceTest {
     User user = mock(User.class);
     given(user.getEmail()).willReturn(toEmail);
     given(userRepository.findById(userId)).willReturn(Optional.of(user));
+    given(socialAccountRepository.existsByUser(user)).willReturn(false);
 
     doThrow(new MailSendException("SMTP 서버 에러"))
         .when(emailSender).send(any(SimpleMailMessage.class));
