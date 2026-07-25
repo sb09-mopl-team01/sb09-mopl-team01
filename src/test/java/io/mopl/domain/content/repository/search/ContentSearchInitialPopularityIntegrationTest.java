@@ -71,7 +71,7 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
         null,
         null,
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
     CursorResponse<UUID> secondPage = contentSearchRepository.searchContentIdsByCursor(
@@ -81,7 +81,7 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
         firstPage.nextCursor(),
         firstPage.nextIdAfter(),
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
 

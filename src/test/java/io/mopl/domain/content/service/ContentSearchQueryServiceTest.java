@@ -75,16 +75,16 @@ class ContentSearchQueryServiceTest {
     UUID contentId = UUID.randomUUID();
     CursorResponse<UUID> expected = new CursorResponse<>(
         List.of(contentId), "3|4.5", contentId, false, 1L,
-        "reviewCount", SortDirection.DESCENDING
+        "watcherCount", SortDirection.DESCENDING
     );
     given(contentSearchRepository.searchContentIdsByCursor(
         null, "ㄱ", null, null, null, 10,
-        "reviewCount", SortDirection.DESCENDING
+        "watcherCount", SortDirection.DESCENDING
     )).willReturn(expected);
 
     Optional<CursorResponse<UUID>> result = contentSearchQueryService.search(
         null, "ㄱ", null, null, null, 10,
-        "reviewCount", SortDirection.DESCENDING
+        "watcherCount", SortDirection.DESCENDING
     );
 
     assertThat(result).contains(expected);
