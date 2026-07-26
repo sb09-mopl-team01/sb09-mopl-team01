@@ -71,10 +71,10 @@ class ContentSearchQueryServiceTest {
   }
 
   @Test
-  void usesOpenSearchForInitialKeywordAndReviewCountSort() {
+  void usesOpenSearchForInitialKeywordAndPopularitySort() {
     UUID contentId = UUID.randomUUID();
     CursorResponse<UUID> expected = new CursorResponse<>(
-        List.of(contentId), "3|4.5", contentId, false, 1L,
+        List.of(contentId), "9|3|4.5", contentId, false, 1L,
         "watcherCount", SortDirection.DESCENDING
     );
     given(contentSearchRepository.searchContentIdsByCursor(
@@ -84,6 +84,26 @@ class ContentSearchQueryServiceTest {
 
     Optional<CursorResponse<UUID>> result = contentSearchQueryService.search(
         null, "ㄱ", null, null, null, 10,
+        "watcherCount", SortDirection.DESCENDING
+    );
+
+    assertThat(result).contains(expected);
+  }
+
+  @Test
+  void usesOpenSearchForPopularitySortWithoutKeyword() {
+    UUID contentId = UUID.randomUUID();
+    CursorResponse<UUID> expected = new CursorResponse<>(
+        List.of(contentId), "9|3|4.5", contentId, false, 1L,
+        "watcherCount", SortDirection.DESCENDING
+    );
+    given(contentSearchRepository.searchContentIdsByCursor(
+        null, null, null, null, null, 10,
+        "watcherCount", SortDirection.DESCENDING
+    )).willReturn(expected);
+
+    Optional<CursorResponse<UUID>> result = contentSearchQueryService.search(
+        null, null, null, null, null, 10,
         "watcherCount", SortDirection.DESCENDING
     );
 

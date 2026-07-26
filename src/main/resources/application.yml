@@ -248,6 +248,9 @@ mopl:
     batch:
       external-sync:
         cron: ${CONTENT_EXTERNAL_SYNC_CRON:0 0 3 * * *}
+      popularity-sync:
+        cron: ${CONTENT_POPULARITY_SYNC_CRON:0 0 * * * *}
+        chunk-size: ${CONTENT_POPULARITY_SYNC_CHUNK_SIZE:500}
       thumbnail-cleanup:
         enabled: ${CONTENT_THUMBNAIL_CLEANUP_ENABLED:true}
         cron: ${CONTENT_THUMBNAIL_CLEANUP_CRON:0 30 4 * * *}

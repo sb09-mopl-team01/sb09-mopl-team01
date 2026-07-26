@@ -43,6 +43,15 @@ public interface ContentRepository extends JpaRepository<Content, UUID>, Content
       + "where c.id in :contentIds and c.deletedAt is null")
   List<Content> findAllByIdWithTags(@Param("contentIds") Collection<UUID> contentIds);
 
+  @Query("select c.id from Content c "
+      + "where c.deletedAt is null "
+      + "and (:idAfter is null or c.id > :idAfter) "
+      + "order by c.id asc")
+  List<UUID> findActiveIdsAfter(
+      @Param("idAfter") UUID idAfter,
+      Pageable pageable
+  );
+
   @Query("select c from Content c where c.id = :contentId")
   Optional<Content> findByIdIncludingDeleted(@Param("contentId") UUID contentId);
 
