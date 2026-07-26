@@ -10,6 +10,7 @@ import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
 import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -234,7 +235,7 @@ class ContentRepositoryTest {
     ));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> result = contentRepository.findContentIdsByCursor(
         ContentType.MOVIE,
         "우주",
         List.of("SF"),
@@ -269,13 +270,13 @@ class ContentRepositoryTest {
     ));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> shortKeywordResult = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> shortKeywordResult = contentRepository.findContentIdsByCursor(
         null, "우주", null, null, null, 10, "createdAt", SortDirection.DESCENDING
     );
-    CursorResponse<java.util.UUID> longKeywordResult = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> longKeywordResult = contentRepository.findContentIdsByCursor(
         null, "로맨스", null, null, null, 10, "createdAt", SortDirection.DESCENDING
     );
-    CursorResponse<java.util.UUID> oneCharacterResult = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> oneCharacterResult = contentRepository.findContentIdsByCursor(
         null, "우", null, null, null, 10, "createdAt", SortDirection.DESCENDING
     );
 
@@ -301,7 +302,7 @@ class ContentRepositoryTest {
     entityManager.clear();
 
     for (String keyword : List.of("%", "_", "!")) {
-      CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+      CursorResponse<UUID> result = contentRepository.findContentIdsByCursor(
           null, keyword, null, null, null, 10, "createdAt", SortDirection.DESCENDING
       );
 
@@ -322,7 +323,7 @@ class ContentRepositoryTest {
     ));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> result = contentRepository.findContentIdsByCursor(
         null, null, List.of("액션", "SF"), null, null, 10,
         "createdAt", SortDirection.DESCENDING
     );
@@ -355,7 +356,7 @@ class ContentRepositoryTest {
     contentRepository.saveAndFlush(highRatedContent);
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> result = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
@@ -385,10 +386,10 @@ class ContentRepositoryTest {
     );
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> firstPage = contentRepository.findContentIdsByCursor(
         null, null, null, null, null, 2, "createdAt", SortDirection.DESCENDING
     );
-    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> secondPage = contentRepository.findContentIdsByCursor(
         null, null, null, firstPage.nextCursor(), firstPage.nextIdAfter(),
         2, "createdAt", SortDirection.DESCENDING
     );
@@ -399,10 +400,10 @@ class ContentRepositoryTest {
     assertThat(java.util.stream.Stream.concat(firstPage.data().stream(), secondPage.data().stream()))
         .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
 
-    CursorResponse<java.util.UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
         null, null, null, null, null, 2, "createdAt", SortDirection.ASCENDING
     );
-    CursorResponse<java.util.UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
         null, null, null, ascendingFirstPage.nextCursor(), ascendingFirstPage.nextIdAfter(),
         2, "createdAt", SortDirection.ASCENDING
     );
@@ -430,10 +431,10 @@ class ContentRepositoryTest {
         List.of(highest, tiedFirst, tiedSecond, lowest));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> firstPage = contentRepository.findContentIdsByCursor(
         null, null, null, null, null, 2, "rate", SortDirection.DESCENDING
     );
-    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> secondPage = contentRepository.findContentIdsByCursor(
         null, null, null, firstPage.nextCursor(), firstPage.nextIdAfter(),
         2, "rate", SortDirection.DESCENDING
     );
@@ -444,10 +445,10 @@ class ContentRepositoryTest {
     assertThat(java.util.stream.Stream.concat(firstPage.data().stream(), secondPage.data().stream()))
         .containsExactlyInAnyOrderElementsOf(contents.stream().map(Content::getId).toList());
 
-    CursorResponse<java.util.UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> ascendingFirstPage = contentRepository.findContentIdsByCursor(
         null, null, null, null, null, 2, "rate", SortDirection.ASCENDING
     );
-    CursorResponse<java.util.UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> ascendingSecondPage = contentRepository.findContentIdsByCursor(
         null, null, null, ascendingFirstPage.nextCursor(), ascendingFirstPage.nextIdAfter(),
         2, "rate", SortDirection.ASCENDING
     );
@@ -486,30 +487,30 @@ class ContentRepositoryTest {
     contentRepository.saveAllAndFlush(List.of(mostReviewed, higherRated, lowerRated));
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> firstPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> firstPage = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
         null,
         null,
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
-    CursorResponse<java.util.UUID> secondPage = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> secondPage = contentRepository.findContentIdsByCursor(
         null,
         null,
         null,
         firstPage.nextCursor(),
         firstPage.nextIdAfter(),
         2,
-        "reviewCount",
+        "watcherCount",
         SortDirection.DESCENDING
     );
 
     assertThat(firstPage.data()).containsExactly(mostReviewed.getId(), higherRated.getId());
     assertThat(firstPage.nextCursor()).isEqualTo("5|4.8");
-    assertThat(firstPage.sortBy()).isEqualTo("reviewCount");
+    assertThat(firstPage.sortBy()).isEqualTo("watcherCount");
     assertThat(secondPage.data()).containsExactly(lowerRated.getId());
   }
 
@@ -530,7 +531,7 @@ class ContentRepositoryTest {
     contentRepository.flush();
     entityManager.clear();
 
-    CursorResponse<java.util.UUID> result = contentRepository.findContentIdsByCursor(
+    CursorResponse<UUID> result = contentRepository.findContentIdsByCursor(
         null, null, null, null, null, 10, "createdAt", SortDirection.DESCENDING
     );
 

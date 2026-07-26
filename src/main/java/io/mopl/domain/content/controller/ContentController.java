@@ -36,7 +36,7 @@ import org.springframework.web.multipart.MultipartFile;
 @Slf4j
 public class ContentController {
 
-  private static final List<String> SUPPORTED_SORT_BY = List.of("createdAt", "rate", "reviewCount");
+  private static final List<String> SUPPORTED_SORT_BY = List.of("createdAt", "rate", "watcherCount");
 
   private final ContentService contentService;
 

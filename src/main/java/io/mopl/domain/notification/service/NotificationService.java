@@ -78,7 +78,7 @@ public class NotificationService {
       throw new BaseException(ErrorCode.FORBIDDEN);
     }
 
-    boolean changed = notification.markAsRead();
+    boolean changed = notificationRepository.markAsReadIfUnread(notificationId, receiverId) == 1;
     if (changed) {
       eventPublisher.publish(new NotificationReadEvent(
           notification.getId(),
@@ -86,6 +86,7 @@ public class NotificationService {
           Instant.now()
       ));
     }
+
   }
 
   @Transactional(readOnly = true)
