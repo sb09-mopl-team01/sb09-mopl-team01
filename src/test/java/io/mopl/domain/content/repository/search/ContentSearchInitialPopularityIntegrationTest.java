@@ -48,9 +48,9 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
     secondPopularId = UUID.randomUUID();
     leastPopularId = UUID.randomUUID();
     contentSearchRepository.saveAll(List.of(
-        document(mostPopularId, "기생충", 7, 2.0),
-        document(secondPopularId, "괴물", 5, 4.8),
-        document(leastPopularId, "국제시장", 5, 3.0)
+        document(mostPopularId, "기생충", 8L, 1, 2.0),
+        document(secondPopularId, "괴물", 5L, 7, 4.8),
+        document(leastPopularId, "국제시장", 5L, 7, 3.0)
     ));
     indexOperations.refresh();
   }
@@ -63,7 +63,7 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
   }
 
   @Test
-  void searchesSingleInitialAndSortsByReviewCountThenRatingWithCursor() {
+  void searchesSingleInitialAndSortsByWatcherReviewAndRatingWithCursor() {
     CursorResponse<UUID> firstPage = contentSearchRepository.searchContentIdsByCursor(
         null,
         "ㄱ",
@@ -86,14 +86,33 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
     );
 
     assertThat(firstPage.data()).containsExactly(mostPopularId, secondPopularId);
-    assertThat(firstPage.nextCursor()).isEqualTo("5|4.8");
+    assertThat(firstPage.nextCursor()).isEqualTo("5|7|4.8");
     assertThat(firstPage.totalCount()).isEqualTo(3L);
     assertThat(secondPage.data()).containsExactly(leastPopularId);
+  }
+
+  @Test
+  void sortsByPopularityWithoutKeyword() {
+    CursorResponse<UUID> result = contentSearchRepository.searchContentIdsByCursor(
+        null,
+        null,
+        null,
+        null,
+        null,
+        3,
+        "watcherCount",
+        SortDirection.DESCENDING
+    );
+
+    assertThat(result.data())
+        .containsExactly(mostPopularId, secondPopularId, leastPopularId);
+    assertThat(result.nextCursor()).isEqualTo("5|7|3.0");
   }
 
   private ContentDocument document(
       UUID contentId,
       String title,
+      long watcherCount,
       int reviewCount,
       double averageRating
   ) {
@@ -107,6 +126,7 @@ class ContentSearchInitialPopularityIntegrationTest extends BaseIntegrationTest 
         .createdAt(Instant.parse("2026-07-25T00:00:00Z"))
         .averageRating(averageRating)
         .reviewCount(reviewCount)
+        .watcherCount(watcherCount)
         .build();
   }
 }

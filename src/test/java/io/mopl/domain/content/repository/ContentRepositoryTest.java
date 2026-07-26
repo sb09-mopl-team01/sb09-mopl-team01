@@ -6,6 +6,8 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import io.mopl.domain.content.entity.Content;
 import io.mopl.domain.content.entity.ContentSource;
 import io.mopl.domain.content.entity.ContentType;
+import io.mopl.domain.user.entity.User;
+import io.mopl.domain.watchingsession.entity.WatchingSession;
 import io.mopl.global.response.CursorResponse;
 import io.mopl.global.response.SortDirection;
 import java.time.Instant;
@@ -459,7 +461,7 @@ class ContentRepositoryTest {
 
   @Test
   @DisplayName("인기순은 리뷰 수가 많고 같은 리뷰 수에서는 평점이 높은 순으로 정렬한다")
-  void findContentsByReviewCountAndRatingSort() {
+  void findContentsByWatcherCountReviewCountAndRatingSort() {
     Content mostReviewed = Content.createManual(
         ContentType.MOVIE,
         "리뷰 최다 영화",
@@ -485,6 +487,10 @@ class ContentRepositoryTest {
     );
     lowerRated.updateReviewStats(3.0, 5);
     contentRepository.saveAllAndFlush(List.of(mostReviewed, higherRated, lowerRated));
+    persistWatchingSessions(mostReviewed, 2);
+    persistWatchingSessions(higherRated, 1);
+    persistWatchingSessions(lowerRated, 1);
+    entityManager.flush();
     entityManager.clear();
 
     CursorResponse<UUID> firstPage = contentRepository.findContentIdsByCursor(
@@ -509,9 +515,47 @@ class ContentRepositoryTest {
     );
 
     assertThat(firstPage.data()).containsExactly(mostReviewed.getId(), higherRated.getId());
-    assertThat(firstPage.nextCursor()).isEqualTo("5|4.8");
+    assertThat(firstPage.nextCursor()).isEqualTo("1|5|4.8");
     assertThat(firstPage.sortBy()).isEqualTo("watcherCount");
     assertThat(secondPage.data()).containsExactly(lowerRated.getId());
+  }
+
+  private void persistWatchingSessions(Content content, int watcherCount) {
+    for (int index = 0; index < watcherCount; index++) {
+      User watcher = User.builder()
+          .email(UUID.randomUUID() + "@example.com")
+          .passwordHash("password")
+          .name("watcher-" + UUID.randomUUID())
+          .build();
+      entityManager.persist(watcher);
+      entityManager.persist(WatchingSession.start(watcher, content));
+    }
+  }
+
+  @Test
+  @DisplayName("활성 콘텐츠 ID를 UUID 키셋 기준으로 조회한다")
+  void findActiveIdsAfterWithKeyset() {
+    List<Content> contents = List.of(
+        Content.createManual(ContentType.MOVIE, "영화 1", "설명", null, List.of("영화")),
+        Content.createManual(ContentType.MOVIE, "영화 2", "설명", null, List.of("영화")),
+        Content.createManual(ContentType.MOVIE, "영화 3", "설명", null, List.of("영화"))
+    );
+    contentRepository.saveAllAndFlush(contents);
+    List<UUID> expectedIds = contents.stream().map(Content::getId).toList();
+
+    List<UUID> firstPage = contentRepository.findActiveIdsAfter(
+        null,
+        PageRequest.of(0, 2)
+    );
+    List<UUID> secondPage = contentRepository.findActiveIdsAfter(
+        firstPage.get(firstPage.size() - 1),
+        PageRequest.of(0, 2)
+    );
+
+    assertThat(firstPage).hasSize(2);
+    assertThat(secondPage).hasSize(1);
+    assertThat(java.util.stream.Stream.concat(firstPage.stream(), secondPage.stream()))
+        .containsExactlyInAnyOrderElementsOf(expectedIds);
   }
 
   @Test

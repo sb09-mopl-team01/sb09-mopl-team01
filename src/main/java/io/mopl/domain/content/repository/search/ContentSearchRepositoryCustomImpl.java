@@ -100,16 +100,18 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
       String keywordLike,
       Collection<String> tagsIn
   ) {
-    String keyword = keywordLike.trim();
-    BoolQueryBuilder keywordQuery = QueryBuilders.boolQuery()
-        .should(QueryBuilders.matchQuery("title", keyword))
-        .should(QueryBuilders.matchQuery("description", keyword))
-        .minimumShouldMatch(1);
-    if (isInitialKeyword(keyword)) {
-      keywordQuery.should(QueryBuilders.wildcardQuery("initials", "*" + keyword + "*"));
+    BoolQueryBuilder query = QueryBuilders.boolQuery();
+    String keyword = keywordLike == null ? "" : keywordLike.trim();
+    if (!keyword.isBlank()) {
+      BoolQueryBuilder keywordQuery = QueryBuilders.boolQuery()
+          .should(QueryBuilders.matchQuery("title", keyword))
+          .should(QueryBuilders.matchQuery("description", keyword))
+          .minimumShouldMatch(1);
+      if (isInitialKeyword(keyword)) {
+        keywordQuery.should(QueryBuilders.wildcardQuery("initials", "*" + keyword + "*"));
+      }
+      query.must(keywordQuery);
     }
-
-    BoolQueryBuilder query = QueryBuilders.boolQuery().must(keywordQuery);
 
     if (typeEqual != null) {
       query.filter(QueryBuilders.termQuery("type", typeEqual.getValue()));
@@ -130,12 +132,13 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
       primarySortValue = Double.parseDouble(cursor);
     } else if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       String[] cursorParts = cursor.split(POPULARITY_CURSOR_DELIMITER, -1);
-      if (cursorParts.length != 2) {
+      if (cursorParts.length != 3) {
         throw new IllegalArgumentException("Invalid watcherCount cursor: " + cursor);
       }
       return List.of(
-          Integer.parseInt(cursorParts[0]),
-          Double.parseDouble(cursorParts[1]),
+          Long.parseLong(cursorParts[0]),
+          Integer.parseInt(cursorParts[1]),
+          Double.parseDouble(cursorParts[2]),
           idAfter.toString()
       );
     } else {
@@ -163,6 +166,10 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
   ) {
     if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       queryBuilder
+          .withSort(SortBuilders.fieldSort("watcherCount")
+              .unmappedType("long")
+              .missing(0L)
+              .order(order))
           .withSort(SortBuilders.fieldSort("reviewCount").order(order))
           .withSort(SortBuilders.fieldSort("averageRating").order(order))
           .withSort(SortBuilders.fieldSort("id").order(order));
@@ -176,7 +183,9 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
 
   private String cursorValue(ContentDocument document, String sortBy) {
     if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return document.getReviewCount() + "|" + document.getAverageRating();
+      return document.getWatcherCount()
+          + "|" + document.getReviewCount()
+          + "|" + document.getAverageRating();
     }
     if (SORT_BY_RATE.equals(sortBy)) {
       return String.valueOf(document.getAverageRating());
