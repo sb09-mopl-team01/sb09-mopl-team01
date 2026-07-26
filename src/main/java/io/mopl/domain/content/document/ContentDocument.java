@@ -77,6 +77,6 @@ public class ContentDocument {
   }
 
   private static String extractKoreanInitials(String title) {
-    return InitialUtils.extractInitial(title).replaceAll("[^ㄱ-ㅎ]", "");
+    return InitialUtils.extractInitial(title).replaceAll("[^\\u3131-\\u314E]", "");
   }
 }

@@ -185,6 +185,6 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
   }
 
   private boolean isInitialKeyword(String keyword) {
-    return keyword.matches("^[ㄱ-ㅎ]+$");
+    return keyword.matches("^[\\u3131-\\u314E]+$");
   }
 }
