@@ -27,7 +27,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
 
   private static final String SORT_BY_CREATED_AT = "createdAt";
   private static final String SORT_BY_RATE = "rate";
-  private static final String SORT_BY_REVIEW_COUNT = "reviewCount";
+  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
   private static final String POPULARITY_CURSOR_DELIMITER = "\\|";
 
   private final ElasticsearchOperations elasticsearchOperations;
@@ -128,10 +128,10 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     Object primarySortValue;
     if (SORT_BY_RATE.equals(sortBy)) {
       primarySortValue = Double.parseDouble(cursor);
-    } else if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    } else if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       String[] cursorParts = cursor.split(POPULARITY_CURSOR_DELIMITER, -1);
       if (cursorParts.length != 2) {
-        throw new IllegalArgumentException("Invalid reviewCount cursor: " + cursor);
+        throw new IllegalArgumentException("Invalid watcherCount cursor: " + cursor);
       }
       return List.of(
           Integer.parseInt(cursorParts[0]),
@@ -150,7 +150,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
     }
     if (SORT_BY_CREATED_AT.equals(sortBy)
         || SORT_BY_RATE.equals(sortBy)
-        || SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+        || SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       return sortBy;
     }
     throw new IllegalArgumentException("Unsupported OpenSearch content sortBy: " + sortBy);
@@ -161,7 +161,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
       String sortBy,
       SortOrder order
   ) {
-    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       queryBuilder
           .withSort(SortBuilders.fieldSort("reviewCount").order(order))
           .withSort(SortBuilders.fieldSort("averageRating").order(order))
@@ -175,7 +175,7 @@ public class ContentSearchRepositoryCustomImpl implements ContentSearchRepositor
   }
 
   private String cursorValue(ContentDocument document, String sortBy) {
-    if (SORT_BY_REVIEW_COUNT.equals(sortBy)) {
+    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
       return document.getReviewCount() + "|" + document.getAverageRating();
     }
     if (SORT_BY_RATE.equals(sortBy)) {
