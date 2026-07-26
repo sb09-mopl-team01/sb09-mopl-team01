@@ -62,7 +62,10 @@ public class ContentDocument {
   @Field(type = FieldType.Integer)
   private int reviewCount;
 
-  public static ContentDocument from(Content content) {
+  @Field(type = FieldType.Long)
+  private long watcherCount;
+
+  public static ContentDocument from(Content content, long watcherCount) {
     return ContentDocument.builder()
         .id(content.getId())
         .title(content.getTitle())
@@ -73,10 +76,11 @@ public class ContentDocument {
         .createdAt(content.getCreatedAt())
         .averageRating(content.getAverageRating())
         .reviewCount(content.getReviewCount())
+        .watcherCount(watcherCount)
         .build();
   }
 
   private static String extractKoreanInitials(String title) {
-    return InitialUtils.extractInitial(title).replaceAll("[^ㄱ-ㅎ]", "");
+    return InitialUtils.extractInitial(title).replaceAll("[^\\u3131-\\u314E]", "");
   }
 }

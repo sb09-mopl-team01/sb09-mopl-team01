@@ -20,10 +20,11 @@ class ContentDocumentTest {
     );
     content.updateReviewStats(4.5, 7);
 
-    ContentDocument document = ContentDocument.from(content);
+    ContentDocument document = ContentDocument.from(content, 9L);
 
     assertThat(document.getInitials()).isEqualTo("ㅇㅈㅇㄱㅇㅅㄹㅇㅅㅈ");
     assertThat(document.getReviewCount()).isEqualTo(7);
     assertThat(document.getAverageRating()).isEqualTo(4.5);
+    assertThat(document.getWatcherCount()).isEqualTo(9L);
   }
 }

@@ -18,6 +18,7 @@ public class ContentSearchQueryService {
 
   private static final int MIN_OPENSEARCH_KEYWORD_LENGTH = 2;
   private static final int MAX_OPENSEARCH_KEYWORD_LENGTH = 20;
+  private static final String SORT_BY_WATCHER_COUNT = "watcherCount";
 
   private final ContentSearchRepository contentSearchRepository;
 
@@ -62,11 +63,12 @@ public class ContentSearchQueryService {
       String sortBy
   ) {
     if (keywordLike == null || keywordLike.isBlank()) {
-      return false;
+      return SORT_BY_WATCHER_COUNT.equals(sortBy)
+          && (cursor == null || cursor.isBlank() || idAfter != null);
     }
     String keyword = keywordLike.trim();
     int keywordLength = keyword.codePointCount(0, keyword.length());
-    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[ㄱ-ㅎ]$");
+    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[\\u3131-\\u314E]$");
     if (!isSingleInitial && (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
         || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH)) {
       return false;

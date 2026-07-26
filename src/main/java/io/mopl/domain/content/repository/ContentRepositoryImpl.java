@@ -1,11 +1,13 @@
 package io.mopl.domain.content.repository;
 
 import static io.mopl.domain.content.entity.QContent.content;
+import static io.mopl.domain.watchingsession.entity.QWatchingSession.watchingSession;
 
 import com.querydsl.core.Tuple;
 import com.querydsl.core.types.OrderSpecifier;
 import com.querydsl.core.types.dsl.BooleanExpression;
 import com.querydsl.core.types.dsl.Expressions;
+import com.querydsl.core.types.dsl.NumberExpression;
 import com.querydsl.jpa.impl.JPAQueryFactory;
 import io.mopl.domain.content.entity.ContentType;
 import io.mopl.global.response.CursorResponse;
@@ -44,6 +46,18 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     String resolvedSortBy = resolveSortBy(sortBy);
     SortDirection resolvedDirection = sortDirection == null ? SortDirection.DESCENDING : sortDirection;
 
+    if (SORT_BY_WATCHER_COUNT.equals(resolvedSortBy)) {
+      return findPopularContentIdsByCursor(
+          typeEqual,
+          keywordLike,
+          tagsIn,
+          cursor,
+          idAfter,
+          limit,
+          resolvedDirection
+      );
+    }
+
     List<Tuple> rows = queryFactory
         .select(content.id, content.createdAt, content.averageRating, content.reviewCount)
         .from(content)
@@ -78,7 +92,7 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         .toList();
 
     Long totalCount = queryFactory
-        .select(content.id.count())
+        .select(content.id.countDistinct())
         .from(content)
         .where(
             isActive(),
@@ -96,6 +110,78 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
         totalCount == null ? 0L : totalCount,
         resolvedSortBy,
         resolvedDirection
+    );
+  }
+
+  private CursorResponse<UUID> findPopularContentIdsByCursor(
+      ContentType typeEqual,
+      String keywordLike,
+      Collection<String> tagsIn,
+      String cursor,
+      UUID idAfter,
+      int limit,
+      SortDirection sortDirection
+  ) {
+    NumberExpression<Long> watcherCount = watchingSession.id.countDistinct();
+    List<Tuple> rows = queryFactory
+        .select(content.id, watcherCount, content.reviewCount, content.averageRating)
+        .from(content)
+        .leftJoin(watchingSession).on(watchingSession.content.eq(content))
+        .where(
+            isActive(),
+            eqType(typeEqual),
+            containsKeyword(keywordLike),
+            containsAnyTag(tagsIn)
+        )
+        .groupBy(content.id, content.reviewCount, content.averageRating)
+        .having(popularityCursorCondition(
+            cursor,
+            idAfter,
+            sortDirection,
+            watcherCount
+        ))
+        .orderBy(createPopularityOrderSpecifiers(sortDirection, watcherCount))
+        .limit(limit + 1)
+        .fetch();
+
+    boolean hasNext = rows.size() > limit;
+    if (hasNext) {
+      rows.remove(limit);
+    }
+
+    String nextCursor = null;
+    UUID nextIdAfter = null;
+    if (!rows.isEmpty()) {
+      Tuple lastRow = rows.get(rows.size() - 1);
+      Long lastWatcherCount = lastRow.get(watcherCount);
+      nextCursor = (lastWatcherCount == null ? 0L : lastWatcherCount)
+          + "|" + lastRow.get(content.reviewCount)
+          + "|" + lastRow.get(content.averageRating);
+      nextIdAfter = lastRow.get(content.id);
+    }
+
+    List<UUID> contentIds = rows.stream()
+        .map(row -> row.get(content.id))
+        .toList();
+    Long totalCount = queryFactory
+        .select(content.id.countDistinct())
+        .from(content)
+        .where(
+            isActive(),
+            eqType(typeEqual),
+            containsKeyword(keywordLike),
+            containsAnyTag(tagsIn)
+        )
+        .fetchOne();
+
+    return new CursorResponse<>(
+        contentIds,
+        nextCursor,
+        nextIdAfter,
+        hasNext,
+        totalCount == null ? 0L : totalCount,
+        SORT_BY_WATCHER_COUNT,
+        sortDirection
     );
   }
 
@@ -171,9 +257,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
     if (SORT_BY_RATE.equals(sortBy)) {
       return rateCursorCondition(cursor, idAfter, sortDirection);
     }
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return popularityCursorCondition(cursor, idAfter, sortDirection);
-    }
     return createdAtCursorCondition(cursor, idAfter, sortDirection);
   }
 
@@ -224,40 +307,75 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   private BooleanExpression popularityCursorCondition(
       String cursor,
       UUID idAfter,
-      SortDirection sortDirection
+      SortDirection sortDirection,
+      NumberExpression<Long> watcherCount
   ) {
+    if (cursor == null || cursor.isBlank()) {
+      return null;
+    }
+
     String[] cursorParts = cursor.split(POPULARITY_CURSOR_DELIMITER, -1);
-    if (cursorParts.length != 2) {
+    if (cursorParts.length != 3) {
       throw new IllegalArgumentException("Invalid watcherCount cursor: " + cursor);
     }
 
-    int cursorReviewCount = Integer.parseInt(cursorParts[0]);
-    double cursorAverageRating = Double.parseDouble(cursorParts[1]);
+    long cursorWatcherCount = Long.parseLong(cursorParts[0]);
+    int cursorReviewCount = Integer.parseInt(cursorParts[1]);
+    double cursorAverageRating = Double.parseDouble(cursorParts[2]);
+    BooleanExpression sameWatcherCount = watcherCount.eq(cursorWatcherCount);
+    BooleanExpression sameReviewCount = content.reviewCount.eq(cursorReviewCount);
+    BooleanExpression sameAverageRating = content.averageRating.eq(cursorAverageRating);
+
     if (sortDirection == SortDirection.ASCENDING) {
-      BooleanExpression afterCursor = content.reviewCount.gt(cursorReviewCount)
-          .or(content.reviewCount.eq(cursorReviewCount)
+      BooleanExpression afterCursor = watcherCount.gt(cursorWatcherCount)
+          .or(sameWatcherCount.and(content.reviewCount.gt(cursorReviewCount)))
+          .or(sameWatcherCount.and(sameReviewCount)
               .and(content.averageRating.gt(cursorAverageRating)));
       if (idAfter == null) {
         return afterCursor;
       }
       return afterCursor.or(
-          content.reviewCount.eq(cursorReviewCount)
-              .and(content.averageRating.eq(cursorAverageRating))
+          sameWatcherCount
+              .and(sameReviewCount)
+              .and(sameAverageRating)
               .and(content.id.gt(idAfter))
       );
     }
 
-    BooleanExpression beforeCursor = content.reviewCount.lt(cursorReviewCount)
-        .or(content.reviewCount.eq(cursorReviewCount)
+    BooleanExpression beforeCursor = watcherCount.lt(cursorWatcherCount)
+        .or(sameWatcherCount.and(content.reviewCount.lt(cursorReviewCount)))
+        .or(sameWatcherCount.and(sameReviewCount)
             .and(content.averageRating.lt(cursorAverageRating)));
     if (idAfter == null) {
       return beforeCursor;
     }
     return beforeCursor.or(
-        content.reviewCount.eq(cursorReviewCount)
-            .and(content.averageRating.eq(cursorAverageRating))
+        sameWatcherCount
+            .and(sameReviewCount)
+            .and(sameAverageRating)
             .and(content.id.lt(idAfter))
     );
+  }
+
+  private OrderSpecifier<?>[] createPopularityOrderSpecifiers(
+      SortDirection sortDirection,
+      NumberExpression<Long> watcherCount
+  ) {
+    OrderSpecifier<UUID> idOrder = createIdOrderSpecifier(sortDirection);
+    if (sortDirection == SortDirection.ASCENDING) {
+      return new OrderSpecifier<?>[]{
+          watcherCount.asc(),
+          content.reviewCount.asc(),
+          content.averageRating.asc(),
+          idOrder
+      };
+    }
+    return new OrderSpecifier<?>[]{
+        watcherCount.desc(),
+        content.reviewCount.desc(),
+        content.averageRating.desc(),
+        idOrder
+    };
   }
 
   private OrderSpecifier<?>[] createOrderSpecifiers(
@@ -265,20 +383,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
       SortDirection sortDirection
   ) {
     OrderSpecifier<UUID> idOrder = createIdOrderSpecifier(sortDirection);
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      if (sortDirection == SortDirection.ASCENDING) {
-        return new OrderSpecifier<?>[]{
-            content.reviewCount.asc(),
-            content.averageRating.asc(),
-            idOrder
-        };
-      }
-      return new OrderSpecifier<?>[]{
-          content.reviewCount.desc(),
-          content.averageRating.desc(),
-          idOrder
-      };
-    }
     if (SORT_BY_RATE.equals(sortBy)) {
       return new OrderSpecifier<?>[]{
           sortDirection == SortDirection.ASCENDING
@@ -302,9 +406,6 @@ public class ContentRepositoryImpl implements ContentRepositoryCustom {
   }
 
   private String nextCursor(Tuple row, String sortBy) {
-    if (SORT_BY_WATCHER_COUNT.equals(sortBy)) {
-      return row.get(content.reviewCount) + "|" + row.get(content.averageRating);
-    }
     if (SORT_BY_RATE.equals(sortBy)) {
       return String.valueOf(row.get(content.averageRating));
     }
