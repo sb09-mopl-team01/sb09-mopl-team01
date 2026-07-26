@@ -68,7 +68,7 @@ public class ContentSearchQueryService {
     }
     String keyword = keywordLike.trim();
     int keywordLength = keyword.codePointCount(0, keyword.length());
-    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[ㄱ-ㅎ]$");
+    boolean isSingleInitial = keywordLength == 1 && keyword.matches("^[\\u3131-\\u314E]$");
     if (!isSingleInitial && (keywordLength < MIN_OPENSEARCH_KEYWORD_LENGTH
         || keywordLength > MAX_OPENSEARCH_KEYWORD_LENGTH)) {
       return false;

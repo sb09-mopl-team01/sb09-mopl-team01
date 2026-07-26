@@ -19,7 +19,7 @@ public class StatelessCsrfTokenRepository implements CsrfTokenRepository {
     this.delegate.setCookieName("XSRF-TOKEN");
     this.delegate.setHeaderName("X-XSRF-TOKEN");
     this.delegate.setCookieCustomizer(cookie -> {
-      cookie.secure(false);
+      cookie.secure(true);
       cookie.path("/");
       cookie.sameSite("Lax");
     });
