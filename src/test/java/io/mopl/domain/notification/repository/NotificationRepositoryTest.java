@@ -119,6 +119,27 @@ class NotificationRepositoryTest {
     assertThat(result).isEqualTo(2);
   }
 
+  @Test
+  @DisplayName("읽지 않은 알림만 읽음 상태로 변경한다")
+  void markAsReadIfUnread() {
+    UUID receiverId = UUID.randomUUID();
+    Notification notification = saveNotification(receiverId, "읽음 처리할 알림");
+
+    int firstUpdateCount = notificationRepository.markAsReadIfUnread(
+        notification.getId(),
+        receiverId
+    );
+    int duplicateUpdateCount = notificationRepository.markAsReadIfUnread(
+        notification.getId(),
+        receiverId
+    );
+
+    Notification result = notificationRepository.findById(notification.getId()).orElseThrow();
+    assertThat(firstUpdateCount).isEqualTo(1);
+    assertThat(duplicateUpdateCount).isZero();
+    assertThat(result.isRead()).isTrue();
+  }
+
   private Notification saveNotification(UUID receiverId, String title) {
     Notification notification = Notification.create(
         receiverId,
