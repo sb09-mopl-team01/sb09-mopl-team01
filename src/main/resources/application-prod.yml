@@ -50,3 +50,8 @@ mopl:
       redis:
         enabled: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_ENABLED:true}
         channel: ${CONTENT_ROOM_CHAT_REALTIME_REDIS_CHANNEL:content-room-chat:realtime}
+  direct-message:
+    realtime:
+      redis:
+        enabled: ${DIRECT_MESSAGE_REALTIME_REDIS_ENABLED:true}
+        channel: ${DIRECT_MESSAGE_REALTIME_REDIS_CHANNEL:direct-message:realtime}
