@@ -48,7 +48,7 @@ public class NotificationMessageFactory {
   }
 
   public List<NotificationRequestedEvent> from(PlaylistSubscribedEvent event) {
-    return List.of(request(sourceEventId(event.playlistId(), event.subscriberId()), event.ownerId(), PLAYLIST_SUBSCRIBED_TITLE,
+    return List.of(request(event.subscriptionId(), event.ownerId(), PLAYLIST_SUBSCRIBED_TITLE,
         PLAYLIST_SUBSCRIBED_CONTENT_FORMAT.formatted(displayName(event.subscriberName()), event.playlistTitle())));
   }
 

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.argThat;
 import static org.mockito.BDDMockito.given;
+import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 
@@ -146,6 +147,11 @@ class PlaylistServiceTest {
     given(userRepository.findById(subscriberId)).willReturn(Optional.of(subscriber));
     given(playlistSubscriptionRepository.existsByPlaylistAndUser(playlist, subscriber))
         .willReturn(false);
+    doAnswer(invocation -> {
+      PlaylistSubscription subscription = invocation.getArgument(0);
+      ReflectionTestUtils.setField(subscription, "id", UUID.randomUUID());
+      return subscription;
+    }).when(playlistSubscriptionRepository).save(any(PlaylistSubscription.class));
 
     playlistService.subscribePlaylist(subscriberId, playlistId);
 
@@ -155,7 +161,8 @@ class PlaylistServiceTest {
       if (!(event instanceof PlaylistSubscribedEvent playlistSubscribedEvent)) {
         return false;
       }
-      return playlistSubscribedEvent.playlistId().equals(playlistId)
+      return playlistSubscribedEvent.subscriptionId() != null
+          && playlistSubscribedEvent.playlistId().equals(playlistId)
           && playlistSubscribedEvent.playlistTitle().equals("Title")
           && playlistSubscribedEvent.ownerId().equals(ownerId)
           && playlistSubscribedEvent.subscriberId().equals(subscriberId)
