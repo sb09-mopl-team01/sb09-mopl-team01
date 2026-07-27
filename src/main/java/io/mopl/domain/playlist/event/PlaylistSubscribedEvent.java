@@ -4,6 +4,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 public record PlaylistSubscribedEvent(
+    UUID subscriptionId,
     UUID playlistId,
     String playlistTitle,
     UUID ownerId,
