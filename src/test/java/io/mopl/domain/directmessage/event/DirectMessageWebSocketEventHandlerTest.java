@@ -5,20 +5,21 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
+import io.mopl.domain.directmessage.realtime.DirectMessageRealtimeEvent;
+import io.mopl.domain.directmessage.realtime.DirectMessageRealtimePublisher;
 import io.mopl.domain.directmessage.service.ConversationService;
 import io.mopl.domain.user.dto.response.UserSummary;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 class DirectMessageWebSocketEventHandlerTest {
 
   private final ConversationService conversationService = mock(ConversationService.class);
-  private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+  private final DirectMessageRealtimePublisher realtimePublisher = mock(DirectMessageRealtimePublisher.class);
   private final DirectMessageWebSocketEventHandler handler = new DirectMessageWebSocketEventHandler(
       conversationService,
-      messagingTemplate
+      realtimePublisher
   );
 
   @Test
@@ -56,9 +57,6 @@ class DirectMessageWebSocketEventHandlerTest {
     handler.handleDirectMessageSent(event);
 
     verify(conversationService).findDirectMessage(directMessageId);
-    verify(messagingTemplate).convertAndSend(
-        "/sub/conversations/%s/direct-messages".formatted(conversationId),
-        message
-    );
+    verify(realtimePublisher).publish(new DirectMessageRealtimeEvent(conversationId, message));
   }
 }
