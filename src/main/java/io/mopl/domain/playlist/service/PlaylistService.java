@@ -106,14 +106,16 @@ public class PlaylistService {
       throw new BaseException(ErrorCode.DUPLICATE_RESOURCE);
     }
 
-    PlaylistSubscription subscription = new PlaylistSubscription(playlist, subscriber);
-    playlistSubscriptionRepository.save(subscription);
+    PlaylistSubscription subscription = playlistSubscriptionRepository.save(
+        new PlaylistSubscription(playlist, subscriber)
+    );
 
     playlistSubscriptionRepository.flush();
     playlistRepository.increaseSubscriberCount(playlistId);
 
     log.info("Playlist subscribed successfully: playlistId={}, subscriberId={}", playlistId, userId);
     eventPublisher.publish(new PlaylistSubscribedEvent(
+        subscription.getId(),
         playlist.getId(),
         playlist.getTitle(),
         playlist.getOwner().getId(),

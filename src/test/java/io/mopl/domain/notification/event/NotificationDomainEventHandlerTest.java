@@ -72,7 +72,9 @@ class NotificationDomainEventHandlerTest {
   @DisplayName("플레이리스트 구독 이벤트를 플레이리스트 소유자의 알림으로 변환한다")
   void handlePlaylistSubscribed() {
     UUID ownerId = UUID.randomUUID();
+    UUID subscriptionId = UUID.randomUUID();
     PlaylistSubscribedEvent event = new PlaylistSubscribedEvent(
+        subscriptionId,
         UUID.randomUUID(),
         "주말 영화",
         ownerId,
@@ -84,6 +86,7 @@ class NotificationDomainEventHandlerTest {
     eventHandler.handlePlaylistSubscribed(event);
 
     verify(eventPublisher).publishEvent((Object) argThat(published -> published instanceof NotificationRequestedEvent request
+        && request.sourceEventId().equals(subscriptionId)
         && request.receiverId().equals(ownerId)
         && request.title().equals("플레이리스트를 구독했습니다")
         && request.content().equals("subscriber님이 '주말 영화' 플레이리스트를 구독했습니다.")
