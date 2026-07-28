@@ -2,6 +2,7 @@ package io.mopl.domain.directmessage.realtime;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
+import io.mopl.global.sse.SseNotificationService;
 import java.io.IOException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -24,6 +25,7 @@ public class DirectMessageRedisMessageListener implements MessageListener {
 
   private final ObjectMapper objectMapper;
   private final SimpMessagingTemplate messagingTemplate;
+  private final SseNotificationService sseNotificationService;
 
   @Override
   public void onMessage(Message message, byte[] pattern) {
@@ -51,6 +53,20 @@ public class DirectMessageRedisMessageListener implements MessageListener {
       log.error("Failed to relay direct message Redis event to local WebSocket subscribers. conversationId={}",
           event.conversationId(), e);
     }
+
+    try {
+      sseNotificationService.sendDirectMessage(
+          event.message().receiver().userId(),
+          event.message().id(),
+          event.message()
+      );
+    } catch (RuntimeException e) {
+      log.error(
+          "Failed to relay direct message Redis event to local SSE subscriber. conversationId={}",
+          event.conversationId(),
+          e
+      );
+    }
   }
 
   private boolean hasRequiredFields(DirectMessageRealtimeEvent event) {
@@ -62,7 +78,9 @@ public class DirectMessageRedisMessageListener implements MessageListener {
     return message.id() != null
         && event.conversationId().equals(message.conversationId())
         && message.sender() != null
+        && message.sender().userId() != null
         && message.receiver() != null
+        && message.receiver().userId() != null
         && StringUtils.hasText(message.content());
   }
 }
