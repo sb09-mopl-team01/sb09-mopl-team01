@@ -1,8 +1,6 @@
 package io.mopl.domain.directmessage.event;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -11,6 +9,8 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import io.mopl.domain.directmessage.dto.DirectMessageDto;
+import io.mopl.domain.directmessage.realtime.DirectMessageRealtimeEvent;
+import io.mopl.domain.directmessage.realtime.DirectMessageRealtimePublisher;
 import io.mopl.domain.directmessage.service.ConversationService;
 import io.mopl.domain.user.dto.response.UserSummary;
 import io.mopl.global.event.DomainEventPublisher;
@@ -27,7 +27,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.scheduling.annotation.EnableAsync;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 import org.springframework.test.context.junit.jupiter.SpringJUnitConfig;
@@ -51,11 +50,11 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
   private ConversationService conversationService;
 
   @Autowired
-  private SimpMessagingTemplate messagingTemplate;
+  private DirectMessageRealtimePublisher realtimePublisher;
 
   @AfterEach
   void tearDown() {
-    reset(conversationService, messagingTemplate);
+    reset(conversationService, realtimePublisher);
   }
 
   @Test
@@ -67,10 +66,7 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
     doAnswer(invocation -> {
       latch.countDown();
       return null;
-    }).when(messagingTemplate).convertAndSend(
-        "/sub/conversations/%s/direct-messages".formatted(event.conversationId()),
-        message
-    );
+    }).when(realtimePublisher).publish(new DirectMessageRealtimeEvent(event.conversationId(), message));
 
     new TransactionTemplate(transactionManager).executeWithoutResult(status ->
         eventPublisher.publish(event)
@@ -78,10 +74,7 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
 
     assertThat(latch.await(2, TimeUnit.SECONDS)).isTrue();
     verify(conversationService).findDirectMessage(event.directMessageId());
-    verify(messagingTemplate).convertAndSend(
-        "/sub/conversations/%s/direct-messages".formatted(event.conversationId()),
-        message
-    );
+    verify(realtimePublisher).publish(new DirectMessageRealtimeEvent(event.conversationId(), message));
   }
 
   @Test
@@ -93,7 +86,7 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
     doAnswer(invocation -> {
       latch.countDown();
       return null;
-    }).when(messagingTemplate).convertAndSend(any(String.class), any(Object.class));
+    }).when(realtimePublisher).publish(new DirectMessageRealtimeEvent(event.conversationId(), message));
 
     new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
       eventPublisher.publish(event);
@@ -102,7 +95,7 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
 
     assertThat(latch.await(500, TimeUnit.MILLISECONDS)).isFalse();
     verify(conversationService, never()).findDirectMessage(event.directMessageId());
-    verify(messagingTemplate, never()).convertAndSend(any(String.class), eq(message));
+    verify(realtimePublisher, never()).publish(new DirectMessageRealtimeEvent(event.conversationId(), message));
   }
 
   private DirectMessageSentEvent createEvent() {
@@ -148,9 +141,9 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
     @Bean
     DirectMessageWebSocketEventHandler directMessageWebSocketEventHandler(
         ConversationService conversationService,
-        SimpMessagingTemplate messagingTemplate
+        DirectMessageRealtimePublisher realtimePublisher
     ) {
-      return new DirectMessageWebSocketEventHandler(conversationService, messagingTemplate);
+      return new DirectMessageWebSocketEventHandler(conversationService, realtimePublisher);
     }
 
     @Bean(name = "directMessageRealtimeExecutor")
@@ -193,8 +186,8 @@ class DirectMessageWebSocketEventHandlerIntegrationTest {
     }
 
     @Bean
-    SimpMessagingTemplate messagingTemplate() {
-      return mock(SimpMessagingTemplate.class);
+    DirectMessageRealtimePublisher directMessageRealtimePublisher() {
+      return mock(DirectMessageRealtimePublisher.class);
     }
   }
 }
