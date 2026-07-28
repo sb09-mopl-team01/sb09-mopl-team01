@@ -1,7 +1,7 @@
 spring:
   config:
     import:
-      - classpath:application-local-redis.yml
+      - classpath:config/redis-local.yml
   h2:
     console:
       enabled: true
@@ -16,6 +16,21 @@ spring:
       initialization-fail-timeout: 0
       connection-timeout: 3000
       maximum-pool-size: 5
+
+  mail:
+    username: local@example.invalid
+    password: local-only-not-a-secret
+
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: local-google-client-id
+            client-secret: local-google-client-secret
+          kakao:
+            client-id: local-kakao-client-id
+            client-secret: local-kakao-client-secret
 
   jpa:
     hibernate:
@@ -35,7 +50,17 @@ spring:
   batch:
     jdbc:
       initialize-schema: always
+
+jwt:
+  secret: ${LOCAL_JWT_SECRET}
+
 mopl:
+  external:
+    tmdb:
+      api-key: local-tmdb-api-key
+    the-sports-db:
+      api-key: local-sports-api-key
+      league-id: local-league-id
   content:
     batch:
       external-sync:

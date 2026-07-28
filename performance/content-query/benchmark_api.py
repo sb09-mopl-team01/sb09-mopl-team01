@@ -180,9 +180,11 @@ def main() -> None:
 
     email = os.environ.get("ADMIN_EMAIL")
     password = os.environ.get("ADMIN_PASSWORD")
-    redis_password = os.environ.get("PERF_REDIS_PASSWORD", "perf-local-only")
-    if not email or not password:
-        raise SystemExit("ADMIN_EMAIL and ADMIN_PASSWORD environment variables are required")
+    redis_password = os.environ.get("PERF_REDIS_PASSWORD")
+    if not email or not password or not redis_password:
+        raise SystemExit(
+            "ADMIN_EMAIL, ADMIN_PASSWORD and PERF_REDIS_PASSWORD environment variables are required"
+        )
 
     token = login(args.base_url.rstrip("/"), email, password)
 

@@ -1,196 +1,356 @@
-# 모두의 플리 서버
+# 모두의 플리 (MOPL)
+
+> 흩어진 영화·드라마·스포츠 콘텐츠를 한곳에서 탐색하고,
+> 플레이리스트와 실시간 상호작용으로 취향과 시청 경험을 연결하는 콘텐츠 플랫폼
 
 ![Java](https://img.shields.io/badge/Java-17-007396?logo=openjdk&logoColor=white)
 ![Spring Boot](https://img.shields.io/badge/Spring%20Boot-3.5.x-6DB33F?logo=springboot&logoColor=white)
 ![PostgreSQL](https://img.shields.io/badge/PostgreSQL-Main%20RDB-4169E1?logo=postgresql&logoColor=white)
-![AWS](https://img.shields.io/badge/AWS-ECS%20%7C%20ALB%20%7C%20S3%20%7C%20ECR-FF9900?logo=amazonaws&logoColor=white)
+![Redis](https://img.shields.io/badge/Redis-Realtime-DC382D?logo=redis&logoColor=white)
+![Kafka](https://img.shields.io/badge/Apache%20Kafka-Event-231F20?logo=apachekafka&logoColor=white)
+![AWS](https://img.shields.io/badge/AWS-ECS%20%7C%20RDS%20%7C%20S3-FF9900?logo=amazonaws&logoColor=white)
 ![CI](https://img.shields.io/badge/GitHub%20Actions-CI%2FCD-2088FF?logo=githubactions&logoColor=white)
+
+## 목차
+
+- [프로젝트 소개](#프로젝트-소개)
+- [핵심 사용자 경험](#핵심-사용자-경험)
+- [주요 기능](#주요-기능)
+- [핵심 기술 설계](#핵심-기술-설계)
+- [시스템 아키텍처](#시스템-아키텍처)
+- [도메인 구조](#도메인-구조)
+- [기술 스택](#기술-스택)
+- [품질 관리와 협업](#품질-관리와-협업)
+- [로컬 실행](#로컬-실행)
 
 ## 프로젝트 소개
 
-모두의 플리는 영화, 드라마, 스포츠 등 다양한 콘텐츠를 함께 탐색하고, 개인 플레이리스트와 실시간 시청 경험을 제공하는 콘텐츠 큐레이션 서비스 백엔드입니다.
+콘텐츠 서비스는 작품을 찾는 경험과 시청 후 감상을 나누는 경험이 서로 분리되어 있습니다.
+모두의 플리는 여러 외부 콘텐츠를 통합해 탐색하고, 사용자가 만든 플레이리스트를 중심으로 다른 사용자와 관계를 맺으며, 같은 콘텐츠를 보는 순간까지 연결하는 것을 목표로 합니다.
 
-사용자는 콘텐츠를 평가하거나 플레이리스트로 관리할 수 있고, 다른 사용자와 팔로우, DM, 실시간 채팅, 알림을 통해 상호작용할 수 있습니다.
+| 항목 | 내용                                                      |
+| --- |---------------------------------------------------------|
+| 프로젝트 형태 | 5인 백엔드 팀 프로젝트                                           |
+| 개발 기간 | 2026.06 ~ 2026.07                                       |
+| 개발 방식 | `dev` 통합 브랜치 기반 기능 브랜치·Pull Request·코드 리뷰               |
+| API 계약 | Swagger/OpenAPI 우선                                      |
+| 운영 환경 | AWS ALB → Nginx ECS → Spring Boot ECS → RDS·ElastiCache |
 
-## 서비스
+서비스 확장성과 안정적인 사용자 경험을 위해 다음 기술 목표를 두었습니다.
 
-- 헬스 체크: `/actuator/health`
-- Swagger UI: `/swagger-ui/index.html`
-- API Docs: `/v3/api-docs`
-- WebSocket STOMP: `/ws`
+- 여러 서버 인스턴스 간 시청 상태와 실시간 메시지의 일관된 전달
+- 도메인 트랜잭션과 비동기 알림 이벤트 사이의 유실·중복 방지
+- 데이터 증가에도 안정적인 검색 및 커서 페이지네이션 성능 확보
+- 외부 API와 메시지 브로커 장애가 핵심 사용자 요청으로 전파되지 않는 격리 구조
+
+## 핵심 사용자 경험
+
+```mermaid
+flowchart LR
+    Explore["콘텐츠 탐색<br/>영화 · 드라마 · 스포츠"]
+    Curate["리뷰 작성<br/>플레이리스트 구성"]
+    Watch["시청 세션 참여<br/>현재 시청자 확인"]
+    Interact["콘텐츠 채팅 · DM<br/>팔로우"]
+    Notify["SSE 실시간 알림"]
+
+    Explore --> Curate --> Watch --> Interact --> Notify
+    Notify -. 재방문 .-> Explore
+```
+
+1. TMDB와 TheSportsDB에서 수집한 콘텐츠를 검색하고 상세 정보를 확인합니다.
+2. 리뷰를 남기거나 나만의 플레이리스트를 만들고 다른 사용자의 플레이리스트를 구독합니다.
+3. 콘텐츠 시청 세션에 참여해 현재 함께 시청 중인 사용자를 확인합니다.
+4. 시청 참여자끼리 콘텐츠 채팅을 나누고, 사용자 간에는 영속적인 DM을 주고받습니다.
+5. 팔로우·플레이리스트·DM 등 주요 활동을 실시간 알림으로 전달받습니다.
 
 ## 주요 기능
 
-| 구분 | 내용 |
+| 영역 | 기능 | 구현 포인트 |
+| --- | --- | --- |
+| 인증·사용자 | JWT 로그인, Google·Kakao OAuth2, 권한·잠금 관리, 프로필 | Spring Security, CSRF 방어, Redis 토큰 관리 |
+| 콘텐츠 | 영화·드라마·스포츠 수집, 검색·필터·정렬, 관리자 CRUD | TMDB·TheSportsDB, QueryDSL, PostgreSQL `pg_trgm` |
+| 큐레이션 | 리뷰, 플레이리스트, 콘텐츠 추가, 구독 | 커서 페이지네이션, 도메인 이벤트 |
+| 소셜 | 팔로우, 사용자 검색, 현재 시청 정보 | Redis Cache, OpenSearch 장애 시 DB fallback |
+| 실시간 시청 | 입장·퇴장, 현재 시청자, 콘텐츠 채팅 | WebSocket/STOMP, Redis lease·Pub/Sub |
+| 다이렉트 메시지 | 대화방, 메시지 내역, 읽음 처리, 실시간 수신 | PostgreSQL 영속화, WebSocket, 참여자 인가 |
+| 알림 | 목록·읽음 처리, 실시간 전달, 비동기 생성 | SSE, Kafka, Transactional Outbox, DLT |
+| 운영 | 헬스 체크, 메트릭, 로그 보관, 자동 배포 | Actuator, Prometheus, Spring Batch, AWS ECS |
+
+## 핵심 기술 설계
+
+### 1. 다중 인스턴스 실시간 상태 동기화
+
+ECS Task마다 WebSocket 연결과 JVM 메모리가 분리되므로 로컬 상태만으로는 다른 Task에 접속한 사용자에게 이벤트를 전달할 수 없습니다.
+
+- PostgreSQL을 최종 시청 상태와 DM의 영속 저장소로 사용했습니다.
+- Redis Set과 lease로 콘텐츠별 현재 시청자 및 Task별 구독 상태를 공유했습니다.
+- Redis Pub/Sub으로 시청 상태, 콘텐츠 채팅, DM, SSE 알림을 모든 Task에 중계했습니다.
+- 비정상 종료 시 만료 lease를 정리하고 DB 상태를 멱등하게 복구하도록 설계했습니다.
+- STOMP 구독 시 시청 참여자와 대화 참여자를 검증해 destination 탈취를 차단했습니다.
+
+Redis Pub/Sub은 실시간 전달 경로일 뿐 영속 기록으로 사용하지 않습니다. 재접속 후 복구가 필요한 데이터는 PostgreSQL 조회 API를 기준으로 합니다.
+
+### 2. 알림 이벤트의 유실과 중복 방지
+
+도메인 변경과 Kafka 발행을 한 트랜잭션으로 묶을 수 없는 문제를 Transactional Outbox로 해결했습니다.
+
+```mermaid
+sequenceDiagram
+    participant Domain as Domain Service
+    participant DB as PostgreSQL
+    participant Relay as Outbox Relay
+    participant Kafka
+    participant Consumer as Notification Consumer
+    participant Client
+
+    Domain->>DB: 도메인 변경 + Outbox 저장
+    DB-->>Domain: 동일 트랜잭션 Commit
+    Relay->>DB: SKIP LOCKED로 이벤트 선점
+    Relay->>Kafka: Integration Event 발행
+    Kafka->>Consumer: 이벤트 전달
+    Consumer->>DB: 멱등 키 확인 + 알림 저장
+    Consumer-->>Client: Redis Pub/Sub + SSE
+```
+
+- PostgreSQL `FOR UPDATE SKIP LOCKED`로 여러 Relay가 같은 이벤트를 처리하지 않도록 했습니다.
+- broker ACK 이후에만 Outbox를 완료 처리하고, 실패 시 지수 백오프로 재시도합니다.
+- 결정적 `deduplication_key`와 `processed_kafka_events` 유니크 제약으로 중복을 방어합니다.
+- 영구 오류는 DLT로 격리하고, 일시 오류만 제한적으로 재시도합니다.
+- JSON Schema 호환성을 배포 전에 검증하며 런타임 자동 등록은 비활성화했습니다.
+
+### 3. 콘텐츠 100,000건 조회 성능 개선
+
+재현 가능한 부하 환경에서 병목을 측정하고, 효과가 확인된 변경만 운영 코드에 반영했습니다.
+
+| 시나리오 | 개선 전 p95 | 개선 후 p95 | 결과 |
+| --- | ---: | ---: | ---: |
+| 최신순 조회 | 78.169ms | 28.383ms | 63.7% 감소 |
+| 3글자 검색 | 468.841ms | 27.711ms | 94.1% 감소 |
+| 2글자 + 태그 검색 | 618.159ms | 97.468ms | 84.2% 감소 |
+| 깊은 생성일 커서 DB 실행 | 21.467ms | 0.074ms | 99% 이상 감소 |
+
+- 3글자 이상 부분 검색에 PostgreSQL `pg_trgm` GIN 인덱스를 적용했습니다.
+- 짧은 검색어는 정확한 검색 의미를 유지하는 별도 안전 경로로 분리했습니다.
+- 복합 인덱스 순서와 같은 행 값 비교를 사용해 깊은 커서의 인덱스 탐색을 유도했습니다.
+- 불필요한 `DISTINCT`와 `COUNT(DISTINCT ...)`를 제거했습니다.
+- OpenSearch 도입이나 광범위한 결과 캐시는 운영 복잡도와 무효화 비용을 측정한 뒤 적용 범위에서 제외했습니다.
+
+측정 환경과 재현 방법은 [콘텐츠 조회 성능 최적화 보고서](performance/content-query/final-report.md)에서 확인할 수 있습니다.
+
+### 4. 운영 장애를 고려한 경계 설계
+
+| 장애 지점 | 대응 |
 | --- | --- |
-| 사용자 | 회원가입, 로그인, JWT 인증/인가, 어드민 계정 초기화, 권한 관리, 계정 잠금 |
-| 콘텐츠 | 콘텐츠 등록, 수정, 삭제, 조회, TMDB 및 The Sports DB 연동 수집 |
-| 큐레이션 | 콘텐츠 평가, 개인 플레이리스트, 플레이리스트 구독 |
-| 프로필 | 프로필 조회/수정, 팔로우, 현재 시청 중 콘텐츠 조회 |
-| 실시간 | WebSocket 기반 시청 세션, 콘텐츠 채팅, DM 실시간 송수신 |
-| 알림 | SSE 기반 알림 전송, 알림 조회 및 읽음 처리 |
-| 운영 | Actuator 헬스 체크, Prometheus 메트릭, GitHub Actions 기반 검증 |
+| 외부 콘텐츠 API | timeout·재시도 정책과 provider별 실패 격리 |
+| OpenSearch | 검색 실패 시 PostgreSQL 조회 경로로 fallback |
+| Kafka | HTTP readiness에서 분리하고 Outbox 재시도로 복구 |
+| Redis 실시간 중계 | 영속 데이터는 PostgreSQL에서 재조회 |
+| ECS Task 종료 | Redis lease 만료 감지와 멱등 DB 정리 |
+| 배포 | 새 Task Definition과 ECR image 반영 후 service stability 확인 |
+
+## 시스템 아키텍처
+
+```mermaid
+flowchart TB
+    Client["Web Client"]
+    ALB["AWS ALB<br/>HTTPS"]
+    Nginx["Nginx ECS<br/>Reverse Proxy"]
+
+    subgraph App["Spring Boot ECS Service"]
+        App1["Application Task 1"]
+        App2["Application Task 2"]
+    end
+
+    RDS[("PostgreSQL / RDS<br/>영속 데이터 · Outbox")]
+    Redis[("Redis / ElastiCache<br/>Cache · Lease · Pub/Sub")]
+    Kafka["Confluent Kafka<br/>비동기 이벤트 · DLT"]
+    S3["AWS S3<br/>이미지 · 로그 보관"]
+    External["TMDB · TheSportsDB<br/>외부 콘텐츠 API"]
+    Metrics["Actuator · Prometheus<br/>CloudWatch"]
+    Actions["GitHub Actions"]
+    ECR["AWS ECR"]
+
+    Client --> ALB --> Nginx
+    Nginx --> App1
+    Nginx --> App2
+    App1 --> RDS
+    App2 --> RDS
+    App1 <--> Redis
+    App2 <--> Redis
+    App1 <--> Kafka
+    App2 <--> Kafka
+    App1 --> S3
+    App2 --> S3
+    App1 --> External
+    App2 --> External
+    App1 --> Metrics
+    App2 --> Metrics
+    Actions --> ECR
+    ECR --> App1
+    ECR --> App2
+```
+
+### 데이터 저장소의 역할
+
+| 저장소 | 책임 | 선택 이유 |
+| --- | --- | --- |
+| PostgreSQL | 사용자·콘텐츠·리뷰·메시지·알림·Outbox | 트랜잭션과 영속 데이터의 단일 기준 |
+| Redis | Cache, 토큰, 시청 lease·presence, 실시간 Pub/Sub | 짧은 수명의 공유 상태와 빠른 fan-out |
+| Kafka | 도메인 간 비동기 알림 이벤트, DLT | 생산자·소비자 분리와 실패 복구 |
+| OpenSearch | 사용자 검색 | 검색 확장성 확보, 장애 시 DB fallback |
+| S3 | 프로필 이미지와 로그 아카이브 | 애플리케이션 파일 시스템과 수명 분리 |
+
+## 도메인 구조
+
+```mermaid
+erDiagram
+    USER ||--o{ SOCIAL_ACCOUNT : authenticates
+    USER ||--o{ FOLLOW : follows
+    USER ||--o{ REVIEW : writes
+    USER ||--o{ PLAYLIST : owns
+    USER ||--o{ PLAYLIST_SUBSCRIPTION : subscribes
+    USER ||--o| WATCHING_SESSION : watches
+    USER ||--o{ CONVERSATION : participates
+    USER ||--o{ DIRECT_MESSAGE : sends
+    USER ||--o{ NOTIFICATION : receives
+
+    CONTENT ||--o{ CONTENT_TAG : has
+    CONTENT ||--o{ REVIEW : receives
+    CONTENT ||--o{ PLAYLIST_CONTENT : included_in
+    CONTENT ||--o{ WATCHING_SESSION : watched_by
+
+    PLAYLIST ||--o{ PLAYLIST_CONTENT : contains
+    PLAYLIST ||--o{ PLAYLIST_SUBSCRIPTION : subscribed_by
+    CONVERSATION ||--o{ DIRECT_MESSAGE : contains
+```
+
+실제 운영 스키마는 Flyway 마이그레이션을 기준으로 관리하며, JPA의 `ddl-auto`는 운영 환경에서 사용하지 않습니다.
 
 ## 기술 스택
 
 | 구분 | 기술 |
 | --- | --- |
-| Backend & Application | Java 17, Spring Boot 3.5.x, Spring Batch, RestClient, Actuator, MapStruct, QueryDSL |
-| Data & Messaging | PostgreSQL, Spring Data JPA, Spring Data JDBC, Redis, Apache Kafka |
-| Infrastructure & DevOps | AWS ECS, ALB, S3, ECR, Docker, GitHub Actions, NGINX |
-| API Documentation & Testing | Swagger, OpenAPI, JUnit5, Mockito, Jacoco, WireMock, Testcontainers |
+| Backend | Java 17, Spring Boot 3.5, Spring Security, Spring Batch |
+| Persistence | PostgreSQL, Spring Data JPA, QueryDSL, Flyway |
+| Search & Cache | OpenSearch, Redis, Spring Cache |
+| Messaging & Realtime | Kafka, Confluent Schema Registry, WebSocket/STOMP, SSE |
+| External & Storage | Spring RestClient, TMDB, TheSportsDB, AWS S3 |
+| Infrastructure | Docker, AWS ECS·ALB·RDS·ECR, Nginx, Secrets Manager |
+| Test & Quality | JUnit 5, Mockito, Testcontainers, Embedded Kafka, JaCoCo |
+| CI/CD & Observability | GitHub Actions, Actuator, Prometheus, CloudWatch |
 
-## 아키텍처
+## 품질 관리와 협업
+
+### 자동 검증
+
+- PR과 `dev`·`main` 반영 시 테스트와 JaCoCo 검증을 GitHub Actions에서 실행합니다.
+- DTO·Entity·Exception·Mapper를 제외한 비즈니스 코드의 라인 커버리지 80%를 품질 게이트로 적용합니다.
+- PostgreSQL 동시성 쿼리, Kafka 소비·DLT, Redis Pub/Sub, WebSocket 인가를 변경 범위에 맞는 통합·단위 테스트로 검증합니다.
+- API 계약은 Swagger/OpenAPI를 기준으로 관리하고, DB 변경은 기존 migration을 수정하지 않고 새 Flyway version으로 추가합니다.
+
+```bash
+./gradlew check --no-daemon
+```
+
+### 브랜치와 배포 흐름
 
 ```mermaid
 flowchart LR
-    Client["Client"] --> ALB["AWS ALB (HTTPS)"]
-    ALB --> NGINX["Nginx ECS service"]
-    NGINX --> CloudMap["Cloud Map: app.mopl.local"]
-    CloudMap --> ECS["Spring Boot ECS service"]
-    ECS --> RDS["PostgreSQL"]
-    ECS --> S3["S3"]
-    ECS --> Redis["Redis"]
-    ECS --> Kafka["Apache Kafka"]
-    ECS --> CloudWatch["CloudWatch / Metrics"]
-    Github["GitHub Actions"] --> ECR["AWS ECR"]
-    ECR --> ECS
+    Dev["dev"]
+    Work["feat / fix / docs branch"]
+    PR["Pull Request<br/>Review + CI"]
+    Main["main"]
+    Deploy["Schema 검증<br/>ECR Build<br/>ECS Deploy"]
+
+    Dev --> Work --> PR --> Dev
+    Dev --> Main --> Deploy
 ```
 
-## 운영 확장 메모
-
-- ECS는 ALB → Nginx 서비스 → Cloud Map(`app.mopl.local`) → Spring Boot 서비스 순서로 요청을 전달합니다. ALB target group은 Nginx의 `/nginx-health`를, 운영 점검은 Spring Boot의 `/actuator/health/liveness`와 `/actuator/health/readiness`를 사용합니다.
-- prod 프로필은 `server.forward-headers-strategy=framework`로 ALB·Nginx가 전달한 `X-Forwarded-*` 헤더를 Spring MVC 요청과 리다이렉트 URL에 반영합니다. Spring Boot Task의 security group은 Nginx Task security group만 인바운드 8080을 허용해야 하며, 클라이언트가 `X-Forwarded-*` 헤더를 직접 주입할 수 없어야 합니다.
-- Nginx는 `/api/sse`에서 buffering을 끄고, `/ws`의 WebSocket/SockJS Upgrade를 전달합니다. Nginx와 Spring Boot 서비스는 모두 최소 2개 Task로 운영해야 단일 Task 장애에 대응할 수 있습니다.
-- `application-prod.yml`은 AWS Secrets Manager `mopl-prod-secrets`에서 DB 및 Confluent Cloud 연결 정보를 읽습니다. Kafka·Schema Registry API key와 secret은 Git이나 Task Definition에 넣지 않습니다.
-
-## ECS 이미지 빌드 및 배포
-
-GitHub Actions의 prod 배포는 `main` 병합 시에만 실행됩니다. 로컬에서 ECR 이미지를 검증·업로드해야 하는 경우 Fargate의 기본 x86_64 런타임과 맞도록 `linux/amd64` 플랫폼을 명시합니다.
-
-```bash
-docker buildx build --platform linux/amd64 --load -t "$ECR_APP_URI:$IMAGE_TAG" .
-docker push "$ECR_APP_URI:$IMAGE_TAG"
-
-docker buildx build --platform linux/amd64 --load -t "$ECR_NGINX_URI:$IMAGE_TAG" ./nginx
-docker push "$ECR_NGINX_URI:$IMAGE_TAG"
-```
-
-ECS 서비스에 반영된 Task Definition revision과 ECR image digest를 함께 확인합니다. 소스의 이미지 태그만 바뀌고 서비스가 새 revision을 채택하지 않은 상태는 배포 완료가 아닙니다.
-
-- WatchingSession의 최종 시청 세션은 PostgreSQL에 보관하고, Redis 활성화 환경에서는 콘텐츠별 현재 시청자 상태를 ElastiCache Set으로 공유합니다.
-- `WATCHING_SESSION_REDIS_ENABLED=true`이면 ECS Task별 시청 구독을 Redis lease로 관리합니다. 동일 사용자가 여러 Task 또는 여러 탭에서 구독하더라도 전역 최초 구독에서만 JOIN, 전역 마지막 구독 해제에서만 LEAVE를 발생시킵니다. lease 만료 시각과 정리 판단은 ECS Task 시간이 아닌 Redis `TIME`을 기준으로 합니다.
-- 정상 해제 또는 Task 비정상 종료로 마지막 lease가 제거되면 같은 Redis ZSET에 DB 종료 복구 마커를 원자적으로 남깁니다. DB 종료 중에는 close guard가 새 lease 획득을 막고, guard 획득 전에 새 구독이 생기면 복구를 취소하여 현재 시청 세션을 종료하지 않습니다. DB 종료는 `endWatchingIfPresent`로 멱등 처리하며, 실패 시 다음 maintenance에서 지수 backoff로 재시도합니다.
-- 자동 복구는 기본 24시간·10회로 제한합니다. 한도를 넘으면 자동 재시도를 중단하고 failed 마커를 7일 보관한 뒤 Redis TTL로 정리합니다. `mopl.watching.session.lease.recovery{outcome="exhausted"}` 증가와 `requires operational action` 로그는 DB 상태 확인 및 수동 정리 대상입니다. lease 키 자체도 기본 7일 보존하므로 전체 ECS 중단이 이 기간을 넘으면 PostgreSQL의 잔존 WatchingSession을 별도로 점검해야 합니다.
-- 입장·퇴장 변경 이벤트는 Redis Pub/Sub으로 중계하여, 어느 ECS Task에 연결된 클라이언트라도 동일한 WebSocket 변경 이벤트를 받습니다. Pub/Sub은 휘발성 UI 동기화 경로이며, Kafka 기반 영속 이벤트 처리는 별도 후속 작업으로 관리합니다.
-- WebSocket STOMP 연결은 JWT 인증이 필요합니다. `/sub/contents/{contentId}/watch`는 인증 사용자를, `/sub/contents/{contentId}/chat`은 해당 콘텐츠의 현재 WatchingSession 참여자를, `/sub/conversations/{conversationId}/direct-messages`는 대화 참여자만 구독할 수 있습니다.
-- `WATCHING_SESSION_REDIS_PRESENCE_TTL`, `WATCHING_SESSION_REDIS_LEASE_TTL`, `WATCHING_SESSION_REDIS_LEASE_MAINTENANCE_DELAY_MILLIS`로 기본 만료 정책을 조정할 수 있습니다. 복구 close guard TTL은 DB 종료 transaction timeout보다 길어야 합니다. ElastiCache 운영 환경에서는 `REDIS_SSL_ENABLED=true`와 별도 `REDIS_PASSWORD`를 사용합니다. 로컬·테스트 기본값은 Redis 기능 비활성화 상태입니다.
-- 실시간 시청자 수는 현재 DB count 기준으로 계산합니다. 고동시성 구간에서만 Redis Set cardinality 또는 별도 counter로 조회 경로를 분리합니다.
-
-| WatchingSession lease 환경 변수 | 기본값 | 용도 |
-| --- | --- | --- |
-| `WATCHING_SESSION_REDIS_LEASE_KEY_RETENTION` | `P7D` | Task 전체 중단 후에도 만료 lease를 복구할 수 있도록 lease 키를 보존하는 상한 |
-| `WATCHING_SESSION_REDIS_RECOVERY_DB_TIMEOUT_SECONDS` | `10` | 멱등 DB 종료 transaction timeout |
-| `WATCHING_SESSION_REDIS_RECOVERY_LOCK_TTL` | `PT30S` | DB 종료 중 새 lease 획득을 막는 close guard TTL |
-| `WATCHING_SESSION_REDIS_RECOVERY_RETENTION` | `PT24H` | 자동 복구 pending 상태 최대 보존 기간 |
-| `WATCHING_SESSION_REDIS_RECOVERY_FAILED_RETENTION` | `P7D` | 자동 복구 한도 초과 failed 마커 보존 기간 |
-| `WATCHING_SESSION_REDIS_RECOVERY_MAX_ATTEMPTS` | `10` | 자동 DB 종료 최대 시도 횟수 |
-| `WATCHING_SESSION_REDIS_RECOVERY_BATCH_SIZE` | `100` | maintenance 한 번에 처리할 최대 복구 건수 |
-| `WATCHING_SESSION_REDIS_RECOVERY_INITIAL_BACKOFF` | `PT5S` | 첫 복구 실패 후 재시도 대기 시간 |
-| `WATCHING_SESSION_REDIS_RECOVERY_BACKOFF_MULTIPLIER` | `2.0` | 복구 재시도 지수 backoff 배수 |
-| `WATCHING_SESSION_REDIS_RECOVERY_MAX_BACKOFF` | `PT5M` | 복구 재시도 최대 대기 시간 |
-
-운영에서는 `mopl.watching.session.lease.recovery`의 `retry_scheduled`, `exhausted`, `claim_error`, `completion_error`, `record_error` 결과를 모니터링합니다. `exhausted` 또는 Redis 오류 결과가 발생하면 `SCAN MATCH watching-session:lease:watcher:*`와 해당 키의 `ZRANGE ... WITHSCORES`로 복구·failed 마커를 확인하고, PostgreSQL의 watcher/content WatchingSession 존재 여부를 대조합니다.
-
-## Kafka 및 스키마 마이그레이션 기반
-
-- Flyway는 `dev`·`prod` 프로필에서 활성화되어 `src/main/resources/db/migration`의 SQL을 PostgreSQL 시작 시 적용합니다. 공통 설정의 `FLYWAY_ENABLED` 기본값은 `false`이며, `test` 프로필은 Flyway를 비활성화합니다.
-- 도메인 서비스는 `IntegrationEventPublisher` 포트로 이벤트를 `event_outbox`에 같은 트랜잭션으로 저장합니다. Kafka 알림 모드는 원본 도메인 이벤트를 `BEFORE_COMMIT`에 처리하고 `REQUIRED` 전파로 Outbox를 적재하므로, 원본 트랜잭션 롤백 시 Outbox도 함께 롤백됩니다. LOCAL 모드는 기존 `AFTER_COMMIT` 즉시 알림 생성 흐름을 유지합니다. 다중 Relay는 PostgreSQL `FOR UPDATE SKIP LOCKED`로 이미 선점된 이벤트를 건너뛰고, Kafka broker ACK 이후에만 발행 완료로 변경합니다.
-- Kafka와 Outbox Relay는 기본값 `KAFKA_ENABLED=false`로 비활성화됩니다. ECS prod Task는 `KAFKA_ENABLED=true`, `NOTIFICATION_DELIVERY_MODE=kafka`로 활성화합니다. 런타임은 Schema Registry에 자동 등록하지 않으며, main 배포 워크플로가 `notification-value`와 `notification-dlt-value` subject의 BACKWARD 호환성을 확인하고 스키마를 등록한 뒤 배포합니다. 발행 실패는 지수 백오프로 재시도하고 선점 만료 이벤트는 복구합니다.
-- 알림 전달 모드는 기본 `local`이며, `NOTIFICATION_DELIVERY_MODE=kafka`에서 `NotificationRequestedEvent`를 Outbox로 적재하고 `notification` consumer가 처리합니다. Outbox는 `sourceEventId:receiverId` 결정적 `deduplication_key`의 유니크 제약으로 중복 적재를 방지하고, `processed_kafka_events.event_key`의 유니크 제약으로 envelope `eventId` 중복 수신은 무시합니다.
-- 알림 consumer는 `ErrorHandlingDeserializer`로 Schema Registry 조회 실패, 잘못된 JSON Schema payload, 바이너리 역직렬화 실패를 listener poll 단계에서 격리합니다. 역직렬화 실패 원본 `byte[]`는 전용 serializer로, 정상 JSON Schema 객체는 기본 serializer로 `notification-dlt`에 보존합니다.
-- 알 수 없는 `eventType`·지원하지 않는 `eventVersion`·필수 payload 누락 같은 영구 오류는 즉시 `notification-dlt`로 이동합니다. DB·네트워크 등 일시 오류만 blocking backoff로 재시도하며, DLT는 원인 수정 후 새 consumer group 또는 명시적 offset 관리로 재처리합니다. 원인을 고치지 않은 채 원본 topic에 재발행하지 않습니다.
-- DLT topic의 partition 수는 원본 `notification` topic 이상이어야 합니다. Recoverer가 원본 partition 번호로 DLT에 발행하므로 이 조건을 만족하지 않으면 DLT 발행 자체가 실패할 수 있습니다.
-- SSE 알림 실시간 발송은 기본적으로 현재 Task의 연결에 직접 전송합니다. `NOTIFICATION_REALTIME_REDIS_ENABLED=true`이면 생성 이벤트를 Redis Pub/Sub 채널에 발행하고, 모든 ECS Task가 수신 후 각 Task가 보유한 해당 수신자의 SSE 연결에 전달합니다. Redis Pub/Sub은 휘발성 UI 전달 경로이므로 영속적 재전송이 필요한 알림 조회는 기존 DB API를 기준으로 합니다.
-
-| 환경 변수 | 기본값 | 용도 |
-| --- | --- | --- |
-| `KAFKA_ENABLED` | `false` | Kafka producer, listener, health check 및 Outbox Relay 활성화 여부 |
-| `KAFKA_BOOTSTRAP_SERVERS` | `localhost:9092` | Kafka broker 주소 목록 |
-| `KAFKA_SCHEMA_REGISTRY_URL` | `http://localhost:8081` | Confluent Schema Registry 주소 |
-| `KAFKA_API_KEY` | 없음 | Confluent Kafka runtime 서비스 계정 API key (prod secret) |
-| `KAFKA_API_SECRET` | 없음 | Confluent Kafka runtime 서비스 계정 API secret (prod secret) |
-| `KAFKA_SCHEMA_REGISTRY_API_KEY` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API key (`mopl-prod-secrets`) |
-| `KAFKA_SCHEMA_REGISTRY_API_SECRET` | 없음 | ECS runtime 및 CI schema 등록·호환성 검사 공용 API secret (`mopl-prod-secrets`) |
-| `NOTIFICATION_DELIVERY_MODE` | `local` | `local` 즉시 처리 또는 `kafka` Outbox·Consumer 처리 선택 |
-| `NOTIFICATION_REALTIME_REDIS_ENABLED` | `false` | 다중 인스턴스 SSE 알림 Redis Pub/Sub 중계 활성화 여부 |
-| `NOTIFICATION_REALTIME_REDIS_CHANNEL` | `notification:realtime` | SSE 알림 Redis Pub/Sub 채널 |
-| `NOTIFICATION_KAFKA_TOPIC` | `notification` | 알림 요청 토픽 |
-| `NOTIFICATION_KAFKA_DLT_TOPIC` | `notification-dlt` | 재시도 한도 초과 레코드 토픽 |
-| `NOTIFICATION_KAFKA_MAX_RETRIES` | `3` | Consumer blocking 재시도 횟수 |
-| `OUTBOX_RELAY_ENABLED` | `true` | Outbox Relay 및 발행 완료 데이터 정리 스케줄 활성화 여부 |
-| `OUTBOX_RELAY_BATCH_SIZE` | `20` | 한 번의 Relay 실행에서 선점할 최대 이벤트 수 |
-| `OUTBOX_MAX_ATTEMPTS` | `5` | Kafka 발행 최대 시도 횟수. 초과 시 `FAILED` 상태로 보관 |
-| `OUTBOX_CLAIM_TIMEOUT` | `PT2M` | Relay 장애로 간주하고 선점 이벤트를 복구할 시간. 기본 `send-timeout` 5초 기준 최대 20건을 순차 발행하는 시간을 포함합니다. |
-| `FLYWAY_ENABLED` | `false` | 공통 설정에서 Flyway 마이그레이션을 활성화할지 여부 (`dev`·`prod`는 별도 활성화) |
-
-`application-prod.yml`에서만 AWS Secrets Manager import를 수행합니다. 따라서 `test`와 `local` 프로필은 외부 Secrets Manager 연결 없이 실행됩니다.
-이번 변경은 내부 이벤트·Outbox 저장 경계만 다루며 Swagger 엔드포인트와 요청·응답 DTO에는 영향이 없습니다.
-
-### Confluent Cloud 운영 적용
-
-- Confluent Cloud에는 `notification`, `notification-dlt` topic을 만들고 DLT partition 수를 원본 이상으로 설정합니다.
-- `mopl-prod-secrets` 하나에 ECS runtime 및 CI용 Confluent bootstrap/Schema Registry URL과 Kafka·Schema Registry API key를 등록합니다. ECS Task Role과 GitHub Actions 배포 IAM 사용자는 이 Secret에만 `secretsmanager:GetSecretValue` 권한이 필요하며, ECS security group은 Confluent bootstrap endpoint의 9092/TCP와 Schema Registry의 443/TCP outbound를 허용해야 합니다.
-- 배포 workflow는 `notification-value`와 `notification-dlt-value` subject의 호환성을 `BACKWARD`로 설정하고 검증한 뒤 새 version을 등록합니다. ECS runtime과 CI는 동일한 Schema Registry API key를 사용하며, 런타임 자동 schema 등록은 하지 않습니다.
-- 배포 뒤 새 ECS revision/ECR digest, `event_outbox`의 `PUBLISHED` 전환, `processed_kafka_events` 중복 방지, `notification-dlt` 이동을 확인합니다. consumer lag, `FAILED` Outbox 누적, DLT 증가, `Kafka publish failed` 로그를 알람 대상으로 관리합니다.
-- Kafka broker 연결은 readiness probe에서 제외합니다. broker 장애가 HTTP 트래픽 전체를 비정상으로 만들지 않도록 하고, 발행 실패는 Outbox 재시도로 복구합니다. secret rotation 후에는 새 ECS deployment가 필요합니다.
+- `main`은 배포, `dev`는 통합 브랜치로 분리하고 모든 변경은 작업 브랜치와 PR을 거칩니다.
+- 공통 설정과 도메인 구현을 분리해 변경 범위가 독립적으로 검토되도록 관리합니다.
+- 운영 배포는 GitHub Actions 성공뿐 아니라 ECS revision, image, rollout 상태까지 확인합니다.
 
 ## 프로젝트 구조
 
 ```text
 src/main/java/io/mopl
-├── global      # 공통 설정, 보안, 예외, 응답, 검증, 이벤트, 캐시, 실시간 통신
-├── infra       # Redis, Kafka, S3, 외부 API 등 인프라 연동
-└── domain      # 사용자, 콘텐츠, 알림, 실시간 기능 등 도메인 영역
+├── domain
+│   ├── auth, user, follow
+│   ├── content, review, playlist
+│   ├── watchingsession, contentroomchat
+│   └── directmessage, notification
+├── global
+│   ├── config, security, exception
+│   ├── event, websocket, sse
+│   └── cache, scheduler, logging
+└── infra
+    ├── external, storage
+    ├── redis, kafka
+    └── outbox
 ```
 
-현재 공통 설정과 전역 예외 처리 기반을 먼저 구성하고 있으며, 각 도메인은 Swagger 명세와 프론트엔드 연동 계약에 맞춰 순차적으로 구현합니다.
+도메인은 자신의 유스케이스와 이벤트 의미를 소유하고, Redis·Kafka·S3 같은 기술 구현은 포트 또는 `infra` 경계 뒤에 배치했습니다.
 
-## 실행
+## 로컬 실행
+
+### 요구 사항
+
+- JDK 17
+- Docker
+- Redis 7
+
+### 빠른 실행: H2 + Redis
 
 ```bash
-chmod +x gradlew
+export LOCAL_REDIS_PASSWORD="<local-only-password>"
+export LOCAL_JWT_SECRET="$(openssl rand -base64 32)"
+docker compose -f docker-compose/docker-compose-redis.yml up -d
+
+SPRING_PROFILES_ACTIVE=local-h2 \
 ./gradlew bootRun
 ```
 
-## 로컬 환경 Docker 기반 Redis 컨테이너 실행
-```bash
-  cd docker-compose
-   docker-compose -f docker-compose-redis.yml up -d
-````
-기본 개발 프로필은 `dev`이며, 로컬 개발 환경에서는 H2 기반 설정을 사용합니다.
+실행 환경은 `SPRING_PROFILES_ACTIVE`로 명시합니다. 빠른 기능 확인에는 `local-h2`를, PostgreSQL 전용 쿼리와 Flyway 검증에는 `dev` 프로필을 사용합니다.
 
-## 로컬 환경 Docker 기반 OpenSearch 컨테이너 실행
-```bash
-  cd docker-compose
-   docker-compose -f docker-compose-opensearch.yml up -d
-````
+### API와 운영 엔드포인트
 
-## 테스트
+| 용도 | 경로 |
+| --- | --- |
+| Swagger UI | `/swagger-ui/index.html` |
+| OpenAPI JSON | `/v3/api-docs` |
+| WebSocket/STOMP | `/ws` |
+| SSE 알림 | `/api/sse` |
+| Health Check | `/actuator/health` |
+| Prometheus | `/actuator/prometheus` |
+
+<details>
+<summary>로컬 OpenSearch 실행</summary>
 
 ```bash
-chmod +x gradlew
-./gradlew test
-./gradlew jacocoTestCoverageVerification
+docker compose -f docker-compose/docker-compose-opensearch.yml up -d
 ```
 
-테스트는 `test` 프로필로 실행하며, `src/test/resources/application-test.yml`에 정의한
-인메모리 H2 데이터베이스를 사용합니다. 테스트 프로필은 Flyway와 Kafka 자동 구성을 비활성화하므로 외부 PostgreSQL, Kafka, Schema Registry 연결이 필요하지 않습니다.
-`test.ignoreFailures=false`이므로 어떤 테스트라도 실패하면 Gradle과 CI가 실패합니다. 이번 Outbox 검증에는 LOCAL 알림 회귀, 원본 트랜잭션 롤백 시 Outbox 미적재, 동일 이벤트 중복 적재 방지가 포함됩니다.
-JaCoCo는 DTO·Entity·Exception·Mapper를 제외한 라인 커버리지 80% 이상을 품질 게이트로 검증합니다. Redis Pub/Sub, Kafka Outbox ACK 실패, SSE 알림 전송·하트비트 경로는 외부 인프라 없이 단위 테스트로 검증합니다.
+- OpenSearch: `http://localhost:9200`
+- OpenSearch Dashboards: `http://localhost:5601`
 
+</details>
 
-## 문서
+<details>
+<summary>프로필별 데이터베이스와 migration 정책</summary>
 
-- API 명세는 Swagger 문서를 기준으로 관리합니다.
-- 구현 시 엔드포인트, 요청/응답 DTO, 커서 페이지네이션 형식은 Swagger와 정합성을 맞춥니다.
+| 프로필 | 데이터베이스 | Flyway | 용도 |
+| --- | --- | --- | --- |
+| `local-h2` | H2 PostgreSQL mode | 비활성 | 빠른 로컬 기능 확인 |
+| `test` | H2 | 비활성 | 자동 테스트 |
+| `dev` | PostgreSQL | 활성 | 개발·migration 검증 |
+| `prod` | PostgreSQL RDS | 활성 | 운영 |
+
+운영 비밀값은 AWS Secrets Manager에서 주입하며 저장소에 커밋하지 않습니다.
+
+</details>
+
+## 참고 문서
+
+- [콘텐츠 조회 100,000건 성능 최적화](performance/content-query/final-report.md)
+- [성능 테스트 재현 방법](performance/content-query/README.md)
+- [Pull Request 작성 기준](.github/PULL_REQUEST_TEMPLATE.md)
