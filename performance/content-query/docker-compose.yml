@@ -5,10 +5,10 @@ services:
     environment:
       POSTGRES_DB: mopl_perf
       POSTGRES_USER: mopl_perf
-      POSTGRES_PASSWORD: perf-local-only
+      POSTGRES_PASSWORD: ${PERF_POSTGRES_PASSWORD:?PERF_POSTGRES_PASSWORD is required}
       TZ: Asia/Seoul
     ports:
-      - "15432:5432"
+      - "127.0.0.1:15432:5432"
     volumes:
       - mopl_perf_postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -20,13 +20,21 @@ services:
   redis:
     image: redis:7-alpine
     container_name: mopl-perf-redis
-    command: redis-server --save "" --appendonly no --requirepass perf-local-only
-    ports:
-      - "16379:6379"
     environment:
+      REDIS_PASSWORD: ${PERF_REDIS_PASSWORD:?PERF_REDIS_PASSWORD is required}
       TZ: Asia/Seoul
+    command:
+      - redis-server
+      - --save
+      - ""
+      - --appendonly
+      - "no"
+      - --requirepass
+      - ${PERF_REDIS_PASSWORD:?PERF_REDIS_PASSWORD is required}
+    ports:
+      - "127.0.0.1:16379:6379"
     healthcheck:
-      test: ["CMD", "redis-cli", "-a", "perf-local-only", "ping"]
+      test: ["CMD-SHELL", "REDISCLI_AUTH=\"$${REDIS_PASSWORD}\" redis-cli ping"]
       interval: 5s
       timeout: 3s
       retries: 10

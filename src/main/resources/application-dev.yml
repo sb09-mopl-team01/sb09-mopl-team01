@@ -1,12 +1,12 @@
 spring:
   config:
     import:
-      - classpath:application-local-redis.yml
+      - classpath:config/redis-local.yml
 
   datasource:
     url: jdbc:postgresql://${RDS_HOST:localhost}:${RDS_PORT:5432}/${RDS_DB_NAME:postgres}
     username: ${RDS_USERNAME:postgres}
-    password: ${RDS_PASSWORD:Moplteam01!}
+    password: ${RDS_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   flyway:
