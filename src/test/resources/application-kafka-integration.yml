@@ -10,6 +10,19 @@ spring:
     driver-class-name: org.h2.Driver
     username: sa
     password:
+  mail:
+    username: test@example.invalid
+    password: test-only-not-a-secret
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: test-google-client-id
+            client-secret: test-google-client-secret
+          kakao:
+            client-id: test-kakao-client-id
+            client-secret: test-kakao-client-secret
   jpa:
     hibernate:
       ddl-auto: create-drop
@@ -45,7 +58,16 @@ spring:
     listener:
       auto-startup: true
 
+jwt:
+  secret: bW9wbC10ZXN0LW9ubHktand0LXNlY3JldC1rZXktMzItYnl0ZXM=
+
 mopl:
+  external:
+    tmdb:
+      api-key: test-tmdb-api-key
+    the-sports-db:
+      api-key: test-sports-api-key
+      league-id: test-league-id
   kafka:
     enabled: true
   notification:

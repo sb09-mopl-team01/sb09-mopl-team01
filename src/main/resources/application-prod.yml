@@ -19,7 +19,7 @@ spring:
     redis:
       host: ${REDIS_HOST}
       port: ${REDIS_PORT:6379}
-      password: ""
+      password: ${REDIS_PASSWORD:}
       ssl:
         enabled: ${REDIS_SSL_ENABLED:true}
 
@@ -27,9 +27,9 @@ spring:
     properties:
       security.protocol: SASL_SSL
       sasl.mechanism: PLAIN
-      sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY:}" password="${KAFKA_API_SECRET:}";'
+      sasl.jaas.config: 'org.apache.kafka.common.security.plain.PlainLoginModule required username="${KAFKA_API_KEY}" password="${KAFKA_API_SECRET}";'
       basic.auth.credentials.source: USER_INFO
-      basic.auth.user.info: "${KAFKA_SCHEMA_REGISTRY_API_KEY:}:${KAFKA_SCHEMA_REGISTRY_API_SECRET:}"
+      basic.auth.user.info: "${KAFKA_SCHEMA_REGISTRY_API_KEY}:${KAFKA_SCHEMA_REGISTRY_API_SECRET}"
       auto.register.schemas: false
 
 management:
