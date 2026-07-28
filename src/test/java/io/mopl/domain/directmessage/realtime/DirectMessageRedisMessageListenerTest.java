@@ -8,6 +8,7 @@ import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import io.mopl.global.sse.SseNotificationService;
 import java.nio.charset.StandardCharsets;
 import org.junit.jupiter.api.Test;
 import org.springframework.data.redis.connection.DefaultMessage;
@@ -18,8 +19,13 @@ class DirectMessageRedisMessageListenerTest {
 
   private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
   private final SimpMessagingTemplate messagingTemplate = mock(SimpMessagingTemplate.class);
+  private final SseNotificationService sseNotificationService = mock(SseNotificationService.class);
   private final DirectMessageRedisMessageListener listener =
-      new DirectMessageRedisMessageListener(objectMapper, messagingTemplate);
+      new DirectMessageRedisMessageListener(
+          objectMapper,
+          messagingTemplate,
+          sseNotificationService
+      );
 
   @Test
   void relaysRedisMessageToLocalWebSocketSubscribers() throws Exception {
@@ -31,20 +37,25 @@ class DirectMessageRedisMessageListenerTest {
         eq(DirectMessageTopic.of(event.conversationId())),
         eq(event.message())
     );
+    verify(sseNotificationService).sendDirectMessage(
+        event.message().receiver().userId(),
+        event.message().id(),
+        event.message()
+    );
   }
 
   @Test
   void ignoresMalformedMessage() {
     listener.onMessage(message("not-json"), null);
 
-    verifyNoInteractions(messagingTemplate);
+    verifyNoInteractions(messagingTemplate, sseNotificationService);
   }
 
   @Test
   void ignoresMessageWithMissingRequiredFields() {
     listener.onMessage(message("{}"), null);
 
-    verifyNoInteractions(messagingTemplate);
+    verifyNoInteractions(messagingTemplate, sseNotificationService);
   }
 
   @Test
@@ -56,6 +67,30 @@ class DirectMessageRedisMessageListenerTest {
 
     assertThatCode(() -> listener.onMessage(message(objectMapper.writeValueAsString(event)), null))
         .doesNotThrowAnyException();
+    verify(sseNotificationService).sendDirectMessage(
+        event.message().receiver().userId(),
+        event.message().id(),
+        event.message()
+    );
+  }
+
+  @Test
+  void isolatesLocalSseRelayFailure() throws Exception {
+    DirectMessageRealtimeEvent event = DirectMessageRealtimeFixtures.event();
+    doThrow(new IllegalStateException("SSE unavailable"))
+        .when(sseNotificationService)
+        .sendDirectMessage(
+            event.message().receiver().userId(),
+            event.message().id(),
+            event.message()
+        );
+
+    assertThatCode(() -> listener.onMessage(message(objectMapper.writeValueAsString(event)), null))
+        .doesNotThrowAnyException();
+    verify(messagingTemplate).convertAndSend(
+        eq(DirectMessageTopic.of(event.conversationId())),
+        eq(event.message())
+    );
   }
 
   private DefaultMessage message(String payload) {
