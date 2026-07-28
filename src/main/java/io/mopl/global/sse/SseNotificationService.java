@@ -1,5 +1,6 @@
 package io.mopl.global.sse;
 
+import io.mopl.global.event.DomainEventPublisher;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.Comparator;
@@ -7,6 +8,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -14,6 +16,7 @@ import org.springframework.web.context.request.async.AsyncRequestNotUsableExcept
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 @Service
+@RequiredArgsConstructor
 @Slf4j
 public class SseNotificationService {
 
@@ -21,9 +24,11 @@ public class SseNotificationService {
   private static final int MAX_EMITTERS_PER_USER = 3;
   private static final String CONNECT_EVENT_NAME = "connect";
   static final String NOTIFICATION_EVENT_NAME = "notifications";
+  static final String DIRECT_MESSAGE_EVENT_NAME = "direct-messages";
   private static final String HEARTBEAT_EVENT_NAME = "ping";
 
   private final Map<UUID, Map<UUID, SseConnection>> emitters = new ConcurrentHashMap<>();
+  private final DomainEventPublisher eventPublisher;
 
   public SseEmitter subscribe(UUID receiverId, UUID lastEventId) {
     SseEmitter emitter = new SseEmitter(DEFAULT_TIMEOUT_MILLIS);
@@ -51,6 +56,19 @@ public class SseNotificationService {
       closeQuietly(receiverId, emitterId, emitter, e);
     }
 
+    if (userEmitters.containsKey(emitterId)) {
+      try {
+        eventPublisher.publish(new SseConnectedEvent(receiverId, emitterId));
+      } catch (RuntimeException e) {
+        log.warn(
+            "SSE connection sync event publish failed. receiverId={}, emitterId={}",
+            receiverId,
+            emitterId,
+            e
+        );
+      }
+    }
+
     return emitter;
   }
 
@@ -70,6 +88,38 @@ public class SseNotificationService {
         closeQuietly(receiverId, emitterId, connection.emitter(), e);
       }
     });
+  }
+
+  public void sendNotificationToConnection(
+      UUID receiverId,
+      UUID emitterId,
+      UUID notificationId,
+      Object notification
+  ) {
+    sendToConnection(
+        receiverId,
+        emitterId,
+        notificationId,
+        NOTIFICATION_EVENT_NAME,
+        notification
+    );
+  }
+
+  public void sendDirectMessage(UUID receiverId, UUID directMessageId, Object directMessage) {
+    Map<UUID, SseConnection> userEmitters = emitters.get(receiverId);
+    if (userEmitters == null || userEmitters.isEmpty()) {
+      return;
+    }
+
+    userEmitters.forEach((emitterId, connection) ->
+        sendToConnection(
+            receiverId,
+            emitterId,
+            directMessageId,
+            DIRECT_MESSAGE_EVENT_NAME,
+            directMessage
+        )
+    );
   }
 
   @Scheduled(fixedDelayString = "${sse.heartbeat-delay-millis:30000}")
@@ -137,6 +187,33 @@ public class SseNotificationService {
       );
     }
     safeComplete(emitter);
+  }
+
+  private void sendToConnection(
+      UUID receiverId,
+      UUID emitterId,
+      UUID eventId,
+      String eventName,
+      Object data
+  ) {
+    Map<UUID, SseConnection> userEmitters = emitters.get(receiverId);
+    if (userEmitters == null) {
+      return;
+    }
+
+    SseConnection connection = userEmitters.get(emitterId);
+    if (connection == null) {
+      return;
+    }
+
+    try {
+      connection.emitter().send(SseEmitter.event()
+          .id(eventId.toString())
+          .name(eventName)
+          .data(data));
+    } catch (Exception e) {
+      closeQuietly(receiverId, emitterId, connection.emitter(), e);
+    }
   }
 
   private boolean isExpectedDisconnect(Exception exception) {
