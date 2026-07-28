@@ -18,17 +18,20 @@ Content 조회 API를 실제 PostgreSQL과 Redis에서 반복 측정하기 위�
 - Redis: `localhost:16379`
 - 성능 테스트 애플리케이션: `localhost:18080`
 
-비밀번호는 외부 시스템과 공유하지 않는 로컬 성능 컨테이너 전용 값이다.
+비밀번호는 코드에 저장하지 않고 실행 전에 로컬 환경 변수로 주입한다. 운영 시스템에서 사용하는 값과 공유하지 않는다.
 
 ## 실행 순서
 
 ```powershell
+$env:PERF_POSTGRES_PASSWORD = "<local-only-password>"
+$env:PERF_REDIS_PASSWORD = "<local-only-password>"
+
 docker compose -f performance/content-query/docker-compose.yml up -d
 docker cp performance/content-query/seed.sql mopl-perf-postgres:/tmp/seed.sql
 docker exec mopl-perf-postgres psql -U mopl_perf -d mopl_perf -f /tmp/seed.sql
 ```
 
-API 벤치마크는 실행 중인 로컬 애플리케이션과 `ADMIN_EMAIL`, `ADMIN_PASSWORD` 환경 변수가 필요하다.
+API 벤치마크는 실행 중인 로컬 애플리케이션과 `ADMIN_EMAIL`, `ADMIN_PASSWORD`, `PERF_REDIS_PASSWORD` 환경 변수가 필요하다.
 
 ```powershell
 python performance/content-query/benchmark_api.py `
